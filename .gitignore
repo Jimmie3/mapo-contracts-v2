@@ -12,3 +12,14 @@ docs/
 
 # Dotenv file
 .env
+
+# Node modules
+node_modules/
+
+# Coverage
+coverage/
+coverage.json
+
+# Build artifacts
+artifacts/
+typechain-types/

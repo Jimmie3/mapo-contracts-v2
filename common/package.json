@@ -1,0 +1,73 @@
+{
+  "name": "@mapprotocol/common-contracts",
+  "version": "0.1.0",
+  "description": "Common contracts for MAP Protocol",
+  "main": "typechain-types/index.js",
+  "types": "typechain-types/index.d.ts",
+  "files": [
+    "contracts/**/*.sol",
+    "artifacts/contracts/**/*.json",
+    "!artifacts/contracts/**/*.dbg.json",
+    "typechain-types/**/*",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mapprotocol/mapo-contracts-v2.git",
+    "directory": "common"
+  },
+  "homepage": "https://github.com/mapprotocol/mapo-contracts-v2/tree/main/common",
+  "bugs": {
+    "url": "https://github.com/mapprotocol/mapo-contracts-v2/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "forge build",
+    "build:hardhat": "hardhat compile",
+    "test": "forge test",
+    "test:hardhat": "hardhat test",
+    "format": "forge fmt",
+    "clean": "forge clean && hardhat clean && rm -rf typechain-types",
+    "compile": "hardhat compile",
+    "typecheck": "tsc --noEmit",
+    "gas-report": "forge test --gas-report",
+    "coverage": "forge coverage",
+    "prepublishOnly": "npm run clean && npm run build:hardhat && npm run typecheck"
+  },
+  "keywords": [
+    "solidity",
+    "ethereum",
+    "smart-contracts",
+    "map-protocol"
+  ],
+  "author": "MAP Protocol",
+  "license": "MIT",
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-foundry": "^1.1.1",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": ">=9.1.0",
+    "@types/node": ">=18.0.0",
+    "chai": "^4.2.0",
+    "ethers": "^6.4.0",
+    "hardhat": "^2.19.0",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.0",
+    "ts-node": ">=8.0.0",
+    "typechain": "^8.3.0",
+    "typescript": ">=4.5.0"
+  }
+}

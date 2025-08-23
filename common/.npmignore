@@ -1,0 +1,67 @@
+# Development and build files
+node_modules/
+cache/
+cache_hardhat/
+cache_forge/
+out/
+lib/
+
+# Test files
+test/
+*.t.sol
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# Scripts (except necessary ones)
+scripts/
+script/
+
+# Configuration files (keep only necessary ones)
+foundry.toml
+hardhat.config.ts
+tsconfig.json
+.env
+.env.*
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git files
+.git/
+.gitignore
+.gitmodules
+
+# Documentation source files (if any)
+docs/
+
+# Coverage and reports
+coverage/
+coverage.json
+gas-report.txt
+
+# Lock files (controversial, but usually excluded for libraries)
+yarn.lock
+package-lock.json
+
+# Build artifacts we don't want
+artifacts/build-info/
+artifacts/**/*.dbg.json
+
+# Forge specific
+forge-cache/
+broadcast/
+
+# Other
+*.log
+*.orig
+.npmrc

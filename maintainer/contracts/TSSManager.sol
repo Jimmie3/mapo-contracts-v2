@@ -71,18 +71,6 @@ contract TSSManager is BaseImplementation, ITSSManager {
         return e.status;
     }
 
-    function getPublicKeys()
-        external
-        view
-        override
-        returns (bytes memory, bytes memory)
-    {
-        TSSInfo storage activeTSS = tssInfos[activePubkey];
-        TSSInfo storage retireTSS = tssInfos[retirePubkey];
-
-        return (activeTSS.pubkey, retireTSS.pubkey);
-    }
-
     function elect(uint256 _epochId, address[] calldata _maintainers) external override returns (uint256) {
         // todo: check status
         // tss = tssInfos[ELECTING_PUBKEY_HASH];
@@ -111,7 +99,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         retireEpoch.status = TSSStatus.RETIRING;
         activeEpoch.status = TSSStatus.MIGRATING;
 
-        _getRelay().initVaultAllowance(activePubkey, activeEpoch.maintainers);
+        _getRelay().rotate(retirePubkey, activePubkey);
     }
 
     function retire(uint256 epochId, uint256 newId) external override {
@@ -127,7 +115,12 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
 
     function migrate() external override {
-        _getRelay().migrate(retirePubkey, activePubkey);
+        bool completed = _getRelay().migrate();
+
+        TSSInfo storage activeEpoch = tssInfos[activePubkey];
+        if (activeEpoch.status == TSSStatus.MIGRATING && completed) {
+            activeEpoch.status = TSSStatus.MIGRATED;
+        }
     }
 
     struct TssPoolParam {

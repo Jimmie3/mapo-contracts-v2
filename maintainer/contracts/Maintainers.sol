@@ -162,7 +162,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 epoch.startBlock = uint64(block.number);
             } else if (status == ITSSManager.TSSStatus.MIGRATED) {
                 //
-                tssManager.rotate(currentEpoch, electionEpoch);
+                tssManager.retire(currentEpoch, electionEpoch);
                 EpochInfo storage retireEpoch = epochInfos[currentEpoch];
                 currentEpoch = electionEpoch;
                 electionEpoch = 0;

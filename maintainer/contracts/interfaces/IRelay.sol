@@ -8,10 +8,12 @@ interface IRelay {
     function removeChain(uint256 chain) external;
     function updateLastScanBlock(uint256 chain, uint256 height) external;
 
-    function migrate(bytes32 retireVault, bytes32 activeVault)  external returns (bool completed);
+    function migrate()  external returns (bool completed);
 
-    function initVaultAllowance(bytes32 vault, address[] calldata members) external;
+    function rotate(bytes32 _retireVault, bytes32 _activeVault) external;
+
     function executeTxOut(TxOutItem memory txOutItem) external;
+
     function executeTxIn(TxInItem memory txInItem) external;
 
     function postNetworkFee(

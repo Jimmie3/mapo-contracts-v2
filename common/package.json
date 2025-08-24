@@ -1,6 +1,6 @@
 {
   "name": "@mapprotocol/common-contracts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Common contracts for MAP Protocol",
   "main": "typechain-types/index.js",
   "types": "typechain-types/index.d.ts",
@@ -46,8 +46,8 @@
   "author": "MAP Protocol",
   "license": "MIT",
   "dependencies": {
-    "@openzeppelin/contracts": "^5.0.0",
-    "@openzeppelin/contracts-upgradeable": "^5.0.0"
+    "@openzeppelin/contracts": "^5.4.0",
+    "@openzeppelin/contracts-upgradeable": "^5.4.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",

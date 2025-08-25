@@ -140,8 +140,8 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 // incentive
                 // election
                 _elect();
-            } else {
-                tssManager.migrate();
+
+                return;
             }
         } else {
             ITSSManager.TSSStatus status = tssManager.getTSSStatus(electionEpoch);
@@ -152,14 +152,16 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.STANDBY);
                 // todo: slash and re-elect maintainers
                 _elect();
-
+                return;
             } else if (status == ITSSManager.TSSStatus.KEYGEN_COMPLETED) {
-                _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.ACTIVE);
                 // finish tss keygen, start migration
                 tssManager.rotate(currentEpoch, electionEpoch);
                 EpochInfo storage e = epochInfos[currentEpoch];
                 e.endBlock = uint64(block.number);
                 epoch.startBlock = uint64(block.number);
+
+                _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.ACTIVE);
+                return;
             } else if (status == ITSSManager.TSSStatus.MIGRATED) {
                 //
                 tssManager.retire(currentEpoch, electionEpoch);
@@ -170,8 +172,12 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
                 _switchMaintainerStatus(retireEpoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.STANDBY);
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.STANDBY);
+                return;
             }
         }
+
+        // other status, call migrate to schedule vault migration
+        tssManager.migrate();
     }
 
     function _elect() internal {
@@ -183,9 +189,28 @@ contract Maintainers is BaseImplementation, IMaintainers {
         e.electedBlock = uint64(block.number);
         e.maintainers = maintainers;
 
-        tssManager.elect(electionEpoch, maintainers);
-        _switchMaintainerStatus(maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.READY);
+        bool update = tssManager.elect(electionEpoch, maintainers);
+
+        if (!update) {
+            // no need rotate
+            EpochInfo storage retireEpoch = epochInfos[currentEpoch];
+            retireEpoch.endBlock = uint64(block.number);
+            retireEpoch.migratedBlock = uint64(block.number);
+
+            e.startBlock = uint64(block.number);
+
+            currentEpoch = electionEpoch;
+            electionEpoch = 0;
+        } else {
+            _switchMaintainerStatus(maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.READY);
+
+        }
+
         // todo: emit epoch info
+    }
+
+    function _slash() internal {
+
     }
 
     function distributeReward() external override payable onlyVm { }

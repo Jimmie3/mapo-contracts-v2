@@ -71,27 +71,39 @@ contract TSSManager is BaseImplementation, ITSSManager {
         return e.status;
     }
 
-    function elect(uint256 _epochId, address[] calldata _maintainers) external override returns (uint256) {
+    function elect(uint256 _epochId, address[] calldata _maintainers) external override returns (bool) {
         // todo: check status
-        // tss = tssInfos[ELECTING_PUBKEY_HASH];
+
+        TSSInfo storage currentTSS = tssInfos[currentEpoch];
+
+        if (Utils.addressListEq(currentTSS.maintainers, _maintainers)) {
+            // no need rotate
+            epochKeys[_epochId] = activePubkey;
+            return false;
+        }
 
         epochKeys[_epochId] = ELECTING_PUBKEY_HASH;
         TSSInfo storage e = tssInfos[ELECTING_PUBKEY_HASH];
         e.electBlock = uint128(block.number);
 
         e.maintainers = _maintainers;
+
+
         e.status = TSSStatus.KEYGEN_PENDING;
         // todo emit new election members
 
-        return _epochId;
+        return true;
     }
 
 
-    function rotate(uint256 epochId, uint256 newId) external override {
-        retirePubkey = epochKeys[epochId];
-        activePubkey = epochKeys[newId];
+    function rotate(uint256 currentId, uint256 nextId) external override {
 
-        epochId = newId;
+        currentEpoch = nextId;
+
+        retirePubkey = epochKeys[currentId];
+        activePubkey = epochKeys[nextId];
+
+        currentId = nextId;
 
         TSSInfo storage retireEpoch = tssInfos[retirePubkey];
         TSSInfo storage activeEpoch = tssInfos[activePubkey];
@@ -106,11 +118,11 @@ contract TSSManager is BaseImplementation, ITSSManager {
         retirePubkey = epochKeys[epochId];
         activePubkey = epochKeys[newId];
 
-        TSSInfo storage retireEpoch = tssInfos[retirePubkey];
-        TSSInfo storage activeEpoch = tssInfos[activePubkey];
+        TSSInfo storage retireTSS = tssInfos[retirePubkey];
+        TSSInfo storage activeTSS = tssInfos[activePubkey];
 
-        retireEpoch.status = TSSStatus.RETIRED;
-        activeEpoch.status = TSSStatus.ACTIVE;
+        retireTSS.status = TSSStatus.RETIRED;
+        activeTSS.status = TSSStatus.ACTIVE;
     }
 
 

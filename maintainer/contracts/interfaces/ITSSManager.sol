@@ -63,11 +63,11 @@ interface ITSSManager {
     }
 
 
-    function elect(uint256 _epochId, address[] calldata maintainers) external returns (uint256 epoch);
+    function elect(uint256 electedEpochId, address[] calldata maintainers) external returns (bool);
 
-    function rotate(uint256 epochId, uint256 newId) external;
+    function rotate(uint256 currentEpochId, uint256 nextEpochId) external;
 
-    function retire(uint256 epochId, uint256 newId) external;
+    function retire(uint256 previousEpochId, uint256 currentEpochId) external;
 
     function migrate() external;
 

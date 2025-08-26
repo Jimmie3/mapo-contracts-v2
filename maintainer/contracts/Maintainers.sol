@@ -27,8 +27,6 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     ITSSManager public tssManager;
 
-    mapping(address => bytes) private keyShare;
-
     mapping(address => MaintainerInfo) private maintainerInfos;
 
     mapping(uint256 => EpochInfo) private epochInfos;
@@ -41,7 +39,6 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     event Deregister(address user);
     event SetTSSManager(address manager);
-    event UpdateKeyShare(address maitainer, bytes keyShare);
     event UpdateMaintainerLimit(uint256 limit);
     event Update(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
     event Register(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
@@ -170,8 +167,8 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 electionEpoch = 0;
                 retireEpoch.migratedBlock = uint64(block.number);
 
-                _switchMaintainerStatus(retireEpoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.STANDBY);
-                _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.STANDBY);
+                _switchMaintainerStatus(retireEpoch.maintainers, MaintainerStatus.STANDBY, MaintainerStatus.STANDBY);
+                _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.ACTIVE);
                 return;
             }
         }
@@ -189,9 +186,9 @@ contract Maintainers is BaseImplementation, IMaintainers {
         e.electedBlock = uint64(block.number);
         e.maintainers = maintainers;
 
-        bool update = tssManager.elect(electionEpoch, maintainers);
+        bool maintainersUpdate = tssManager.elect(electionEpoch, maintainers);
 
-        if (!update) {
+        if (!maintainersUpdate) {
             // no need rotate
             EpochInfo storage retireEpoch = epochInfos[currentEpoch];
             retireEpoch.endBlock = uint64(block.number);
@@ -214,19 +211,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
     }
 
     function distributeReward() external override payable onlyVm { }
-
-    function updateKeyShare(
-        address _maintainer,
-        bytes calldata _keyShare
-    )
-        external
-        override
-        onlyTSSManager
-    {
-        keyShare[_maintainer] = _keyShare;
-        emit UpdateKeyShare(_maintainer, _keyShare);
-    }
-
+    
 
     function _switchMaintainerStatus(address[] memory maintainers, MaintainerStatus keep, MaintainerStatus target) internal {
         uint256 len = maintainers.length;

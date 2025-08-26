@@ -37,6 +37,13 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
     mapping(address => uint256) private slashPoints;
 
+    struct KeyShare {
+        bytes pubkey;
+        bytes keyShare;
+    }
+
+    mapping(address => KeyShare) private keyShares;
+
     struct Propose {
         bool status;
         uint248 count;
@@ -51,6 +58,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
     event VoteUpdateTssPool(TssPoolParam param);
     event VoteTxIn(TxInItem txInItem);
     event VoteTxOut(TxOutItem txOutItem);
+    event UpdateKeyShare(address maitainer, bytes pubkey, bytes keyShare);
     event VoteNetworkFee(
         uint256 epoch, uint256 chain, uint256 height, uint256 limit, uint256 price
     );
@@ -73,8 +81,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
     function elect(uint256 _epochId, address[] calldata _maintainers) external override returns (bool) {
         // todo: check status
-
-        TSSInfo storage currentTSS = tssInfos[currentEpoch];
+        bytes32 keyHash = epochKeys[currentEpoch];
+        TSSInfo storage currentTSS = tssInfos[keyHash];
 
         if (Utils.addressListEq(currentTSS.maintainers, _maintainers)) {
             // no need rotate
@@ -153,10 +161,10 @@ contract TSSManager is BaseImplementation, ITSSManager {
         // bytes32 id = getTSSPoolId(param.pubkey, param.members, param.epoch, param.blames);
         // if (id != param.id) revert invalid_tss_pool_id();
         address user = msg.sender;
-        IMaintainers m = _getMaintainer();
+        // IMaintainers m = _getMaintainer();
         Propose storage p = proposes[param.id];
         if (param.keyShare.length > 0) {
-            m.updateKeyShare(user, param.keyShare);
+            _updateKeyShare(user, param.pubkey, param.keyShare);
         }
         _beforePropose(user, p, e);
         address[] memory blames = param.blames;
@@ -177,7 +185,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
                 te.pubkey = param.pubkey;
                 te.startBlock = uint120(block.number);
 
-                _subSlashPoint(1, p, te.maintainers);
+                _subProposedSlashPoint(1, p, te.maintainers);
             }
             // keyGen failed;
         } else {
@@ -185,8 +193,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
             if (!p.status && _reachConsensus(e.maintainers.length, p.count)) {
                 p.status = true;
                 // add blames slash point
-                _addSlashPoint(blames, 2);
-                _subSlashPoint(1, p, e.maintainers);
+                _batchAddSlashPoint(blames, 2);
+                _subProposedSlashPoint(1, p, e.maintainers);
             }
 
             e.status = TSSStatus.KEYGEN_FAILED;
@@ -233,7 +241,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         _beforePropose(user, p, e);
         if (!p.status && _reachConsensus(e.maintainers.length, p.count)) {
             p.status = true;
-            _subSlashPoint(1, p, e.maintainers);
+            _subProposedSlashPoint(1, p, e.maintainers);
             _getRelay().postNetworkFee(
                 chain, height, transactionSize, transactionSizeWithCall, transactionRate
             );
@@ -250,7 +258,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         _beforePropose(user, p, e);
         if (!p.status && _reachConsensus(e.maintainers.length, p.count)) {
             p.status = true;
-            _subSlashPoint(1, p, e.maintainers);
+            _subProposedSlashPoint(1, p, e.maintainers);
             _getRelay().executeTxIn(txInItem);
         }
         emit VoteTxIn(txInItem);
@@ -265,10 +273,23 @@ contract TSSManager is BaseImplementation, ITSSManager {
         _beforePropose(user, p, e);
         if (!p.status && _reachConsensus(e.maintainers.length, p.count)) {
             p.status = true;
-            _subSlashPoint(1, p, e.maintainers);
+            _subProposedSlashPoint(1, p, e.maintainers);
             _getRelay().executeTxOut(txOutItem);
         }
         emit VoteTxOut(txOutItem);
+    }
+
+    function _updateKeyShare(
+        address _maintainer,
+        bytes calldata _pubkey,
+        bytes calldata _keyShare
+    )
+        internal
+    {   
+        KeyShare storage ks = keyShares[_maintainer];
+        ks.keyShare = _keyShare;
+        ks.pubkey = _pubkey;
+        emit UpdateKeyShare(_maintainer, _pubkey, _keyShare);
     }
 
     function _getMaintainer() internal view returns (IMaintainers m) {
@@ -294,11 +315,11 @@ contract TSSManager is BaseImplementation, ITSSManager {
         p.count += 1;
         // slash points
         if (!p.status) {
-            addSlashPoint(maintainer, 1);
+            _addSlashPoint(maintainer, 1);
         }
     }
 
-    function _subSlashPoint(
+    function _subProposedSlashPoint(
         uint256 point,
         Propose storage p,
         address[] memory _maintainers
@@ -318,18 +339,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
                 ++i;
             }
         }
-        subSlashPoint(subs, point);
-    }
-
-    function _addSlashPoint(address[] memory blames, uint256 slashPoint) internal {
-        uint256 len = blames.length;
-        for (uint256 i = 0; i < len;) {
-            address blame = blames[i];
-            addSlashPoint(blame, slashPoint);
-            unchecked {
-                ++i;
-            }
-        }
+        _batchSubSlashPoint(subs, point);
     }
 
     function _checkSig(bytes calldata pubkey, bytes calldata signature) internal pure {
@@ -399,25 +409,38 @@ contract TSSManager is BaseImplementation, ITSSManager {
         );
     }
 
-
-    function addSlashPoint(address _maintainers, uint256 point) internal {
-        slashPoints[_maintainers] += point;
-    }
-
-    function subSlashPoint(
-        address[] memory _maintainers,
-        uint256 point
-    ) internal
-    {
+    function _batchAddSlashPoint(address[] memory _maintainers, uint256 _point) internal {
         uint256 len = _maintainers.length;
-        for (uint256 i = 0; i < len; i++) {
-            address maintainer = _maintainers[i];
-            slashPoints[maintainer] += point;
+        for (uint256 i = 0; i < len;) {
+            address m = _maintainers[i];
+            _addSlashPoint(m, _point);
             unchecked {
                 ++i;
             }
         }
     }
 
+    function _batchSubSlashPoint(
+        address[] memory _maintainers,
+        uint256 _point
+    ) internal
+    {
+        uint256 len = _maintainers.length;
+        for (uint256 i = 0; i < len; i++) {
+            address m = _maintainers[i];
+            _subSlashPoint(m, _point);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function _addSlashPoint(address _maintainers, uint256 point) internal {
+        slashPoints[_maintainers] += point;
+    }
+
+    function _subSlashPoint(address _maintainers, uint256 point) internal {
+        slashPoints[_maintainers] -= point;
+    }
 
 }

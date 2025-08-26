@@ -45,8 +45,6 @@ interface IMaintainers {
     function revoke() external;
     function deregister() external;
 
-    function updateKeyShare(address _maintainer, bytes calldata _keyShare) external;
-
     // function onKeyGenCompleted(bool success, bytes32 publicKeyHash) external;
     // function onRotationCompleted(bool success) external;
 }

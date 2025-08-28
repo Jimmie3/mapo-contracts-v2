@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import { Utils } from "./libs/Utils.sol";
 import { IMaintainers } from "./interfaces/IMaintainers.sol";
 import { IValidators } from "./interfaces/IValidators.sol";
 import { IElection } from "./interfaces/IElection.sol";
@@ -9,6 +10,7 @@ import { ITSSManager } from "./interfaces/ITSSManager.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 contract Maintainers is BaseImplementation, IMaintainers {
+    uint256 public constant REWARD_PER_BLOCK = 50;
     address public constant ACCOUNTS_ADDRESS = 0xEBf2c3d4FC8e8314609f26e3F48709f3C4746B67;
     address public constant VALIDATORS_ADDRESS = 0x48F6678000cB44f746ea6C409f0f7beD33a6Ab48;
     address public constant ELECTIONS_ADDRESS = 0x3c21D9371D987B1f4aC26bA08ae62952C3f03D9b;
@@ -31,6 +33,20 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     mapping(uint256 => EpochInfo) private epochInfos;
 
+    struct Jail {
+        address[] jailList;
+        // 128 -> epoch  128 -> slashPoint
+        mapping(address => uint256) jailSlashPiont;
+    }
+    Jail private jail;
+    struct EpochScore {
+        uint256 total;
+        mapping(address => uint256) maintainerScore;
+    }
+    
+    uint256 public rewardEpoch;
+    mapping(uint256 => EpochScore) private epochScores;
+
     error no_access();
     error empty_pubkey();
     error empty_p2pAddress();
@@ -40,6 +56,9 @@ contract Maintainers is BaseImplementation, IMaintainers {
     event Deregister(address user);
     event SetTSSManager(address manager);
     event UpdateMaintainerLimit(uint256 limit);
+    event AddScore(uint256 epoch, address[] ms, uint256 score);
+    event AddToJail(uint256 epoch, address m, uint256 slashPonit);
+    event DistributeReward(uint256 epoch, address m, uint256 value);
     event Update(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
     event Register(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
 
@@ -77,7 +96,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
     {
         address user = msg.sender;
         MaintainerInfo storage info = maintainerInfos[user];
-        // require(info.status == MaintainerStatus.UNKNOWN);
+        require(info.status == MaintainerStatus.UNKNOWN);
         if (secp256Pubkey.length == 0 || ed25519PubKey.length == 0) {
             revert empty_pubkey();
         }
@@ -122,6 +141,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         address user = msg.sender;
         MaintainerInfo storage info = maintainerInfos[user];
         require(info.status == MaintainerStatus.STANDBY);
+        require(jail.jailSlashPiont[user] == 0);
         require(info.lastActiveEpoch == 0 || (info.lastActiveEpoch + 1) < currentEpoch);
         delete maintainerInfos[user];
         emit Deregister(user);
@@ -137,7 +157,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 // incentive
                 // election
                 _elect();
-
+                _slash();
                 return;
             }
         } else {
@@ -149,14 +169,15 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.STANDBY);
                 // todo: slash and re-elect maintainers
                 _elect();
+                _slash();
                 return;
             } else if (status == ITSSManager.TSSStatus.KEYGEN_COMPLETED) {
                 // finish tss keygen, start migration
                 tssManager.rotate(currentEpoch, electionEpoch);
                 EpochInfo storage e = epochInfos[currentEpoch];
-                e.endBlock = uint64(block.number);
-                epoch.startBlock = uint64(block.number);
-
+                e.endBlock = _getBlock();
+                epoch.startBlock = _getBlock();
+                _updateMaintainerLastActiveEpoch(electionEpoch, epoch.maintainers);
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.ACTIVE);
                 return;
             } else if (status == ITSSManager.TSSStatus.MIGRATED) {
@@ -165,7 +186,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 EpochInfo storage retireEpoch = epochInfos[currentEpoch];
                 currentEpoch = electionEpoch;
                 electionEpoch = 0;
-                retireEpoch.migratedBlock = uint64(block.number);
+                retireEpoch.migratedBlock = _getBlock();
 
                 _switchMaintainerStatus(retireEpoch.maintainers, MaintainerStatus.STANDBY, MaintainerStatus.STANDBY);
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.ACTIVE);
@@ -183,7 +204,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         address[] memory maintainers = _chooseMaintainers();
 
         EpochInfo storage e = epochInfos[electionEpoch];
-        e.electedBlock = uint64(block.number);
+        e.electedBlock = _getBlock();
         e.maintainers = maintainers;
 
         bool maintainersUpdate = tssManager.elect(electionEpoch, maintainers);
@@ -191,13 +212,15 @@ contract Maintainers is BaseImplementation, IMaintainers {
         if (!maintainersUpdate) {
             // no need rotate
             EpochInfo storage retireEpoch = epochInfos[currentEpoch];
-            retireEpoch.endBlock = uint64(block.number);
-            retireEpoch.migratedBlock = uint64(block.number);
+            retireEpoch.endBlock = _getBlock();
+            retireEpoch.migratedBlock = _getBlock();
 
-            e.startBlock = uint64(block.number);
+            e.startBlock = _getBlock();
 
             currentEpoch = electionEpoch;
             electionEpoch = 0;
+
+            _updateMaintainerLastActiveEpoch(electionEpoch, maintainers);
         } else {
             _switchMaintainerStatus(maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.READY);
 
@@ -207,11 +230,74 @@ contract Maintainers is BaseImplementation, IMaintainers {
     }
 
     function _slash() internal {
-
+        Jail storage j = jail;
+        uint256 len = j.jailList.length;
+        for (uint i = 0; i < len;) {
+            address m = j.jailList[i];
+            uint256 epoch = j.jailSlashPiont[m] >> 128;   
+            uint256 point = j.jailSlashPiont[m] & ((1 << 128) - 1);
+            // reduce validator deposit
+            
+            // remove from jailList and reset slash Point
+            Utils.addressListRemove(j.jailList, m);
+            tssManager.resetSlashPoint(m);
+            unchecked{
+              ++i;
+            }
+        }
     }
 
-    function distributeReward() external override payable onlyVm { }
-    
+    function distributeReward() external override payable onlyVm {
+        //uint256 reward = msg.value;
+        uint256 e = rewardEpoch + 1;
+        EpochInfo storage epoch = epochInfos[e];
+        if(epoch.endBlock > 0) {
+           uint256 totalReward = (epoch.endBlock - epoch.startBlock) * REWARD_PER_BLOCK;
+           if(address(this).balance < totalReward) return;
+           EpochScore storage es = epochScores[e]; 
+           uint256 rewardPerScore = totalReward / es.total;
+           uint256 len = epoch.maintainers.length;
+           for (uint i = 0; i < len;) {
+                address m = epoch.maintainers[i];
+                uint256 score = es.maintainerScore[m];
+                if(score > 0) {
+                    uint256 value = score * rewardPerScore;
+                    payable(m).transfer(value);
+                    emit DistributeReward(e, m, value);
+                }
+                unchecked {
+                ++i;
+                }
+           }
+           rewardEpoch = e;
+        }
+
+     }
+
+    function addScore(uint256 _epoch, address[] memory _ms, uint256 _score) external override onlyTSSManager {
+        uint256 len = _ms.length;
+        EpochScore storage es = epochScores[_epoch];
+        for (uint i = 0; i < len;) {
+            es.total += _score;
+            es.maintainerScore[_ms[i]] += _score;
+            unchecked {
+                ++i;
+            }
+        }
+        emit AddScore(_epoch, _ms, _score);
+    }
+
+    function addToJail(uint256 _epoch, address _m, uint256 _slashPonit) external override onlyTSSManager {
+        Jail storage j = jail;
+        uint256 before =  j.jailSlashPiont[_m];
+        if(before == 0) {
+            j.jailList.push(_m);
+        }
+        j.jailSlashPiont[_m] = (_epoch << 128) | _slashPonit;
+        if(before != j.jailSlashPiont[_m]) {
+            emit AddToJail(_epoch, _m, _slashPonit);
+        }
+    }
 
     function _switchMaintainerStatus(address[] memory maintainers, MaintainerStatus keep, MaintainerStatus target) internal {
         uint256 len = maintainers.length;
@@ -224,13 +310,26 @@ contract Maintainers is BaseImplementation, IMaintainers {
         }
     }
 
+    function _updateMaintainerLastActiveEpoch(uint256 _epoch, address[] memory ms) internal {
+        uint256 len = ms.length;
+        for (uint i = 0; i < len;) {
+            MaintainerInfo storage info = maintainerInfos[ms[i]];
+            info.lastActiveEpoch = _epoch;
+            unchecked {
+                ++i;
+            }
+        }
+    } 
+
     function _chooseMaintainers() internal view returns (address[] memory maintainers) {
         address[] memory validators = _getCurrentValidatorSigners();
         uint256 length = validators.length;
         uint256 selectedCount = maintainerLimit;
         maintainers = new address[](selectedCount);
+        Jail storage j = jail;
         for (uint256 i = 0; i < length;) {
             address validator = validators[i];
+            if(j.jailSlashPiont[validator] > 0) continue;
             MaintainerStatus status = maintainerInfos[validator].status;
             if (status == MaintainerStatus.STANDBY || status == MaintainerStatus.ACTIVE) {
                 maintainers[i] = validator;
@@ -250,6 +349,10 @@ contract Maintainers is BaseImplementation, IMaintainers {
     function _isValidator(address _user) internal view returns (bool) {
         address account = IAccounts(ACCOUNTS_ADDRESS).signerToAccount(_user);
         return IValidators(VALIDATORS_ADDRESS).isValidator(account);
+    }
+
+    function _getBlock() internal view returns(uint64) {
+        return uint64(block.number);
     }
 
 }

@@ -45,6 +45,8 @@ interface IMaintainers {
     function revoke() external;
     function deregister() external;
 
+    function addScore(uint256 _epoch, address[] memory _ms, uint256 _score) external;
+    function addToJail(uint256 _epoch, address _m, uint256 _slashPonit) external;
     // function onKeyGenCompleted(bool success, bytes32 publicKeyHash) external;
     // function onRotationCompleted(bool success) external;
 }

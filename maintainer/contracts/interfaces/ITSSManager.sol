@@ -73,5 +73,5 @@ interface ITSSManager {
 
     function getTSSStatus(uint256 epochId) external view returns (TSSStatus status);
 
-
+    function resetSlashPoint(address m) external;
 }

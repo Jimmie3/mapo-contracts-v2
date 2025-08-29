@@ -3,6 +3,8 @@
 # Compiler files
 cache/
 out/
+cache_forge/
+cache_hardhat/
 
 # Ignores development broadcast logs
 !/broadcast

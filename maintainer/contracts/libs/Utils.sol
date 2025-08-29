@@ -23,16 +23,16 @@ library Utils {
     }
 
     function addressListContains(
-        address[] memory lsit,
+        address[] memory list,
         address addr
     )
         internal
         pure
         returns (bool)
     {
-        uint256 length = lsit.length;
+        uint256 length = list.length;
         for (uint256 i = 0; i < length;) {
-            if (lsit[i] == addr) {
+            if (list[i] == addr) {
                 return true;
             }
             unchecked {
@@ -40,6 +40,31 @@ library Utils {
             }
         }
         return false;
+    }
+
+    function addressListRemove(
+        address[] storage list,
+        address addr
+    )
+        internal
+        returns (bool)
+    {
+        uint256 len = list.length;
+        uint256 index;
+        for (uint256 i = 0; i < len;) {
+            if (list[i] == addr) {
+                index = (i + 1);
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        if (index != 0) {
+            list[index - 1] = list[len - 1];
+            list.pop();
+        }
     }
 
     function uintListContains(uint256[] memory lsit, uint256 v) internal pure returns (bool) {

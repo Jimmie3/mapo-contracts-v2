@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import { Utils } from "./libs/Utils.sol";
+import { IParameters } from "./interfaces/IParameters.sol";
 import { IMaintainers } from "./interfaces/IMaintainers.sol";
 import { IValidators } from "./interfaces/IValidators.sol";
 import { IElection } from "./interfaces/IElection.sol";
@@ -10,42 +10,33 @@ import { ITSSManager } from "./interfaces/ITSSManager.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 contract Maintainers is BaseImplementation, IMaintainers {
-    uint256 public constant REWARD_PER_BLOCK = 50;
-    address public constant ACCOUNTS_ADDRESS = 0xEBf2c3d4FC8e8314609f26e3F48709f3C4746B67;
-    address public constant VALIDATORS_ADDRESS = 0x48F6678000cB44f746ea6C409f0f7beD33a6Ab48;
-    address public constant ELECTIONS_ADDRESS = 0x3c21D9371D987B1f4aC26bA08ae62952C3f03D9b;
+    address public constant ACCOUNTS_ADDRESS = 0x000000000000000000000000000000000000d010;
+    address public constant VALIDATORS_ADDRESS = 0x000000000000000000000000000000000000D012;
+    address public constant ELECTIONS_ADDRESS = 0x000000000000000000000000000000000000d013;
     string public constant version = "1.0.0";
 
-    uint256 private constant BLOCKS_PER_EPOCH = 50_000;
-    uint256 private constant MAX_BLOCKS_FOR_UPDATE_TSS = 5000;
+    bytes32 private constant REWARD_PER_BLOCK = keccak256(bytes("REWARD_PER_BLOCK"));
+    bytes32 private constant BLOCKS_PER_EPOCH = keccak256(bytes("BLOCKS_PER_EPOCH"));
+    bytes32 private constant MAX_BLOCKS_FOR_UPDATE_TSS = keccak256("MAX_BLOCKS_FOR_UPDATE_TSS");
+    bytes32 private constant MAX_SLASH_POINT_FOR_ELECT = keccak256(bytes("MAX_SLASH_POINT_FOR_ELECT"));
+    bytes32 private constant ADDITIONAL_REWARD_MAX_SLASH_POINT = keccak256(bytes("ADDITIONAL_REWARD_MAX_SLASH_POINT"));
 
+    uint256 public rewardEpoch;
     uint256 public currentEpoch;
     uint256 public electionEpoch;
 
-    uint256 public rotationAttempts;
-    uint256 constant MAX_RETRY = 3;
+    // uint256 public rotationAttempts;
+    // uint256 constant MAX_RETRY = 3;
 
     uint256 public maintainerLimit = 3;
 
     ITSSManager public tssManager;
+    IParameters public parameters;
 
     mapping(address => MaintainerInfo) private maintainerInfos;
 
     mapping(uint256 => EpochInfo) private epochInfos;
 
-    struct Jail {
-        address[] jailList;
-        // 128 -> epoch  128 -> slashPoint
-        mapping(address => uint256) jailSlashPiont;
-    }
-    Jail private jail;
-    struct EpochScore {
-        uint256 total;
-        mapping(address => uint256) maintainerScore;
-    }
-    
-    uint256 public rewardEpoch;
-    mapping(uint256 => EpochScore) private epochScores;
 
     error no_access();
     error empty_pubkey();
@@ -54,18 +45,13 @@ contract Maintainers is BaseImplementation, IMaintainers {
     error only_validator_can_register();
 
     event Deregister(address user);
-    event SetTSSManager(address manager);
+    event Set(address _manager, address _parameter);
     event UpdateMaintainerLimit(uint256 limit);
     event AddScore(uint256 epoch, address[] ms, uint256 score);
     event AddToJail(uint256 epoch, address m, uint256 slashPonit);
     event DistributeReward(uint256 epoch, address m, uint256 value);
     event Update(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
     event Register(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
-
-    modifier onlyTSSManager() {
-        if (msg.sender != address(tssManager)) revert no_access();
-        _;
-    }
 
     modifier onlyVm() {
         //if (msg.sender != address(0)) revert no_access();
@@ -74,10 +60,11 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     receive() external payable { }
 
-    function setTSSManager(address _manager) external restricted {
-        require(_manager != address(0));
+    function set(address _manager, address _parameter) external restricted {
+        require(_manager != address(0) && _parameter != address(0));
+        parameters = IParameters(_parameter);
         tssManager = ITSSManager(_manager);
-        emit SetTSSManager(_manager);
+        emit Set(_manager, _parameter);
     }
 
     function updateMaintainerLimit(uint256 _limit) external restricted {
@@ -97,10 +84,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         address user = msg.sender;
         MaintainerInfo storage info = maintainerInfos[user];
         require(info.status == MaintainerStatus.UNKNOWN);
-        if (secp256Pubkey.length == 0 || ed25519PubKey.length == 0) {
-            revert empty_pubkey();
-        }
-        if (bytes(p2pAddress).length == 0) revert empty_p2pAddress();
+        _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress);
         if (!_isValidator(user)) revert only_validator_can_register();
         info.status = MaintainerStatus.STANDBY;
         info.p2pAddress = p2pAddress;
@@ -120,10 +104,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         address user = msg.sender;
         MaintainerInfo storage info = maintainerInfos[user];
         require(info.status == MaintainerStatus.STANDBY);
-        if (secp256Pubkey.length == 0 || ed25519PubKey.length == 0) {
-            revert empty_pubkey();
-        }
-        if (bytes(p2pAddress).length == 0) revert empty_p2pAddress();
+        _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress);
         info.p2pAddress = p2pAddress;
         info.secp256Pubkey = secp256Pubkey;
         info.ed25519Pubkey = ed25519PubKey;
@@ -141,7 +122,6 @@ contract Maintainers is BaseImplementation, IMaintainers {
         address user = msg.sender;
         MaintainerInfo storage info = maintainerInfos[user];
         require(info.status == MaintainerStatus.STANDBY);
-        require(jail.jailSlashPiont[user] == 0);
         require(info.lastActiveEpoch == 0 || (info.lastActiveEpoch + 1) < currentEpoch);
         delete maintainerInfos[user];
         emit Deregister(user);
@@ -149,45 +129,42 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     function orchestrate() external {
         if (electionEpoch == 0) {
-            ITSSManager.TSSStatus status = tssManager.getTSSStatus(currentEpoch);
-            EpochInfo storage epoch = epochInfos[currentEpoch];
-            if (status == ITSSManager.TSSStatus.ACTIVE && (epoch.startBlock + BLOCKS_PER_EPOCH < block.number)) {
+            if (_needElect(currentEpoch)) {
                 // todo rotate to new epoch
                 // slash
                 // incentive
                 // election
                 _elect();
-                _slash();
                 return;
             }
         } else {
             ITSSManager.TSSStatus status = tssManager.getTSSStatus(electionEpoch);
             EpochInfo storage epoch = epochInfos[electionEpoch];
-            if (status == ITSSManager.TSSStatus.KEYGEN_FAILED ||
-                (status == ITSSManager.TSSStatus.KEYGEN_PENDING && (epoch.electedBlock + MAX_BLOCKS_FOR_UPDATE_TSS < block.number))) {
-
+            if (_needReElect(status, epoch)) {
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.STANDBY);
                 // todo: slash and re-elect maintainers
                 _elect();
-                _slash();
                 return;
             } else if (status == ITSSManager.TSSStatus.KEYGEN_COMPLETED) {
                 // finish tss keygen, start migration
                 tssManager.rotate(currentEpoch, electionEpoch);
                 EpochInfo storage e = epochInfos[currentEpoch];
-                e.endBlock = _getBlock();
-                epoch.startBlock = _getBlock();
+                uint64 _block =  _getBlock();
+                e.endBlock = _block;
+                epoch.startBlock = _block;
                 _updateMaintainerLastActiveEpoch(electionEpoch, epoch.maintainers);
+                // switch elected maintainers status to ACTIVE 
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.ACTIVE);
                 return;
             } else if (status == ITSSManager.TSSStatus.MIGRATED) {
-                //
+                // migration completed
                 tssManager.retire(currentEpoch, electionEpoch);
                 EpochInfo storage retireEpoch = epochInfos[currentEpoch];
                 currentEpoch = electionEpoch;
                 electionEpoch = 0;
                 retireEpoch.migratedBlock = _getBlock();
-
+                // switch pre epoch maintainers status to STANDBY 
+                // keep ACTIVE if elected by current epoch
                 _switchMaintainerStatus(retireEpoch.maintainers, MaintainerStatus.STANDBY, MaintainerStatus.STANDBY);
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.ACTIVE);
                 return;
@@ -204,7 +181,8 @@ contract Maintainers is BaseImplementation, IMaintainers {
         address[] memory maintainers = _chooseMaintainers();
 
         EpochInfo storage e = epochInfos[electionEpoch];
-        e.electedBlock = _getBlock();
+        uint64 _block = _getBlock();
+        e.electedBlock = _block;
         e.maintainers = maintainers;
 
         bool maintainersUpdate = tssManager.elect(electionEpoch, maintainers);
@@ -212,90 +190,69 @@ contract Maintainers is BaseImplementation, IMaintainers {
         if (!maintainersUpdate) {
             // no need rotate
             EpochInfo storage retireEpoch = epochInfos[currentEpoch];
-            retireEpoch.endBlock = _getBlock();
-            retireEpoch.migratedBlock = _getBlock();
+            
+            retireEpoch.endBlock = _block;
+            retireEpoch.migratedBlock = _block;
 
-            e.startBlock = _getBlock();
+            e.startBlock = _block;
 
             currentEpoch = electionEpoch;
             electionEpoch = 0;
 
             _updateMaintainerLastActiveEpoch(electionEpoch, maintainers);
         } else {
+            // switch next epoch elected maintainers status to READY 
+            // keep current epcoh elected maintainers status ACTIVE
             _switchMaintainerStatus(maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.READY);
 
         }
 
         // todo: emit epoch info
     }
-
-    function _slash() internal {
-        Jail storage j = jail;
-        uint256 len = j.jailList.length;
-        for (uint i = 0; i < len;) {
-            address m = j.jailList[i];
-            uint256 epoch = j.jailSlashPiont[m] >> 128;   
-            uint256 point = j.jailSlashPiont[m] & ((1 << 128) - 1);
-            // reduce validator deposit
-            
-            // remove from jailList and reset slash Point
-            Utils.addressListRemove(j.jailList, m);
-            tssManager.resetSlashPoint(m);
-            unchecked{
-              ++i;
-            }
-        }
-    }
-
+    /**
+     * The reward is divided into two parts: 
+     * one half is distributed equally among all maintainers,
+     * while the other half is allocated based on each user's SLASH_POINT. 
+     * First, a maximum SLASH_POINT threshold is set for eligibility to receive this latter portion of the reward. 
+     * Users exceeding this threshold are disqualified from receiving this part of the reward. 
+     * The difference between this threshold and a user's SLASH_POINT (for those below the threshold) can be referred to as a "score" or "weight." 
+     * This portion of the reward is then distributed to all maintainers proportionally based on these scores or weights.
+     */
     function distributeReward() external override payable onlyVm {
-        //uint256 reward = msg.value;
-        uint256 e = rewardEpoch + 1;
-        EpochInfo storage epoch = epochInfos[e];
-        if(epoch.endBlock > 0) {
-           uint256 totalReward = (epoch.endBlock - epoch.startBlock) * REWARD_PER_BLOCK;
-           if(address(this).balance < totalReward) return;
-           EpochScore storage es = epochScores[e]; 
-           uint256 rewardPerScore = totalReward / es.total;
-           uint256 len = epoch.maintainers.length;
-           for (uint i = 0; i < len;) {
-                address m = epoch.maintainers[i];
-                uint256 score = es.maintainerScore[m];
-                if(score > 0) {
-                    uint256 value = score * rewardPerScore;
-                    payable(m).transfer(value);
-                    emit DistributeReward(e, m, value);
-                }
-                unchecked {
-                ++i;
-                }
-           }
-           rewardEpoch = e;
-        }
+        uint256 _rewardEpoch = rewardEpoch + 1;
+        ITSSManager.TSSStatus status = tssManager.getTSSStatus(_rewardEpoch);
+        if(status == ITSSManager.TSSStatus.MIGRATED) {
+            EpochInfo storage e = epochInfos[electionEpoch];
+            uint256 totalReward = (e.endBlock - e.startBlock) * _getParameter(REWARD_PER_BLOCK);
+            uint256[] memory points = tssManager.batchGetSlashPoint(_rewardEpoch, e.maintainers);
+            uint256 arm = _getParameter(ADDITIONAL_REWARD_MAX_SLASH_POINT);
+            uint256 mask = _getSlashPointMask(arm, points);
+            uint256 len = points.length;
 
-     }
-
-    function addScore(uint256 _epoch, address[] memory _ms, uint256 _score) external override onlyTSSManager {
-        uint256 len = _ms.length;
-        EpochScore storage es = epochScores[_epoch];
-        for (uint i = 0; i < len;) {
-            es.total += _score;
-            es.maintainerScore[_ms[i]] += _score;
-            unchecked {
-                ++i;
+            if(mask == 0) {
+               uint256 reward = totalReward / len;
+               for (uint i = 0; i < len;) {
+                    payable(e.maintainers[i]).transfer(reward);
+                    emit DistributeReward(_rewardEpoch, e.maintainers[i], reward);
+                    unchecked {
+                        ++i;
+                    }
+               }
+            } else {
+                uint256 baseReward = totalReward / 2 / len;
+                uint256 rewardPerMask = totalReward / 2 / mask;
+                for (uint i = 0; i < len;) {
+                    uint256 additoinalReward = arm > points[i] ? rewardPerMask * (arm - points[i]) : 0;
+                    uint256 reward = baseReward + additoinalReward;
+                    payable(e.maintainers[i]).transfer(reward);
+                    emit DistributeReward(_rewardEpoch, e.maintainers[i], reward);
+                    unchecked {
+                        ++i;
+                    }
+               }
             }
-        }
-        emit AddScore(_epoch, _ms, _score);
-    }
 
-    function addToJail(uint256 _epoch, address _m, uint256 _slashPonit) external override onlyTSSManager {
-        Jail storage j = jail;
-        uint256 before =  j.jailSlashPiont[_m];
-        if(before == 0) {
-            j.jailList.push(_m);
-        }
-        j.jailSlashPiont[_m] = (_epoch << 128) | _slashPonit;
-        if(before != j.jailSlashPiont[_m]) {
-            emit AddToJail(_epoch, _m, _slashPonit);
+            rewardEpoch = _rewardEpoch;
         }
     }
 
@@ -322,16 +279,15 @@ contract Maintainers is BaseImplementation, IMaintainers {
     } 
 
     function _chooseMaintainers() internal view returns (address[] memory maintainers) {
+        uint256 e = currentEpoch;
         address[] memory validators = _getCurrentValidatorSigners();
         uint256 length = validators.length;
         uint256 selectedCount = maintainerLimit;
         maintainers = new address[](selectedCount);
-        Jail storage j = jail;
+        ITSSManager m = tssManager;
         for (uint256 i = 0; i < length;) {
             address validator = validators[i];
-            if(j.jailSlashPiont[validator] > 0) continue;
-            MaintainerStatus status = maintainerInfos[validator].status;
-            if (status == MaintainerStatus.STANDBY || status == MaintainerStatus.ACTIVE) {
+            if(_checkCandidacy(m, e, validator)) {
                 maintainers[i] = validator;
                 if ((selectedCount -= 1) == 0) break;
             }
@@ -340,6 +296,40 @@ contract Maintainers is BaseImplementation, IMaintainers {
             }
         }
         if (selectedCount != 0) revert maintainer_not_enough();
+    }
+
+    function _needElect(uint256 epochId) internal view returns(bool) {
+        ITSSManager.TSSStatus status = tssManager.getTSSStatus(epochId);
+        EpochInfo storage epoch = epochInfos[epochId];
+        return (status == ITSSManager.TSSStatus.ACTIVE && (epoch.startBlock + _getParameter(BLOCKS_PER_EPOCH) < block.number));
+    }
+
+    function _needReElect(ITSSManager.TSSStatus status, EpochInfo storage epoch) internal view returns(bool) {
+        return status == ITSSManager.TSSStatus.KEYGEN_FAILED ||
+                (status == ITSSManager.TSSStatus.KEYGEN_PENDING && (epoch.electedBlock + _getParameter(MAX_BLOCKS_FOR_UPDATE_TSS) < block.number));
+    }
+
+    function _checkCandidacy(ITSSManager m, uint256 epochId, address v) internal view returns(bool) {
+        MaintainerStatus status = maintainerInfos[v].status;
+        if (status != MaintainerStatus.STANDBY && status != MaintainerStatus.ACTIVE) {
+            return false;
+        }
+        uint256 jailBlock = m.getJailBlock(v);
+        if(jailBlock > _getBlock()) return false;
+        uint256 slashPoint = m.getSlashPoint(epochId, v);
+        if(slashPoint > _getParameter(MAX_SLASH_POINT_FOR_ELECT)) return false;
+        return true;
+    }
+
+    function _checkRegisterParameters(
+        bytes calldata secp256Pubkey,
+        bytes calldata ed25519PubKey,
+        string calldata p2pAddress
+    ) internal pure {
+        if (secp256Pubkey.length == 0 || ed25519PubKey.length == 0) {
+            revert empty_pubkey();
+        }
+        if (bytes(p2pAddress).length == 0) revert empty_p2pAddress();
     }
 
     function _getCurrentValidatorSigners() internal view returns (address[] memory signers) {
@@ -351,8 +341,24 @@ contract Maintainers is BaseImplementation, IMaintainers {
         return IValidators(VALIDATORS_ADDRESS).isValidator(account);
     }
 
+    function _getSlashPointMask(uint256 arm, uint256[] memory points) internal pure returns(uint256 mask) {
+        uint256 len = points.length;
+        for (uint i = 0; i < len;) {
+            if(arm > points[i]){
+                mask += points[i];
+            }
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     function _getBlock() internal view returns(uint64) {
         return uint64(block.number);
+    }
+
+    function _getParameter(bytes32 hash) internal view returns(uint256) {
+        return parameters.getByHash(hash);
     }
 
 }

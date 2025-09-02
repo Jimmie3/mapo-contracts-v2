@@ -1,0 +1,55 @@
+{
+  "name": "@mapprotocol/protocol-contracts",
+  "version": "1.0.0",
+  "description": "MAP Protocol contracts maintainer module with Forge and Hardhat compatibility",
+  "scripts": {
+    "build": "forge build",
+    "build:hardhat": "hardhat compile",
+    "test": "forge test",
+    "test:hardhat": "hardhat test",
+    "compile": "hardhat compile",
+    "typecheck": "tsc --noEmit",
+    "clean": "forge clean && hardhat clean && rm -rf dist typechain-types",
+    "deploy": "forge script script/Deploy.s.sol --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast",
+    "deploy:hardhat": "hardhat run scripts/deploy.ts",
+    "verify": "forge verify-contract",
+    "format": "forge fmt",
+    "gas-report": "forge test --gas-report",
+    "coverage": "forge coverage"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-foundry": "^1.1.1",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "chai": "^4.2.0",
+    "ethers": "^6.4.0",
+    "hardhat": "^2.19.0",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.1",
+    "ts-node": "^10.0.0",
+    "typechain": "^8.3.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "solidity",
+    "ethereum",
+    "smart-contracts",
+    "forge",
+    "hardhat",
+    "map-protocol"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@mapprotocol/common-contracts": "^0.1.1",
+    "@openzeppelin/contracts": "^5.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.0"
+  }
+}

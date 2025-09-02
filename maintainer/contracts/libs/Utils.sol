@@ -47,7 +47,6 @@ library Utils {
         address addr
     )
         internal
-        returns (bool)
     {
         uint256 len = list.length;
         uint256 index;

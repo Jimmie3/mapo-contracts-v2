@@ -73,5 +73,10 @@ interface ITSSManager {
 
     function getTSSStatus(uint256 epochId) external view returns (TSSStatus status);
 
-    function resetSlashPoint(address m) external;
+    function getSlashPoint(uint256 epoch, address m) external view returns(uint256 point);
+
+    function getJailBlock(address m) external view returns(uint256 jailBlock);
+
+    function batchGetSlashPoint(uint256 epoch, address[] calldata ms) external view returns(uint256[] memory points);
+
 }

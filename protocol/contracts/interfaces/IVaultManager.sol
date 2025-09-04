@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {TxItem, ChainType} from "../libs/Types.sol";
+import {TxItem} from "../libs/Types.sol";
 
 interface IVaultManager {
     function getVaultToken(address _token) external view returns (address);

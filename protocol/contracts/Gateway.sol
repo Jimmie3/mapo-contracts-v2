@@ -36,8 +36,9 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
 
     event TransferIn(bytes32 orderId, address token, uint256 amount, address to, bool result);
 
-    event BridgeOut( // fromChain (8 bytes) | toChain (8 bytes) | reserved (16 bytes)
+    event BridgeOut(
         bytes32 indexed orderId,
+        // fromChain (8 bytes) | toChain (8 bytes) | reserved (16 bytes)
         uint256 indexed chainAndGasLimit,
         TxType txOutType,
         bytes vault,
@@ -46,19 +47,39 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
         uint256 amount,
         address from,
         bytes to,
-        bytes data
+        bytes payload
     );
 
-    event BridgeIn( // fromChain (8 bytes) | toChain (8 bytes) | reserved (8 bytes) | gasUsed (8 bytes)
-        // maintainer
+    event BridgeIn(
         bytes32 indexed orderId,
+        // fromChain (8 bytes) | toChain (8 bytes) | reserved (8 bytes) | gasUsed (8 bytes)
         uint256 indexed chainAndGasLimit,
         TxType txInType,
         bytes vault,
+
         uint256 sequence,
-        address sender,
+
+        address sender,     // maintainer, will receive gas on relay chain
+
+        address token,
+        uint256 amount,
+
+        bytes from,
         address to,
-        bytes data
+
+        bytes data          // migration: new vault
+    );
+
+    event BridgeFailed(
+        bytes32 indexed orderId,
+        address token,
+        uint256 amount,
+
+        bytes from,
+        address to,
+
+        bytes data,
+        bytes reason
     );
 
     error transfer_in_failed();
@@ -114,16 +135,23 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
 
     struct BridgeInParams {
         TxType txType;
-        bytes32 orderId;
         // address to;
         // address token;
         // uint256 amount;
         // bytes payload;
-        uint256 sequence;
+        bytes token;
+        uint256 amount;
+
+        bytes from;
         bytes to;
+
+        uint256 sequence;
+        //bytes to;
         bytes data;
-        bytes signature;
+        //bytes signature;
     }
+
+    // function bridgeIn(bytes32 orderId, bytes calldata vault, bytes calldata params, bytes calldata signature) external whenNotPaused nonReentrant {}
 
     function bridgeIn(address sender, BridgeInParams calldata params) external whenNotPaused nonReentrant {
         if (orderExecuted[params.orderId]) revert order_executed();

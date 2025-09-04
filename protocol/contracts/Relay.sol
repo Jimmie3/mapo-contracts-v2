@@ -61,13 +61,14 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         bytes vault,
 
         uint256 sequence,
+        bytes token,
+        uint256 amount,
+
         bytes from,
         bytes to,
-        // data
-        // contract chain - tokenOut abi.encode(amount, token, payload)
-        // contract chain - migrate bytes("")
-        // no contract chain tokenOut abi.encode(amount, token)
-        // no contract chain migration abi.encode(amount, token)
+
+        // tokenOut: bytes(payload)
+        // migrate: bytes("vault")
         bytes data
     );
 
@@ -75,13 +76,27 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         bytes32 indexed orderId,
         // fromChain (8 bytes) | toChain (8 bytes) | txRate (8 bytes) | txSize (8 bytes)
         uint256 indexed chainAndGasLimit,
+
+        bytes vault,
+
+        bytes relayData,         // abi.encode(chainAndGasLimit | txOutType | sequence | token | amount| from | to | data)
+        bytes signature     // sign: encodePack(orderId | chainAndGasLimit | txOutType | sequence | bytes(token) | amount| bytes(from) | bytes(to) | bytes(data));
+    );
+
+    event BridgeCompleted(
+        bytes32 indexed orderId,
+    // fromChain (8 bytes) | toChain (8 bytes) | txRate (8 bytes) | txSize (8 bytes)
+        uint256 indexed chainAndGasLimit,
         TxType txOutType,
         bytes vault,
+
         uint256 sequence,
-        bytes from,
-        bytes to,
+        address sender,
+
         bytes data
     );
+
+    event BridgeFeeCollected(bytes32 indexed orderId, address token, uint256 amount);
 
     function setAddressRegistry(address _registry) external restricted {
         require(_registry != address(0));
@@ -116,7 +131,6 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         (toMigrate, txItem.vault, toVault, txItem.amount) = vaultManager.migrate(toMigrateChain, gasFee);
         if (toMigrate) {
             _migrate(txItem, toVault);
-            return true;
         }
 
         return false;
@@ -245,33 +259,35 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         _checkAccess(4);
         _updateLastScanBlock(txInItem.chain, txInItem.height);
 
-        (address relayToken, uint256 relayAmount) = _mintToken(txInItem.chain, txInItem.token, txInItem.amount);
+        TxItem memory txItem;
+
+        (txItem.token, txItem.amount) = _mintToken(txInItem.chain, txInItem.token, txInItem.amount);
 
         if (txInItem.txInType == TxType.DEPOSIT) {
-            if (!vaultManager.transferIn(txInItem.chain, txInItem.vault, relayToken, relayAmount)) {
+            if (!vaultManager.transferIn(txInItem.chain, txInItem.vault, txItem.token, txItem.amount)) {
                 // retired vault, refund token
                 _refund();
             }
-            _deposit(txInItem.orderId, txInItem.chain, relayToken, relayAmount, _fromBytes(txInItem.to));
+            _deposit(txInItem.orderId, txInItem.chain, txItem.token, txItem.amount, _fromBytes(txInItem.to));
         } else {
             (bytes memory affiliateData, bytes memory relayLoad, bytes memory targetLoad) =
                 abi.decode(txInItem.data, (bytes, bytes, bytes));
 
             address toToken;
             uint256 toAmount;
-            TxItem memory txItem;
+
             if (relayLoad.length > 0) {
                 // todo: collect affiliate fee and transferIn fee
-                _collectFee(affiliateData, false, relayToken, relayAmount);
+                _collectFee(affiliateData, false, txItem.token, txItem.amount);
                 bool rst;
-                (rst, txItem) = _swapOut(relayToken, relayAmount, txInItem.to, relayLoad, targetLoad);
+                (rst, txItem) = _swapOut(txItem.token, txItem.amount, txInItem.to, relayLoad, targetLoad);
                 if (!rst) {
                     // refund
                     _refund(txInItem, toAmount, txInItem.from);
                 }
             } else {
                 /// todo: collect affiliate fee and transferIn fee
-                _collectFee(affiliateData, true, relayToken, relayAmount);
+                _collectFee(affiliateData, true, txItem.token, txItem.amount);
 
                 if (txInItem.toChain == selfChainId) {
                     _transferIn(txInItem.orderId, txItem.token, txItem.amount, _fromBytes(txInItem.to), targetLoad);
@@ -354,13 +370,19 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
     }
 
     function _migrate(TxItem memory txItem, bytes memory toVault) internal {
-        // get chain token
+        // todo: set from and to
+        txItem.orderId = _getOrderId();
+
+        _emitRelay(TxType.MIGRATE, txItem);
+
+        txOutOrderGasEstimated[txItem.orderId] = txItem.transactionSize * txItem.transactionRate;
     }
 
     // todo: how to detect the original sender, need refund address
     // only support non-contract chain refund
     function _refund(TxInItem memory txInItem, uint256 amount, bytes memory to) internal {
         (uint256 gasFee, uint256 transactionRate, uint256 transactionSize) = _getTransferOutGas(false, txInItem.chain);
+
         (bool result, bytes memory vault) = vaultManager.chooseVault(txInItem.chain, token, amount, gasFee);
         if (!result) {
             return;
@@ -432,7 +454,7 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
     {
         relayToken = _getRelayToken(fromChain, token);
         relayAmount = _getRelayAmount(fromChain, token, amount);
-        IMintableToken(relayToken).mint(address(this), relayAmount);
+        _checkAndMint(relayToken, relayAmount);
     }
 
     function _checkAndBurn(address _token, uint256 _amount) internal {

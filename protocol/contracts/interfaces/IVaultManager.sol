@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ChainType } from "./libs/Types.sol";
-
-import { TransferItem, ChainType } from "./libs/Types.sol";
+import {TxItem, ChainType} from "../libs/Types.sol";
 
 interface IVaultManager {
     function getVaultToken(address _token) external view returns (address);
@@ -21,14 +19,17 @@ interface IVaultManager {
 
     function checkMigration() external returns (bool completed, uint256 toMigrateChain);
 
-    function migrate(uint256 _chain, uint256 fee) external returns (bool toMigrate, bytes memory fromVault, bytes memory toVault, uint256 amount);
+    function migrate(uint256 _chain, uint256 fee)
+        external
+        returns (bool toMigrate, bytes memory fromVault, bytes memory toVault, uint256 amount);
 
-    function migrationOut(TransferItem memory txItem, bytes memory toVault, uint256 estimatedGas, uint256 usedGas) external;
+    function migrationOut(TxItem memory txItem, bytes memory toVault, uint256 estimatedGas, uint256 usedGas) external;
 
-    function chooseVault(uint256 chain, address token, uint256 amount, uint256 gas) external returns (bool result, bytes memory vault);
+    function chooseVault(uint256 chain, address token, uint256 amount, uint256 gas)
+        external
+        returns (bool result, bytes memory vault);
 
     function transferIn(uint256 fromChain, bytes memory vault, address token, uint256 amount) external returns (bool);
 
     function transferOut(uint256 toChain, bytes memory vault, address token, uint256 amount, uint256 gasFee) external;
-
 }

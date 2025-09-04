@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 // import { ManagerStatus } from "../libs/Types.sol";
 
 interface ITSSManager {
-
     /**
      * @dev TSS Status Enum and State Transition Documentation
      *
@@ -48,20 +47,18 @@ interface ITSSManager {
      *   - Old TSS: RETIRING -> RETIRED
      */
     enum TSSStatus {
-        UNKNOWN,            // Initial state, TSS not initialized
-        KEYGEN_PENDING,     // TSS key generation in progress, waiting for off-chain MPC computation
-        KEYGEN_COMPLETED,   // TSS key generation completed, ready to be activated
-        KEYGEN_FAILED,      // TSS key generation failed, requires re-election
+        UNKNOWN, // Initial state, TSS not initialized
+        KEYGEN_PENDING, // TSS key generation in progress, waiting for off-chain MPC computation
+        KEYGEN_COMPLETED, // TSS key generation completed, ready to be activated
+        KEYGEN_FAILED, // TSS key generation failed, requires re-election
+        MIGRATING, // Performing emergency migration to backup TSS
+        MIGRATED, // Migration completed, original TSS has been replaced
+        RETIRING, // In retirement process, waiting for new TSS to take over
+        RETIRED, // Fully retired, no longer in use
+        ACTIVE, // Active state, currently providing service
+        EMERGENCY_PAUSE // Emergency pause, all operations suspended
 
-        MIGRATING,          // Performing emergency migration to backup TSS
-        MIGRATED,           // Migration completed, original TSS has been replaced
-        RETIRING,           // In retirement process, waiting for new TSS to take over
-        RETIRED,            // Fully retired, no longer in use
-
-        ACTIVE,             // Active state, currently providing service
-        EMERGENCY_PAUSE     // Emergency pause, all operations suspended
     }
-
 
     function elect(uint256 _epochId, address[] calldata maintainers) external returns (uint256 epoch);
 
@@ -72,5 +69,4 @@ interface ITSSManager {
     function migrate() external;
 
     function getTSSStatus(uint256 epochId) external view returns (TSSStatus status);
-
 }

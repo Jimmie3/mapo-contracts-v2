@@ -7,30 +7,31 @@ enum ChainType {
     ACCOUNT
 }
 
-enum TxInType {
+enum TxType {
     DEPOSIT,
-    SWAP
-}
-
-enum TxOutType {
     TRANSFER,
-    MIGRATE
+    MIGRATE,
+    REFUND, //
+    MESSAGE // todo
+
 }
 
-struct TransferItem {
-    uint256 chain;
+struct TxItem {
+    uint256 fromChain;
+    uint256 toChain;
     bytes32 orderId;
     address token;
     uint256 amount;
     uint256 transactionRate;
     uint256 transactionSize;
-    bytes memory to;
-    bytes memory vault;
-    bytes memory data;
+    bytes vault;
+    bytes from;
+    bytes to;
+    bytes payload;
 }
 
 struct TxInItem {
-    TxInType txInType;
+    TxType txInType;
     bytes32 orderId;
     uint128 chain;
     uint128 height;
@@ -40,11 +41,11 @@ struct TxInItem {
     bytes from;
     bytes vault;
     bytes to;
-    bytes data; // deposit bytes("")  swap abi.encode(tochain, playload)
+    bytes data;
 }
 
 struct TxOutItem {
-    TxOutType txOutType;
+    TxType txOutType;
     bytes32 orderId;
     uint128 height;
     uint128 chain;

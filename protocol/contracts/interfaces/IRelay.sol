@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import {TxOutItem, TxInItem} from "../libs/Types.sol";
 
 interface IRelay {
-
     function addChain(uint256 chain, uint256 startBlock) external;
 
     function removeChain(uint256 chain) external;
@@ -12,7 +11,7 @@ interface IRelay {
 
     function rotate(bytes memory retiringVault, bytes memory activeVault) external;
 
-    function migrate()  external returns (bool completed);
+    function migrate() external returns (bool completed);
 
     function executeTxOut(TxOutItem memory txOutItem) external;
     function executeTxIn(TxInItem memory txInItem) external;

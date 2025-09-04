@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.24;
 
-import { IRelay } from "./interfaces/IRelay.sol";
-import { Utils } from "./libs/Utils.sol";
+import {IRelay} from "./interfaces/IRelay.sol";
+import {Utils} from "./libs/Utils.sol";
 
-import { IVaultToken } from "./interfaces/IVaultToken.sol";
-import {IRegistry, ChainType } from "./interfaces/IRegistry.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IVaultToken} from "./interfaces/IVaultToken.sol";
+import {IRegistry, ChainType} from "./interfaces/IRegistry.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
@@ -66,7 +66,6 @@ contract Registry is BaseImplementation, IRegistry {
 
     mapping(uint256 => mapping(string => bytes)) public tokenNicknameToAddress;
 
-
     address private baseFeeReceiver;
 
     // hash(fromChain,caller,token) => toChain => rate;
@@ -83,42 +82,23 @@ contract Registry is BaseImplementation, IRegistry {
     event SetRelay(address _relay);
     event SetBaseFeeReceiver(address _baseFeeReceiver);
     event RegisterToken(uint96 indexed id, address indexed _token, address _vaultToken);
-    event MapToken(
-        address indexed _token, uint256 indexed _fromChain, bytes _fromToken, uint8 _decimals
-    );
+    event MapToken(address indexed _token, uint256 indexed _fromChain, bytes _fromToken, uint8 _decimals);
     event RemoveChain(uint256 chain);
-    event RegisterChain(
-        uint256 _chain, ChainType _chainType, bytes _router, string _chainName, address _gasToken
-    );
+    event RegisterChain(uint256 _chain, ChainType _chainType, bytes _router, string _chainName, address _gasToken);
     event UnmapToken(uint256 indexed _fromChain, bytes _fromToken);
     // event RegisterTokenChain(address indexed _token, uint256 indexed _toChain);
     event SetTokenNickname(uint256 _chain, bytes _token, string _nickname);
-    event SetBaseFee(
-        address indexed _token, uint256 indexed _toChain, uint256 _withSwap, uint256 _noSwap
-    );
+    event SetBaseFee(address indexed _token, uint256 indexed _toChain, uint256 _withSwap, uint256 _noSwap);
     event SetMaxAmountPerMigrates(uint256 _chain, uint256 _maxAmount);
     event SetToChainTokenFee(
-        address indexed _token,
-        uint256 indexed _toChain,
-        uint256 _lowest,
-        uint256 _highest,
-        uint256 _rate
+        address indexed _token, uint256 indexed _toChain, uint256 _lowest, uint256 _highest, uint256 _rate
     );
     event SetFromChainTokenFee(
-        address indexed _token,
-        uint256 indexed _toChain,
-        uint256 _lowest,
-        uint256 _highest,
-        uint256 _rate
+        address indexed _token, uint256 indexed _toChain, uint256 _lowest, uint256 _highest, uint256 _rate
     );
 
     event SetToChainWhitelistFeeRate(
-        address _token,
-        uint256 _fromChain,
-        uint256 _toChain,
-        bytes _caller,
-        uint256 _rate,
-        bool _isWhitelist
+        address _token, uint256 _fromChain, uint256 _toChain, bytes _caller, uint256 _rate, bool _isWhitelist
     );
 
     event SetFromChainWhitelistFeeRate(
@@ -149,10 +129,7 @@ contract Registry is BaseImplementation, IRegistry {
         bytes memory _router,
         address _gasToken,
         string memory _chainName
-    )
-        external
-        restricted
-    {
+    ) external restricted {
         ChainInfo storage chainInfo = chainInfos[_chain];
         chainInfo.router = _router;
         chainInfo.gasToken = _gasToken;
@@ -179,11 +156,7 @@ contract Registry is BaseImplementation, IRegistry {
         emit RemoveChain(_chain);
     }
 
-    function registerToken(
-        uint96 _id,
-        address _token,
-        address _vaultToken
-    )
+    function registerToken(uint96 _id, address _token, address _vaultToken)
         external
         restricted
         checkAddress(_token)
@@ -207,12 +180,7 @@ contract Registry is BaseImplementation, IRegistry {
         emit RegisterToken(_id, _token, _vaultToken);
     }
 
-    function mapToken(
-        address _token,
-        uint256 _fromChain,
-        bytes memory _fromToken,
-        uint8 _decimals
-    )
+    function mapToken(address _token, uint256 _fromChain, bytes memory _fromToken, uint8 _decimals)
         external
         restricted
         checkAddress(_token)
@@ -251,14 +219,7 @@ contract Registry is BaseImplementation, IRegistry {
         emit UnmapToken(_fromChain, _fromToken);
     }
 
-    function setTokenNickname(
-        uint256 _chain,
-        bytes memory _token,
-        string memory _nickname
-    )
-        external
-        restricted
-    {
+    function setTokenNickname(uint256 _chain, bytes memory _token, string memory _nickname) external restricted {
         string memory oldNickname = tokenAddressToNickname[_chain][_token];
         delete tokenNicknameToAddress[_chain][oldNickname];
         tokenAddressToNickname[_chain][_token] = _nickname;
@@ -267,22 +228,12 @@ contract Registry is BaseImplementation, IRegistry {
         emit SetTokenNickname(_chain, _token, _nickname);
     }
 
-    function setBaseFeeReceiver(address _baseFeeReceiver)
-        external
-        restricted
-        checkAddress(_baseFeeReceiver)
-    {
+    function setBaseFeeReceiver(address _baseFeeReceiver) external restricted checkAddress(_baseFeeReceiver) {
         baseFeeReceiver = _baseFeeReceiver;
         emit SetBaseFeeReceiver(_baseFeeReceiver);
     }
 
-    function setFromChainFee(
-        address _token,
-        uint256 _fromChain,
-        uint256 _lowest,
-        uint256 _highest,
-        uint256 _rate
-    )
+    function setFromChainFee(address _token, uint256 _fromChain, uint256 _lowest, uint256 _highest, uint256 _rate)
         external
         restricted
         checkAddress(_token)
@@ -295,13 +246,7 @@ contract Registry is BaseImplementation, IRegistry {
         emit SetFromChainTokenFee(_token, _fromChain, _lowest, _highest, _rate);
     }
 
-    function setToChainTokenFee(
-        address _token,
-        uint256 _toChain,
-        uint256 _lowest,
-        uint256 _highest,
-        uint256 _rate
-    )
+    function setToChainTokenFee(address _token, uint256 _toChain, uint256 _lowest, uint256 _highest, uint256 _rate)
         external
         restricted
         checkAddress(_token)
@@ -316,12 +261,7 @@ contract Registry is BaseImplementation, IRegistry {
         emit SetToChainTokenFee(_token, _toChain, _lowest, _highest, _rate);
     }
 
-    function setBaseFee(
-        address _token,
-        uint256 _toChain,
-        uint256 _withSwap,
-        uint256 _noSwap
-    )
+    function setBaseFee(address _token, uint256 _toChain, uint256 _withSwap, uint256 _noSwap)
         external
         restricted
         checkAddress(_token)
@@ -341,10 +281,7 @@ contract Registry is BaseImplementation, IRegistry {
         bytes calldata _caller,
         uint256 _rate,
         bool _isWhitelist
-    )
-        external
-        restricted
-    {
+    ) external restricted {
         if (_rate > MAX_RATE_UNIT) revert invalid_proportion_value();
         bytes32 key = _getKey(_fromChain, _caller, _token);
         if (_isWhitelist) {
@@ -362,10 +299,7 @@ contract Registry is BaseImplementation, IRegistry {
         bytes calldata _caller,
         uint256 _rate,
         bool _isWhitelist
-    )
-        external
-        restricted
-    {
+    ) external restricted {
         if (_rate > MAX_RATE_UNIT) revert invalid_proportion_value();
         bytes32 key = _getKey(_fromChain, _caller, _token);
         if (_isWhitelist) {
@@ -382,10 +316,7 @@ contract Registry is BaseImplementation, IRegistry {
         token = mapTokenIdToAddress[id];
     }
 
-    function getToChainToken(
-        address _token,
-        uint256 _toChain
-    )
+    function getToChainToken(address _token, uint256 _toChain)
         external
         view
         override
@@ -394,11 +325,7 @@ contract Registry is BaseImplementation, IRegistry {
         return _getToChainToken(_token, _toChain);
     }
 
-    function getToChainAmount(
-        address _token,
-        uint256 _amount,
-        uint256 _toChain
-    )
+    function getToChainAmount(address _token, uint256 _amount, uint256 _toChain)
         external
         view
         override
@@ -407,10 +334,7 @@ contract Registry is BaseImplementation, IRegistry {
         return _getTargetAmount(_token, selfChainId, _toChain, _amount);
     }
 
-    function getRelayChainToken(
-        uint256 _fromChain,
-        bytes memory _fromToken
-    )
+    function getRelayChainToken(uint256 _fromChain, bytes memory _fromToken)
         external
         view
         override
@@ -419,11 +343,7 @@ contract Registry is BaseImplementation, IRegistry {
         return _getRelayChainToken(_fromChain, _fromToken);
     }
 
-    function getRelayChainAmount(
-        bytes memory _fromToken,
-        uint256 _fromChain,
-        uint256 _amount
-    )
+    function getRelayChainAmount(bytes memory _fromToken, uint256 _fromChain, uint256 _amount)
         external
         view
         override
@@ -433,11 +353,7 @@ contract Registry is BaseImplementation, IRegistry {
         return _getTargetAmount(_token, _fromChain, selfChainId, _amount);
     }
 
-    function getTargetToken(
-        uint256 _fromChain,
-        uint256 _toChain,
-        bytes memory _fromToken
-    )
+    function getTargetToken(uint256 _fromChain, uint256 _toChain, bytes memory _fromToken)
         external
         view
         returns (bytes memory toToken, uint8 decimals, uint256 vaultBalance)
@@ -447,10 +363,7 @@ contract Registry is BaseImplementation, IRegistry {
         vaultBalance = getVaultBalance(tokenAddr, _toChain);
     }
 
-    function _getTargetToken(
-        uint256 _toChain,
-        address _relayToken
-    )
+    function _getTargetToken(uint256 _toChain, address _relayToken)
         private
         view
         returns (bytes memory toToken, uint8 decimals)
@@ -461,12 +374,7 @@ contract Registry is BaseImplementation, IRegistry {
         decimals = token.decimals[_toChain];
     }
 
-    function getTargetAmount(
-        uint256 _fromChain,
-        uint256 _toChain,
-        bytes memory _fromToken,
-        uint256 _amount
-    )
+    function getTargetAmount(uint256 _fromChain, uint256 _toChain, bytes memory _fromToken, uint256 _amount)
         external
         view
         returns (uint256 toAmount)
@@ -487,17 +395,10 @@ contract Registry is BaseImplementation, IRegistry {
         return baseFeeReceiver;
     }
 
-    function getTargetFeeInfo(
-        address _token,
-        uint256 _chain
-    )
+    function getTargetFeeInfo(address _token, uint256 _chain)
         external
         view
-        returns (
-            BaseFee memory baseFee,
-            FeeRate memory toChainFeeRate,
-            FeeRate memory fromChainFeeRate
-        )
+        returns (BaseFee memory baseFee, FeeRate memory toChainFeeRate, FeeRate memory fromChainFeeRate)
     {
         Token storage token = tokenList[_token];
         if (token.tokenAddress != address(0)) revert invalid_relay_token();
@@ -506,12 +407,7 @@ contract Registry is BaseImplementation, IRegistry {
         baseFee = token.baseFees[_chain];
     }
 
-    function getTransferInFee(
-        bytes memory _caller,
-        address _token,
-        uint256 _amount,
-        uint256 _fromChain
-    )
+    function getTransferInFee(bytes memory _caller, address _token, uint256 _amount, uint256 _fromChain)
         external
         view
         override
@@ -527,14 +423,8 @@ contract Registry is BaseImplementation, IRegistry {
         uint256 _fromChain,
         uint256 _toChain,
         bool _withSwap
-    )
-        external
-        view
-        override
-        returns (address baseReceiver, uint256 baseFee, uint256 bridgeFee)
-    {
-        (, baseFee, bridgeFee) =
-            _getToChainFee(_caller, _token, _amount, _fromChain, _toChain, _withSwap);
+    ) external view override returns (address baseReceiver, uint256 baseFee, uint256 bridgeFee) {
+        (, baseFee, bridgeFee) = _getToChainFee(_caller, _token, _amount, _fromChain, _toChain, _withSwap);
 
         baseReceiver = baseFeeReceiver;
     }
@@ -547,12 +437,7 @@ contract Registry is BaseImplementation, IRegistry {
         uint256 _fromChain,
         uint256 _toChain,
         bool _withSwap
-    )
-        external
-        view
-        override
-        returns (uint256 totalFee, uint256 baseFee, uint256 bridgeFee)
-    {
+    ) external view override returns (uint256 totalFee, uint256 baseFee, uint256 bridgeFee) {
         return _getTransferFee(_caller, _token, _amount, _fromChain, _toChain, _withSwap);
     }
 
@@ -563,11 +448,7 @@ contract Registry is BaseImplementation, IRegistry {
         uint256 _fromChain,
         uint256 _toChain,
         bool _withSwap
-    )
-        internal
-        view
-        returns (uint256 totalFee, uint256 baseFee, uint256 bridgeFee)
-    {
+    ) internal view returns (uint256 totalFee, uint256 baseFee, uint256 bridgeFee) {
         Token storage token = tokenList[_relayToken];
         if (token.tokenAddress == address(0)) revert invalid_relay_token();
 
@@ -610,15 +491,8 @@ contract Registry is BaseImplementation, IRegistry {
         uint256 _fromAmount,
         uint256 _toChain,
         bool _withSwap
-    )
-        external
-        view
-        override
-        returns (uint256 fromChainFee, uint256 toChainVault)
-    {
-        return _getBridgeFeeInfo(
-            _caller, _fromToken, _bridgeToken, _fromChain, _fromAmount, _toChain, _withSwap
-        );
+    ) external view override returns (uint256 fromChainFee, uint256 toChainVault) {
+        return _getBridgeFeeInfo(_caller, _fromToken, _bridgeToken, _fromChain, _fromAmount, _toChain, _withSwap);
     }
 
     function _getBridgeFeeInfo(
@@ -629,11 +503,7 @@ contract Registry is BaseImplementation, IRegistry {
         uint256 _fromAmount,
         uint256 _toChain,
         bool _withSwap
-    )
-        internal
-        view
-        returns (uint256 fromChainFee, uint256 toChainVault)
-    {
+    ) internal view returns (uint256 fromChainFee, uint256 toChainVault) {
         address relayToken;
         uint256 feeAmount;
         uint256 relayAmount;
@@ -645,8 +515,7 @@ contract Registry is BaseImplementation, IRegistry {
         toChainVault = getVaultBalance(_bridgeToken, _toChain);
 
         relayAmount = _getTargetAmount(relayToken, _fromChain, chainId, _fromAmount);
-        (feeAmount,,) =
-            _getTransferFee(_caller, relayToken, relayAmount, _fromChain, _toChain, _withSwap);
+        (feeAmount,,) = _getTransferFee(_caller, relayToken, relayAmount, _fromChain, _toChain, _withSwap);
         if (relayAmount <= feeAmount) {
             return (_fromAmount, toChainVault);
         }
@@ -655,12 +524,7 @@ contract Registry is BaseImplementation, IRegistry {
         // toChainAmount = _getTargetAmount(relayToken, chainId, _toChain, relayAmount - feeAmount);
     }
 
-    function getCallerFeeRate(
-        address _token,
-        uint256 _fromChain,
-        uint256 _toChain,
-        bytes memory _caller
-    )
+    function getCallerFeeRate(address _token, uint256 _fromChain, uint256 _toChain, bytes memory _caller)
         public
         view
         returns (bool isWhitelist, uint256 rate)
@@ -672,12 +536,7 @@ contract Registry is BaseImplementation, IRegistry {
         rate = (toChainWhitelistRate >> 1) + (fromChainWhitelistRate >> 1);
     }
 
-    function getToChainCallerFeeRate(
-        address _token,
-        uint256 _fromChain,
-        uint256 _toChain,
-        bytes memory _caller
-    )
+    function getToChainCallerFeeRate(address _token, uint256 _fromChain, uint256 _toChain, bytes memory _caller)
         external
         view
         returns (bool isWhitelist, uint256 rate)
@@ -685,11 +544,7 @@ contract Registry is BaseImplementation, IRegistry {
         return _getToChainCallerFeeRate(_token, _fromChain, _toChain, _caller);
     }
 
-    function getFromChainCallerFeeRate(
-        address _token,
-        uint256 _fromChain,
-        bytes memory _caller
-    )
+    function getFromChainCallerFeeRate(address _token, uint256 _fromChain, bytes memory _caller)
         external
         view
         returns (bool isWhitelist, uint256 rate)
@@ -711,10 +566,7 @@ contract Registry is BaseImplementation, IRegistry {
         return 0;
     }
 
-    function getVaultBalanceByToken(
-        uint256 chain,
-        bytes memory token
-    )
+    function getVaultBalanceByToken(uint256 chain, bytes memory token)
         external
         view
         override
@@ -744,15 +596,7 @@ contract Registry is BaseImplementation, IRegistry {
         return chainInfos[chain].gasToken;
     }
 
-    function getTokenDecimals(
-        uint256 chain,
-        bytes calldata token
-    )
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function getTokenDecimals(uint256 chain, bytes calldata token) external view override returns (uint256) {
         address relayToken = tokenMappingList[chain][token];
         Token storage t = tokenList[relayToken];
         return t.decimals[chain];
@@ -766,22 +610,11 @@ contract Registry is BaseImplementation, IRegistry {
         return nameToChain[name];
     }
 
-    function getTokenNickname(
-        uint256 chain,
-        bytes memory token
-    )
-        external
-        view
-        override
-        returns (string memory)
-    {
+    function getTokenNickname(uint256 chain, bytes memory token) external view override returns (string memory) {
         return tokenAddressToNickname[chain][token];
     }
 
-    function getTokenAddressByNickname(
-        uint256 chain,
-        string memory nickname
-    )
+    function getTokenAddressByNickname(uint256 chain, string memory nickname)
         external
         view
         override
@@ -793,14 +626,7 @@ contract Registry is BaseImplementation, IRegistry {
     // ----------------------------------------------------- view
     // ------------------------------------------------------------
 
-    function _getRelayChainToken(
-        uint256 _fromChain,
-        bytes memory _fromToken
-    )
-        internal
-        view
-        returns (address token)
-    {
+    function _getRelayChainToken(uint256 _fromChain, bytes memory _fromToken) internal view returns (address token) {
         if (_fromChain == selfChainId) {
             token = Utils.fromBytes(_fromToken);
         } else {
@@ -812,14 +638,7 @@ contract Registry is BaseImplementation, IRegistry {
         // if(!Utils.bytesEq(_fromToken, fromToken)) revert token_not_matched();
     }
 
-    function _getToChainToken(
-        address _token,
-        uint256 _toChain
-    )
-        internal
-        view
-        returns (bytes memory token)
-    {
+    function _getToChainToken(address _token, uint256 _toChain) internal view returns (bytes memory token) {
         if (_toChain == selfChainId) {
             token = Utils.toBytes(_token);
         } else {
@@ -827,12 +646,7 @@ contract Registry is BaseImplementation, IRegistry {
         }
     }
 
-    function _getTargetAmount(
-        address _token,
-        uint256 _fromChain,
-        uint256 _toChain,
-        uint256 _amount
-    )
+    function _getTargetAmount(address _token, uint256 _fromChain, uint256 _toChain, uint256 _amount)
         internal
         view
         returns (uint256)
@@ -855,12 +669,7 @@ contract Registry is BaseImplementation, IRegistry {
         return (_amount * (10 ** decimalsTo)) / (10 ** decimalsFrom);
     }
 
-    function _getFromChainFee(
-        bytes memory _caller,
-        address _relayToken,
-        uint256 _relayAmount,
-        uint256 _fromChain
-    )
+    function _getFromChainFee(bytes memory _caller, address _relayToken, uint256 _relayAmount, uint256 _fromChain)
         internal
         view
         returns (uint256 bridgeFee)
@@ -888,18 +697,13 @@ contract Registry is BaseImplementation, IRegistry {
         uint256 _fromChain,
         uint256 _toChain,
         bool _withSwap
-    )
-        internal
-        view
-        returns (uint256 totalFee, uint256 baseFee, uint256 bridgeFee)
-    {
+    ) internal view returns (uint256 totalFee, uint256 baseFee, uint256 bridgeFee) {
         Token storage token = tokenList[_relayToken];
         if (token.tokenAddress == address(0)) revert invalid_relay_token();
 
         uint256 rate;
         bool isWhitelistCaller;
-        (isWhitelistCaller, rate) =
-            _getToChainCallerFeeRate(_relayToken, _fromChain, _toChain, _caller);
+        (isWhitelistCaller, rate) = _getToChainCallerFeeRate(_relayToken, _fromChain, _toChain, _caller);
 
         if (isWhitelistCaller) {
             bridgeFee = (_relayAmount * rate) / MAX_RATE_UNIT;
@@ -916,12 +720,7 @@ contract Registry is BaseImplementation, IRegistry {
         totalFee = baseFee + bridgeFee;
     }
 
-    function _getToChainCallerFeeRate(
-        address _token,
-        uint256 _fromChain,
-        uint256 _toChain,
-        bytes memory _caller
-    )
+    function _getToChainCallerFeeRate(address _token, uint256 _fromChain, uint256 _toChain, bytes memory _caller)
         internal
         view
         returns (bool isWhitelist, uint256 rate)
@@ -933,11 +732,7 @@ contract Registry is BaseImplementation, IRegistry {
         rate = toChainWhitelistRate >> 1;
     }
 
-    function _getFromChainCallerFeeRate(
-        address _token,
-        uint256 _fromChain,
-        bytes memory _caller
-    )
+    function _getFromChainCallerFeeRate(address _token, uint256 _fromChain, bytes memory _caller)
         internal
         view
         returns (bool isWhitelist, uint256 rate)
@@ -948,15 +743,7 @@ contract Registry is BaseImplementation, IRegistry {
         rate = fromChainWhitelistRate >> 1;
     }
 
-    function _getKey(
-        uint256 _fromChain,
-        bytes memory _caller,
-        address _token
-    )
-        private
-        pure
-        returns (bytes32)
-    {
+    function _getKey(uint256 _fromChain, bytes memory _caller, address _token) private pure returns (bytes32) {
         return keccak256(abi.encodePacked(_fromChain, _caller, _token));
     }
 }

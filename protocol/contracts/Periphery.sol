@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {ChainType} from "./libs/Types.sol";
 import {IPeriphery} from "./interfaces/IPeriphery.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 import {IRegistry} from "./interfaces/IRegistry.sol";
-
 
 contract Periphery is BaseImplementation, IPeriphery {
     bytes32 private constant RELAY_ADDRESS_KEY = keccak256("address.relay");
@@ -72,7 +72,7 @@ contract Periphery is BaseImplementation, IPeriphery {
         }
     }
 
-    function getChainType(uint256 _chain) external view returns(ChainType) {
+    function getChainType(uint256 _chain) external view returns (ChainType) {
         return IRegistry(tokenRegistry).getChainType(_chain);
     }
 
@@ -83,5 +83,4 @@ contract Periphery is BaseImplementation, IPeriphery {
     function isTssManager(address _sender) external view returns (bool) {
         return (_sender == tssManager);
     }
-
 }

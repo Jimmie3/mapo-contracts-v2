@@ -59,6 +59,7 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         uint256 indexed chainAndGasLimit,
         TxType txOutType,
         bytes vault,
+
         uint256 sequence,
         bytes from,
         bytes to,
@@ -70,7 +71,7 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         bytes data
     );
 
-    event BridgeRelayOut(
+    event BridgeRelaySigned(
         bytes32 indexed orderId,
         // fromChain (8 bytes) | toChain (8 bytes) | txRate (8 bytes) | txSize (8 bytes)
         uint256 indexed chainAndGasLimit,
@@ -182,7 +183,7 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         (success, txItem.vault) = vaultManager.chooseVault(txItem.toChain, txItem.token, txItem.amount, gasFee);
         require(success);
 
-        _execute(TxType.TRANSFER, txItem);
+        _emitRelay(TxType.TRANSFER, txItem);
 
         txOutOrderGasEstimated[orderId] = gasFee;
 
@@ -367,7 +368,7 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
 
         vaultManager.transferOut();
 
-        _execute(TxType.REFUND, txItem);
+        _emitRelay(TxType.REFUND, txItem);
 
         txOutOrderGasEstimated[txInItem.orderId] = gasFee;
     }
@@ -385,7 +386,7 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         (success, txItem.vault) = vaultManager.chooseVault(txItem.toChain, txItem.token, txItem.amount, gasFee);
         require(success);
 
-        _execute(TxType.TRANSFER, txItem);
+        _emitRelay(TxType.TRANSFER, txItem);
 
         txOutOrderGasEstimated[txItem.orderId] = gasFee;
     }
@@ -465,7 +466,7 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         }
     }
 
-    function _execute(TxType txType, TxItem memory txItem) internal returns (bool) {
+    function _emitRelay(TxType txType, TxItem memory txItem) internal returns (bool) {
         bytes memory toChainToken = _getToChainToken(txItem.toChain, txItem.token);
         uint256 toChainAmount = _getToChainAmount(txItem.toChain, txItem.token, txItem.amount);
 

@@ -9,9 +9,12 @@ import {IRelay} from "./interfaces/IRelay.sol";
 import {IMaintainers} from "./interfaces/IMaintainers.sol";
 import {TxInItem, TxOutItem, TxOutType} from "./libs/Types.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 contract TSSManager is BaseImplementation, ITSSManager {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     // electing epoch hasn't gen tss key
     bytes32 private constant ELECTING_PUBKEY_HASH = 0x0000000000000000000000000000000000000000000000000000000000000001;
     bytes32 private activePubkey;
@@ -21,14 +24,16 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
     struct TSSInfo {
         TSSStatus status;
+        uint64 electBlock;
+        //uint128 startBlock;
+        //uint128 endBlock;
+        //uint128 migrateBlock;
+        uint64 threshold;
+
         uint256 epochId;
-        uint128 electBlock;
-        uint128 startBlock;
-        uint128 endBlock;
-        uint128 migrateBlock;
-        // uint64 threshold;
         bytes pubkey;
         address[] maintainers;
+        // EnumerableSet.AddressSet maintainerList;
     }
 
     //
@@ -49,8 +54,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
     mapping(address => KeyShare) private keyShares;
 
     struct Proposal {
-        uint128 count;
-        uint128 consensusBlock;
+        uint64 count;
+        uint64 consensusBlock;
         mapping(address => bool) proposed;
     }
 
@@ -112,6 +117,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
             epochKeys[_epochId] = activePubkey;
             currentTSS.epochId = _epochId;
             currentEpoch = _epochId;
+
             return false;
         }
 
@@ -147,6 +153,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         activeEpoch.status = TSSStatus.MIGRATING;
 
         _getRelay().rotate(retirePubkey, activePubkey);
+        // todo: emit event
     }
 
     function retire(uint256 retireEpochId, uint256 activeEpochId) external override onlyMaintainers {
@@ -158,6 +165,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
         retireTSS.status = TSSStatus.RETIRED;
         activeTSS.status = TSSStatus.ACTIVE;
+
+        // todo: emit event
     }
 
     function migrate() external override onlyMaintainers {
@@ -167,6 +176,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
             TSSInfo storage activeEpoch = tssInfos[activePubkey];
             if (activeEpoch.status == TSSStatus.MIGRATING) {
                 activeEpoch.status = TSSStatus.MIGRATED;
+
+                // todo: emit event
             }
         }
     }
@@ -223,7 +234,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
                 te.status = TSSStatus.KEYGEN_COMPLETED;
 
                 te.pubkey = param.pubkey;
-                te.startBlock = _getBlock();
+                te.threshold = uint64(param.members.length) * 2 / 3;
+                //te.startBlock = _getBlock();
             }
         } else {
             // keyGen failed;
@@ -543,7 +555,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         return parameters.getByHash(hash);
     }
 
-    function _getBlock() internal view returns (uint128) {
-        return uint128(block.number);
+    function _getBlock() internal view returns (uint64) {
+        return uint64(block.number);
     }
 }

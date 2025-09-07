@@ -47,10 +47,10 @@ library Utils {
         }
     }
 
-    function uintListContains(uint256[] memory lsit, uint256 v) internal pure returns (bool) {
-        uint256 length = lsit.length;
+    function uintListContains(uint256[] memory list, uint256 v) internal pure returns (bool) {
+        uint256 length = list.length;
         for (uint256 i = 0; i < length;) {
-            if (lsit[i] == v) {
+            if (list[i] == v) {
                 return true;
             }
             unchecked {
@@ -83,10 +83,10 @@ library Utils {
         return keccak256(b1) == keccak256(b2);
     }
 
-    function bytesListContains(bytes[] memory lsit, bytes memory v) internal pure returns (bool) {
-        uint256 length = lsit.length;
+    function bytesListContains(bytes[] memory list, bytes memory v) internal pure returns (bool) {
+        uint256 length = list.length;
         for (uint256 i = 0; i < length;) {
-            if (bytesEq(lsit[i], v)) {
+            if (bytesEq(list[i], v)) {
                 return true;
             }
             unchecked {

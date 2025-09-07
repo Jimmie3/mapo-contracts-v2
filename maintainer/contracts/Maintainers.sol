@@ -186,7 +186,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
             currentEpoch = electionEpoch;
             electionEpoch = 0;
 
-            _updateMaintainerLastActiveEpoch(electionEpoch, maintainers);
+            _updateMaintainerLastActiveEpoch(currentEpoch, maintainers);
         } else {
             // switch next epoch elected maintainers status to READY
             // keep current epcoh elected maintainers status ACTIVE
@@ -195,6 +195,8 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
         // todo: emit epoch info
     }
+
+
     /**
      * The reward is divided into two parts:
      * one half is distributed equally among all maintainers,
@@ -204,7 +206,6 @@ contract Maintainers is BaseImplementation, IMaintainers {
      * The difference between this threshold and a user's SLASH_POINT (for those below the threshold) can be referred to as a "score" or "weight."
      * This portion of the reward is then distributed to all maintainers proportionally based on these scores or weights.
      */
-
     function distributeReward() external payable override onlyVm {
         uint256 _rewardEpoch = rewardEpoch + 1;
         ITSSManager.TSSStatus status = tssManager.getTSSStatus(_rewardEpoch);

@@ -61,8 +61,6 @@ interface ITSSManager {
         EMERGENCY_PAUSE     // Emergency pause, all operations suspended
     }
 
-    }
-
     function elect(uint256 electedEpochId, address[] calldata maintainers) external returns (bool);
 
     function rotate(uint256 currentEpochId, uint256 nextEpochId) external;

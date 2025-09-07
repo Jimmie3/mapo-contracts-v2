@@ -5,9 +5,9 @@ interface IMaintainers {
     enum MaintainerStatus {
         UNKNOWN,
         REVOKED,
-        STANDBY,        // waiting to participate tss
-        READY,          // selected, the new tss member
-        ACTIVE,         // current tss member
+        STANDBY, // waiting to participate tss
+        READY, // selected, the new tss member
+        ACTIVE, // current tss member
         DISABLED
     }
 
@@ -16,7 +16,8 @@ interface IMaintainers {
         SCHEDULED,
         IN_PROGRESS,
         COMPLETED,
-        INIT            // waiting for tss setup
+        INIT // waiting for tss setup
+
     }
 
     struct MaintainerInfo {

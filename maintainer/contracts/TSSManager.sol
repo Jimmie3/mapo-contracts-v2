@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import { Utils } from "./libs/Utils.sol";
-import { Constant } from "./libs/Constant.sol";
-import { IParameters } from "./interfaces/IParameters.sol";
-import { ITSSManager } from "./interfaces/ITSSManager.sol";
-import { IRelay } from "./interfaces/IRelay.sol";
-import { IMaintainers } from "./interfaces/IMaintainers.sol";
-import { TxInItem, TxOutItem, TxOutType } from "./libs/Types.sol";
-import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Utils} from "./libs/Utils.sol";
+import {Constant} from "./libs/Constant.sol";
+import {IParameters} from "./interfaces/IParameters.sol";
+import {ITSSManager} from "./interfaces/ITSSManager.sol";
+import {IRelay} from "./interfaces/IRelay.sol";
+import {IMaintainers} from "./interfaces/IMaintainers.sol";
+import {TxInItem, TxOutItem, TxOutType} from "./libs/Types.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 contract TSSManager is BaseImplementation, ITSSManager {
-
     // electing epoch hasn't gen tss key
     bytes32 private constant ELECTING_PUBKEY_HASH = 0x0000000000000000000000000000000000000000000000000000000000000001;
     bytes32 private activePubkey;
@@ -27,10 +26,11 @@ contract TSSManager is BaseImplementation, ITSSManager {
         uint128 startBlock;
         uint128 endBlock;
         uint128 migrateBlock;
+        // uint64 threshold;
         bytes pubkey;
         address[] maintainers;
     }
-    
+
     //
     mapping(bytes32 => TSSInfo) private tssInfos;
 
@@ -48,28 +48,27 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
     mapping(address => KeyShare) private keyShares;
 
-    struct Propose {
+    struct Proposal {
         uint128 count;
         uint128 consensusBlock;
         mapping(address => bool) proposed;
     }
 
-    mapping(bytes32 => Propose) private proposes;
+    mapping(bytes32 => Proposal) private proposals;
 
     IRelay public relay;
     IParameters public parameters;
     IMaintainers public maintainerManager;
 
-
     event VoteUpdateTssPool(TssPoolParam param);
     event ResetSlashPoint(address m);
+
     event VoteTxIn(TxInItem txInItem);
     event VoteTxOut(TxOutItem txOutItem);
+
     event Set(address _maintainer, address _relay, address _parameter);
     event UpdateKeyShare(address maitainer, bytes pubkey, bytes keyShare);
-    event VoteNetworkFee(
-        uint256 epoch, uint256 chain, uint256 height, uint256 limit, uint256 price
-    );
+    event VoteNetworkFee(uint256 epoch, uint256 chain, uint256 height, uint256 limit, uint256 price);
 
     error no_access();
     error invalid_sig();
@@ -78,7 +77,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
     error invalid_status();
 
     modifier onlyMaintainers() {
-        if(msg.sender != address(maintainerManager)) revert no_access();
+        if (msg.sender != address(maintainerManager)) revert no_access();
         _;
     }
 
@@ -98,7 +97,12 @@ contract TSSManager is BaseImplementation, ITSSManager {
         return e.status;
     }
 
-    function elect(uint256 _epochId, address[] calldata _maintainers) external override onlyMaintainers returns (bool) {
+    function elect(uint256 _epochId, address[] calldata _maintainers)
+        external
+        override
+        onlyMaintainers
+        returns (bool)
+    {
         // todo: check status
         bytes32 keyHash = epochKeys[currentEpoch];
         TSSInfo storage currentTSS = tssInfos[keyHash];
@@ -110,11 +114,11 @@ contract TSSManager is BaseImplementation, ITSSManager {
             currentEpoch = _epochId;
             return false;
         }
-    
+
         epochKeys[_epochId] = ELECTING_PUBKEY_HASH;
         TSSInfo storage e = tssInfos[ELECTING_PUBKEY_HASH];
         // voteUpdateTssPool time out reElect
-        if(e.electBlock > 0) {
+        if (e.electBlock > 0) {
             _resetSlashPoint(_epochId, _maintainers);
         }
         e.electBlock = _getBlock();
@@ -128,9 +132,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         return true;
     }
 
-
     function rotate(uint256 currentId, uint256 nextId) external override onlyMaintainers {
-
         currentEpoch = nextId;
 
         retirePubkey = epochKeys[currentId];
@@ -147,9 +149,9 @@ contract TSSManager is BaseImplementation, ITSSManager {
         _getRelay().rotate(retirePubkey, activePubkey);
     }
 
-    function retire(uint256 epochId, uint256 newId) external override onlyMaintainers {
-        retirePubkey = epochKeys[epochId];
-        activePubkey = epochKeys[newId];
+    function retire(uint256 retireEpochId, uint256 activeEpochId) external override onlyMaintainers {
+        retirePubkey = epochKeys[retireEpochId];
+        activePubkey = epochKeys[activeEpochId];
 
         TSSInfo storage retireTSS = tssInfos[retirePubkey];
         TSSInfo storage activeTSS = tssInfos[activePubkey];
@@ -158,13 +160,14 @@ contract TSSManager is BaseImplementation, ITSSManager {
         activeTSS.status = TSSStatus.ACTIVE;
     }
 
-
     function migrate() external override onlyMaintainers {
         bool completed = _getRelay().migrate();
 
-        TSSInfo storage activeEpoch = tssInfos[activePubkey];
-        if (activeEpoch.status == TSSStatus.MIGRATING && completed) {
-            activeEpoch.status = TSSStatus.MIGRATED;
+        if (completed) {
+            TSSInfo storage activeEpoch = tssInfos[activePubkey];
+            if (activeEpoch.status == TSSStatus.MIGRATING) {
+                activeEpoch.status = TSSStatus.MIGRATED;
+            }
         }
     }
 
@@ -176,12 +179,14 @@ contract TSSManager is BaseImplementation, ITSSManager {
         address[] blames;
         bytes signature;
     }
+
+
     /**
      * This method generates a new TSS key after a epoch change.
      * If the blames array is empty, it indicates a keyGen failure.
-     * Before consensus is reached, each committer first applies OBSERVE_SLASH_POINT. 
+     * Before consensus is reached, each committer first applies OBSERVE_SLASH_POINT.
      * After consensus is achieved, participants in the consensus revert the OBSERVE_SLASH_POINT applied before consensus was reached,
-     * while non-participants apply DELAY_SLASH_POINT. 
+     * while non-participants apply DELAY_SLASH_POINT.
      * If non-participants submit within the specified block range, the DELAY_SLASH_POINT applied after consensus is reverted.
      * In case of keyGen failure, added jail block to users listed in the blames array.
      */
@@ -189,12 +194,13 @@ contract TSSManager is BaseImplementation, ITSSManager {
         address user = msg.sender;
         TSSInfo storage e = tssInfos[ELECTING_PUBKEY_HASH];
         _checkTssPoolStatus(param.epoch, e);
+
         _updateKeyShare(user, param.pubkey, param.keyShare);
-        Propose storage p = proposes[_getUpdateTSSPoolHash(param)];
+        Proposal storage p = proposals[_getUpdateTSSPoolHash(param)];
         bool keyGen = (param.blames.length == 0);
         uint256 delaySlashPoint;
-        if(keyGen) {
-            delaySlashPoint = _getParameter(Constant.KEY_GEN_DELAY_SLASY_POINT);
+        if (keyGen) {
+            delaySlashPoint = _getParameter(Constant.KEY_GEN_DELAY_SLASH_POINT);
         } else {
             // keyGen failed
             delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
@@ -205,11 +211,10 @@ contract TSSManager is BaseImplementation, ITSSManager {
             _checkSig(param.pubkey, param.signature);
 
             if (_consensus(p, e.maintainers.length)) {
-                _dealConsensus(0, param.epoch, delaySlashPoint, p, e.maintainers);
+                _handleConsensus(0, param.epoch, delaySlashPoint, p, e.maintainers);
             }
             // all members commit
             if (p.count == param.members.length) {
-
                 bytes32 tssKey = keccak256(param.pubkey);
 
                 epochKeys[param.epoch] = tssKey;
@@ -225,19 +230,20 @@ contract TSSManager is BaseImplementation, ITSSManager {
             if (_consensus(p, e.maintainers.length)) {
                 // add blames to jail
                 _batchAddToJail(param.blames, _getParameter(Constant.KEY_GEN_FAIL_JAIL_BLOCK));
-                _dealConsensus(0, param.epoch, delaySlashPoint, p, e.maintainers);
+                _handleConsensus(0, param.epoch, delaySlashPoint, p, e.maintainers);
             }
 
             e.status = TSSStatus.KEYGEN_FAILED;
         }
+
         emit VoteUpdateTssPool(param);
     }
 
     /**
      * This method is used to submit the gas fee status of various blockchains.
-     * Before consensus is reached, each committer first applies OBSERVE_SLASH_POINT. 
+     * Before consensus is reached, each committer first applies OBSERVE_SLASH_POINT.
      * After consensus is achieved, participants in the consensus revert the OBSERVE_SLASH_POINT applied before consensus was reached,
-     * while non-participants apply DELAY_SLASH_POINT. 
+     * while non-participants apply DELAY_SLASH_POINT.
      * If non-participants submit within the specified block range, the DELAY_SLASH_POINT applied after consensus is reverted.
      */
     function voteNetworkFee(
@@ -246,38 +252,27 @@ contract TSSManager is BaseImplementation, ITSSManager {
         uint256 transactionRate,
         uint256 transactionSize,
         uint256 transactionSizeWithCall
-    )
-        external
-    {
+    ) external {
         bytes32 hash = keccak256(
-            abi.encodePacked(
-                currentEpoch,
-                chain,
-                height,
-                transactionRate,
-                transactionSize,
-                transactionSizeWithCall
-            )
+            abi.encodePacked(currentEpoch, chain, height, transactionRate, transactionSize, transactionSizeWithCall)
         );
         address user = msg.sender;
         TSSInfo storage e = tssInfos[activePubkey];
-        Propose storage p = proposes[hash];
+        Proposal storage p = proposals[hash];
         uint256 delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
         _beforePropose(0, delaySlashPoint, user, p, e);
         if (_consensus(p, e.maintainers.length)) {
-            _getRelay().postNetworkFee(
-                chain, height, transactionSize, transactionSizeWithCall, transactionRate
-            );
-            _dealConsensus(0, e.epochId, delaySlashPoint, p, e.maintainers);
+            _getRelay().postNetworkFee(chain, height, transactionSize, transactionSizeWithCall, transactionRate);
+            _handleConsensus(0, e.epochId, delaySlashPoint, p, e.maintainers);
         }
         emit VoteNetworkFee(currentEpoch, chain, height, transactionSize, transactionRate);
     }
 
     /**
      * This method processes transactions that cross over from other chains through consensus on the relay chain.
-     * Before consensus is reached, each committer first applies OBSERVE_SLASH_POINT. 
+     * Before consensus is reached, each committer first applies OBSERVE_SLASH_POINT.
      * After consensus is achieved, participants in the consensus revert the OBSERVE_SLASH_POINT applied before consensus was reached,
-     * while non-participants apply DELAY_SLASH_POINT. 
+     * while non-participants apply DELAY_SLASH_POINT.
      * If non-participants submit within the specified block range, the DELAY_SLASH_POINT applied after consensus is reverted.
      */
     function voteTxIn(TxInItem calldata txInItem) external {
@@ -285,21 +280,21 @@ contract TSSManager is BaseImplementation, ITSSManager {
         address user = msg.sender;
         bytes32 tssKey = keccak256(txInItem.vault);
         TSSInfo storage e = tssInfos[tssKey];
-        Propose storage p = proposes[hash];
+        Proposal storage p = proposals[hash];
         uint256 delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
         _beforePropose(0, delaySlashPoint, user, p, e);
         if (_consensus(p, e.maintainers.length)) {
             _getRelay().executeTxIn(txInItem);
-            _dealConsensus(0, e.epochId, delaySlashPoint, p, e.maintainers);
+            _handleConsensus(0, e.epochId, delaySlashPoint, p, e.maintainers);
         }
         emit VoteTxIn(txInItem);
     }
 
     /**
      * This method consensus on the relay chain that the target chain has accurately executed the cross-chain transaction.
-     * Before consensus is reached, each committer first applies OBSERVE_SLASH_POINT. 
+     * Before consensus is reached, each committer first applies OBSERVE_SLASH_POINT.
      * After consensus is achieved, participants in the consensus revert the OBSERVE_SLASH_POINT applied before consensus was reached,
-     * while non-participants apply DELAY_SLASH_POINT. 
+     * while non-participants apply DELAY_SLASH_POINT.
      * If non-participants submit within the specified block range, the DELAY_SLASH_POINT applied after consensus is reverted.
      * if TxOutType is MIGRATE add jail block to users who non-participants submit within the specified block range.
      */
@@ -308,36 +303,41 @@ contract TSSManager is BaseImplementation, ITSSManager {
         address user = msg.sender;
         bytes32 tssKey = keccak256(txOutItem.vault);
         TSSInfo storage e = tssInfos[tssKey];
-        Propose storage p = proposes[hash];
+        Proposal storage p = proposals[hash];
         uint256 delaySlashPoint;
         uint256 jailBlock;
-        if(txOutItem.txOutType == TxOutType.TRANSFER) {
-            delaySlashPoint =  _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
+        if (txOutItem.txOutType == TxOutType.TRANSFER) {
+            delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
         } else {
-            delaySlashPoint =  _getParameter(Constant.MIGRATION_DELAY_SLASH_POINT);
+            delaySlashPoint = _getParameter(Constant.MIGRATION_DELAY_SLASH_POINT);
             jailBlock = _getParameter(Constant.MIGRATION_DELAY_JAIL_BLOCK);
         }
         _beforePropose(jailBlock, delaySlashPoint, user, p, e);
         if (_consensus(p, e.maintainers.length)) {
             p.consensusBlock = _getBlock();
             _getRelay().executeTxOut(txOutItem);
-            _dealConsensus(jailBlock, e.epochId, delaySlashPoint, p, e.maintainers);
+            _handleConsensus(jailBlock, e.epochId, delaySlashPoint, p, e.maintainers);
         }
         emit VoteTxOut(txOutItem);
     }
 
-    function getSlashPoint(uint256 epoch, address m) external view override returns(uint256 point) {
+    function getSlashPoint(uint256 epoch, address m) external view override returns (uint256 point) {
         point = slashPoints[epoch][m];
     }
 
-    function getJailBlock(address m) external view override returns(uint256 jailBlock){
+    function getJailBlock(address m) external view override returns (uint256 jailBlock) {
         jailBlock = jail[m];
     }
 
-    function batchGetSlashPoint(uint256 epoch, address[] calldata ms) external view override returns(uint256[] memory points){
+    function batchGetSlashPoint(uint256 epoch, address[] calldata ms)
+        external
+        view
+        override
+        returns (uint256[] memory points)
+    {
         uint256 len = ms.length;
         points = new uint256[](len);
-        for (uint i = 0; i < len;) {
+        for (uint256 i = 0; i < len;) {
             points[i] = slashPoints[epoch][ms[i]];
             unchecked {
                 ++i;
@@ -345,14 +345,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
         }
     }
 
-    function _updateKeyShare(
-        address _maintainer,
-        bytes calldata _pubkey,
-        bytes calldata _keyShare
-    )
-        internal
-    {   
-        if(_pubkey.length > 0 && _keyShare.length > 0) {
+    function _updateKeyShare(address _maintainer, bytes calldata _pubkey, bytes calldata _keyShare) internal {
+        if (_pubkey.length > 0 && _keyShare.length > 0) {
             KeyShare storage ks = keyShares[_maintainer];
             ks.keyShare = _keyShare;
             ks.pubkey = _pubkey;
@@ -372,11 +366,9 @@ contract TSSManager is BaseImplementation, ITSSManager {
         uint256 jailBlock,
         uint256 delayRecoverPoint,
         address maintainer,
-        Propose storage p,
+        Proposal storage p,
         TSSInfo storage e
-    )
-        internal
-    {
+    ) internal {
         if (!Utils.addressListContains(e.maintainers, maintainer)) {
             revert no_access();
         }
@@ -387,29 +379,27 @@ contract TSSManager is BaseImplementation, ITSSManager {
             // apply OBSERVE_SLASH_POINT before Consensus.
             _addSlashPoint(e.epochId, maintainer, _getParameter(Constant.OBSERVE_SLASH_POINT));
         } else {
-            if((_getParameter(Constant.OBSERVE_MAX_DELYA_BLOCK) + p.consensusBlock) > _getBlock()) {
-                // non-participants submit within the specified block range, 
+            if ((_getParameter(Constant.OBSERVE_MAX_DELAY_BLOCK) + p.consensusBlock) > _getBlock()) {
+                // non-participants submit within the specified block range,
                 // reverted the DELAY_SLASH_POINT applied after consensus.
                 _subSlashPoint(e.epochId, maintainer, delayRecoverPoint);
-                if(jailBlock > 0)  _releaseFromJail(maintainer, jailBlock);
+                if (jailBlock > 0) _releaseFromJail(maintainer, jailBlock);
             }
         }
     }
 
-    function _dealConsensus(
+    function _handleConsensus(
         uint256 jailBlock,
         uint256 epochId,
         uint256 delaySlashPoint,
-        Propose storage p,
+        Proposal storage p,
         address[] memory maintainers
-    )
-        internal
-    {   
+    ) internal {
         p.consensusBlock = _getBlock();
         uint256 len = maintainers.length;
-        // maintainers submited propose before Consensus
+        // maintainers submitted propose before Consensus
         address[] memory subs = new address[](p.count);
-        // maintainers no-submited propose before Consensus
+        // maintainers no-submitted propose before Consensus
         address[] memory adds = new address[](len - p.count);
         uint256 index;
         for (uint256 i = 0; i < len;) {
@@ -428,7 +418,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         _batchSubSlashPoint(epochId, subs, _getParameter(Constant.OBSERVE_SLASH_POINT));
         // non-participants apply DELAY_SLASH_POINT.
         _batchAddSlashPoint(epochId, adds, delaySlashPoint);
-        if(jailBlock > 0) _batchAddToJail(adds, jailBlock);
+        if (jailBlock > 0) _batchAddToJail(adds, jailBlock);
     }
 
     function _checkSig(bytes calldata pubkey, bytes calldata signature) internal pure {
@@ -442,18 +432,11 @@ contract TSSManager is BaseImplementation, ITSSManager {
         return address(uint160(uint256(pubkeyHash)));
     }
 
-    function _consensus(
-        Propose storage p,
-        uint256 maintainerCount
-    )
-        internal
-        view
-        returns (bool)
-    {    
+    function _consensus(Proposal storage p, uint256 maintainerCount) internal view returns (bool) {
         return p.consensusBlock == 0 && (p.count > ((maintainerCount * 2) / 3));
     }
 
-    function _getUpdateTSSPoolHash(TssPoolParam calldata param) internal pure returns (bytes32 hash){
+    function _getUpdateTSSPoolHash(TssPoolParam calldata param) internal pure returns (bytes32 hash) {
         hash = keccak256(abi.encodePacked(param.pubkey, param.members, param.epoch, param.blames));
     }
 
@@ -490,7 +473,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
     }
 
     function _batchAddToJail(address[] memory ms, uint256 jailBlock) internal {
-        uint256 len = ms.length; 
+        uint256 len = ms.length;
         uint128 b = _getBlock();
         for (uint256 i = 0; i < len;) {
             uint256 j = jail[ms[i]];
@@ -517,11 +500,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         }
     }
 
-    function _batchSubSlashPoint(
-        uint256 _epochId,
-        address[] memory _maintainers,
-        uint256 _point
-    ) internal {
+    function _batchSubSlashPoint(uint256 _epochId, address[] memory _maintainers, uint256 _point) internal {
         uint256 len = _maintainers.length;
         for (uint256 i = 0; i < len;) {
             address m = _maintainers[i];
@@ -537,13 +516,13 @@ contract TSSManager is BaseImplementation, ITSSManager {
     }
 
     function _subSlashPoint(uint256 _epochId, address _maintainer, uint256 _point) internal {
-        if(slashPoints[_epochId][_maintainer] > _point) {
+        if (slashPoints[_epochId][_maintainer] > _point) {
             slashPoints[_epochId][_maintainer] -= _point;
         } else {
             slashPoints[_epochId][_maintainer] = 0;
         }
     }
-    
+
     function _resetSlashPoint(uint256 epoch, address[] memory ms) internal {
         uint256 len = ms.length;
         for (uint256 i = 0; i < len;) {
@@ -558,14 +537,13 @@ contract TSSManager is BaseImplementation, ITSSManager {
     function _checkTssPoolStatus(uint256 epoch, TSSInfo storage e) internal view {
         if (epochKeys[epoch] != ELECTING_PUBKEY_HASH) revert invalid_status();
         if ((e.electBlock + _getParameter(Constant.MAX_BLOCKS_FOR_UPDATE_TSS)) < _getBlock()) revert invalid_status();
-    } 
+    }
 
-    function _getParameter(bytes32 hash) internal view returns(uint256) {
+    function _getParameter(bytes32 hash) internal view returns (uint256) {
         return parameters.getByHash(hash);
     }
 
-    function _getBlock() internal view returns(uint128) {
+    function _getBlock() internal view returns (uint128) {
         return uint128(block.number);
     }
-
 }

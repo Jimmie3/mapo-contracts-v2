@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 // import { ManagerStatus } from "../libs/Types.sol";
 
 interface ITSSManager {
-
     /**
      * @dev TSS Status Enum and State Transition Documentation
      *
@@ -62,21 +61,21 @@ interface ITSSManager {
         EMERGENCY_PAUSE     // Emergency pause, all operations suspended
     }
 
+    }
 
     function elect(uint256 electedEpochId, address[] calldata maintainers) external returns (bool);
 
     function rotate(uint256 currentEpochId, uint256 nextEpochId) external;
 
-    function retire(uint256 previousEpochId, uint256 currentEpochId) external;
+    function retire(uint256 retireEpochId, uint256 activeEpochId) external;
 
     function migrate() external;
 
     function getTSSStatus(uint256 epochId) external view returns (TSSStatus status);
 
-    function getSlashPoint(uint256 epoch, address m) external view returns(uint256 point);
+    function getSlashPoint(uint256 epoch, address m) external view returns (uint256 point);
 
-    function getJailBlock(address m) external view returns(uint256 jailBlock);
+    function getJailBlock(address m) external view returns (uint256 jailBlock);
 
-    function batchGetSlashPoint(uint256 epoch, address[] calldata ms) external view returns(uint256[] memory points);
-
+    function batchGetSlashPoint(uint256 epoch, address[] calldata ms) external view returns (uint256[] memory points);
 }

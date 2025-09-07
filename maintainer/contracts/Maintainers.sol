@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import { IParameters } from "./interfaces/IParameters.sol";
-import { IMaintainers } from "./interfaces/IMaintainers.sol";
-import { IValidators } from "./interfaces/IValidators.sol";
-import { IElection } from "./interfaces/IElection.sol";
-import { IAccounts } from "./interfaces/IAccounts.sol";
-import { ITSSManager } from "./interfaces/ITSSManager.sol";
+import {IParameters} from "./interfaces/IParameters.sol";
+import {IMaintainers} from "./interfaces/IMaintainers.sol";
+import {IValidators} from "./interfaces/IValidators.sol";
+import {IElection} from "./interfaces/IElection.sol";
+import {IAccounts} from "./interfaces/IAccounts.sol";
+import {ITSSManager} from "./interfaces/ITSSManager.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 contract Maintainers is BaseImplementation, IMaintainers {
@@ -37,7 +37,6 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     mapping(uint256 => EpochInfo) private epochInfos;
 
-
     error no_access();
     error empty_pubkey();
     error empty_p2pAddress();
@@ -58,7 +57,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         _;
     }
 
-    receive() external payable { }
+    receive() external payable {}
 
     function set(address _manager, address _parameter) external restricted {
         require(_manager != address(0) && _parameter != address(0));
@@ -73,11 +72,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         emit UpdateMaintainerLimit(_limit);
     }
 
-    function register(
-        bytes calldata secp256Pubkey,
-        bytes calldata ed25519PubKey,
-        string calldata p2pAddress
-    )
+    function register(bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress)
         external
         restricted
     {
@@ -94,13 +89,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         emit Register(user, secp256Pubkey, ed25519PubKey, p2pAddress);
     }
 
-    function update(
-        bytes calldata secp256Pubkey,
-        bytes calldata ed25519PubKey,
-        string calldata p2pAddress
-    )
-        external
-    {
+    function update(bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress) external {
         address user = msg.sender;
         MaintainerInfo storage info = maintainerInfos[user];
         require(info.status == MaintainerStatus.STANDBY);
@@ -114,8 +103,6 @@ contract Maintainers is BaseImplementation, IMaintainers {
     // will not participate tss
     function revoke() external {
         // todo
-
-
     }
 
     function deregister() external {
@@ -149,11 +136,11 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 // finish tss keygen, start migration
                 tssManager.rotate(currentEpoch, electionEpoch);
                 EpochInfo storage e = epochInfos[currentEpoch];
-                uint64 _block =  _getBlock();
+                uint64 _block = _getBlock();
                 e.endBlock = _block;
                 epoch.startBlock = _block;
                 _updateMaintainerLastActiveEpoch(electionEpoch, epoch.maintainers);
-                // switch elected maintainers status to ACTIVE 
+                // switch elected maintainers status to ACTIVE
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.ACTIVE);
                 return;
             } else if (status == ITSSManager.TSSStatus.MIGRATED) {
@@ -163,7 +150,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 currentEpoch = electionEpoch;
                 electionEpoch = 0;
                 retireEpoch.migratedBlock = _getBlock();
-                // switch pre epoch maintainers status to STANDBY 
+                // switch pre epoch maintainers status to STANDBY
                 // keep ACTIVE if elected by current epoch
                 _switchMaintainerStatus(retireEpoch.maintainers, MaintainerStatus.STANDBY, MaintainerStatus.STANDBY);
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.ACTIVE);
@@ -190,7 +177,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         if (!maintainersUpdate) {
             // no need rotate
             EpochInfo storage retireEpoch = epochInfos[currentEpoch];
-            
+
             retireEpoch.endBlock = _block;
             retireEpoch.migratedBlock = _block;
 
@@ -201,27 +188,27 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
             _updateMaintainerLastActiveEpoch(electionEpoch, maintainers);
         } else {
-            // switch next epoch elected maintainers status to READY 
+            // switch next epoch elected maintainers status to READY
             // keep current epcoh elected maintainers status ACTIVE
             _switchMaintainerStatus(maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.READY);
-
         }
 
         // todo: emit epoch info
     }
     /**
-     * The reward is divided into two parts: 
+     * The reward is divided into two parts:
      * one half is distributed equally among all maintainers,
-     * while the other half is allocated based on each user's SLASH_POINT. 
-     * First, a maximum SLASH_POINT threshold is set for eligibility to receive this latter portion of the reward. 
-     * Users exceeding this threshold are disqualified from receiving this part of the reward. 
-     * The difference between this threshold and a user's SLASH_POINT (for those below the threshold) can be referred to as a "score" or "weight." 
+     * while the other half is allocated based on each user's SLASH_POINT.
+     * First, a maximum SLASH_POINT threshold is set for eligibility to receive this latter portion of the reward.
+     * Users exceeding this threshold are disqualified from receiving this part of the reward.
+     * The difference between this threshold and a user's SLASH_POINT (for those below the threshold) can be referred to as a "score" or "weight."
      * This portion of the reward is then distributed to all maintainers proportionally based on these scores or weights.
      */
-    function distributeReward() external override payable onlyVm {
+
+    function distributeReward() external payable override onlyVm {
         uint256 _rewardEpoch = rewardEpoch + 1;
         ITSSManager.TSSStatus status = tssManager.getTSSStatus(_rewardEpoch);
-        if(status == ITSSManager.TSSStatus.MIGRATED) {
+        if (status == ITSSManager.TSSStatus.MIGRATED) {
             EpochInfo storage e = epochInfos[electionEpoch];
             uint256 totalReward = (e.endBlock - e.startBlock) * _getParameter(REWARD_PER_BLOCK);
             uint256[] memory points = tssManager.batchGetSlashPoint(_rewardEpoch, e.maintainers);
@@ -229,19 +216,19 @@ contract Maintainers is BaseImplementation, IMaintainers {
             uint256 mask = _getSlashPointMask(arm, points);
             uint256 len = points.length;
 
-            if(mask == 0) {
-               uint256 reward = totalReward / len;
-               for (uint i = 0; i < len;) {
+            if (mask == 0) {
+                uint256 reward = totalReward / len;
+                for (uint256 i = 0; i < len;) {
                     payable(e.maintainers[i]).transfer(reward);
                     emit DistributeReward(_rewardEpoch, e.maintainers[i], reward);
                     unchecked {
                         ++i;
                     }
-               }
+                }
             } else {
                 uint256 baseReward = totalReward / 2 / len;
                 uint256 rewardPerMask = totalReward / 2 / mask;
-                for (uint i = 0; i < len;) {
+                for (uint256 i = 0; i < len;) {
                     uint256 additoinalReward = arm > points[i] ? rewardPerMask * (arm - points[i]) : 0;
                     uint256 reward = baseReward + additoinalReward;
                     payable(e.maintainers[i]).transfer(reward);
@@ -249,16 +236,18 @@ contract Maintainers is BaseImplementation, IMaintainers {
                     unchecked {
                         ++i;
                     }
-               }
+                }
             }
 
             rewardEpoch = _rewardEpoch;
         }
     }
 
-    function _switchMaintainerStatus(address[] memory maintainers, MaintainerStatus keep, MaintainerStatus target) internal {
+    function _switchMaintainerStatus(address[] memory maintainers, MaintainerStatus keep, MaintainerStatus target)
+        internal
+    {
         uint256 len = maintainers.length;
-        for (uint256 i = 0; i < len; ) {
+        for (uint256 i = 0; i < len;) {
             MaintainerInfo storage info = maintainerInfos[maintainers[i]];
             if (info.status != keep) info.status = target;
             unchecked {
@@ -269,14 +258,14 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     function _updateMaintainerLastActiveEpoch(uint256 _epoch, address[] memory ms) internal {
         uint256 len = ms.length;
-        for (uint i = 0; i < len;) {
+        for (uint256 i = 0; i < len;) {
             MaintainerInfo storage info = maintainerInfos[ms[i]];
             info.lastActiveEpoch = _epoch;
             unchecked {
                 ++i;
             }
         }
-    } 
+    }
 
     function _chooseMaintainers() internal view returns (address[] memory maintainers) {
         uint256 e = currentEpoch;
@@ -287,7 +276,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         ITSSManager m = tssManager;
         for (uint256 i = 0; i < length;) {
             address validator = validators[i];
-            if(_checkCandidacy(m, e, validator)) {
+            if (_checkCandidacy(m, e, validator)) {
                 maintainers[i] = validator;
                 if ((selectedCount -= 1) == 0) break;
             }
@@ -298,26 +287,32 @@ contract Maintainers is BaseImplementation, IMaintainers {
         if (selectedCount != 0) revert maintainer_not_enough();
     }
 
-    function _needElect(uint256 epochId) internal view returns(bool) {
+    function _needElect(uint256 epochId) internal view returns (bool) {
         ITSSManager.TSSStatus status = tssManager.getTSSStatus(epochId);
         EpochInfo storage epoch = epochInfos[epochId];
-        return (status == ITSSManager.TSSStatus.ACTIVE && (epoch.startBlock + _getParameter(BLOCKS_PER_EPOCH) < block.number));
+        return (
+            status == ITSSManager.TSSStatus.ACTIVE
+                && (epoch.startBlock + _getParameter(BLOCKS_PER_EPOCH) < block.number)
+        );
     }
 
-    function _needReElect(ITSSManager.TSSStatus status, EpochInfo storage epoch) internal view returns(bool) {
-        return status == ITSSManager.TSSStatus.KEYGEN_FAILED ||
-                (status == ITSSManager.TSSStatus.KEYGEN_PENDING && (epoch.electedBlock + _getParameter(MAX_BLOCKS_FOR_UPDATE_TSS) < block.number));
+    function _needReElect(ITSSManager.TSSStatus status, EpochInfo storage epoch) internal view returns (bool) {
+        return status == ITSSManager.TSSStatus.KEYGEN_FAILED
+            || (
+                status == ITSSManager.TSSStatus.KEYGEN_PENDING
+                    && (epoch.electedBlock + _getParameter(MAX_BLOCKS_FOR_UPDATE_TSS) < block.number)
+            );
     }
 
-    function _checkCandidacy(ITSSManager m, uint256 epochId, address v) internal view returns(bool) {
+    function _checkCandidacy(ITSSManager m, uint256 epochId, address v) internal view returns (bool) {
         MaintainerStatus status = maintainerInfos[v].status;
         if (status != MaintainerStatus.STANDBY && status != MaintainerStatus.ACTIVE) {
             return false;
         }
         uint256 jailBlock = m.getJailBlock(v);
-        if(jailBlock > _getBlock()) return false;
+        if (jailBlock > _getBlock()) return false;
         uint256 slashPoint = m.getSlashPoint(epochId, v);
-        if(slashPoint > _getParameter(MAX_SLASH_POINT_FOR_ELECT)) return false;
+        if (slashPoint > _getParameter(MAX_SLASH_POINT_FOR_ELECT)) return false;
         return true;
     }
 
@@ -341,10 +336,10 @@ contract Maintainers is BaseImplementation, IMaintainers {
         return IValidators(VALIDATORS_ADDRESS).isValidator(account);
     }
 
-    function _getSlashPointMask(uint256 arm, uint256[] memory points) internal pure returns(uint256 mask) {
+    function _getSlashPointMask(uint256 arm, uint256[] memory points) internal pure returns (uint256 mask) {
         uint256 len = points.length;
-        for (uint i = 0; i < len;) {
-            if(arm > points[i]){
+        for (uint256 i = 0; i < len;) {
+            if (arm > points[i]) {
                 mask += points[i];
             }
             unchecked {
@@ -353,12 +348,11 @@ contract Maintainers is BaseImplementation, IMaintainers {
         }
     }
 
-    function _getBlock() internal view returns(uint64) {
+    function _getBlock() internal view returns (uint64) {
         return uint64(block.number);
     }
 
-    function _getParameter(bytes32 hash) internal view returns(uint256) {
+    function _getParameter(bytes32 hash) internal view returns (uint256) {
         return parameters.getByHash(hash);
     }
-
 }

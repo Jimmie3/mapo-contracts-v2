@@ -17,7 +17,6 @@ enum TxOutType {
     MIGRATE
 }
 
-
 struct TxInItem {
     TxInType txInType;
     bytes32 orderId;

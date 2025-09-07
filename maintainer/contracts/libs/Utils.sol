@@ -2,14 +2,7 @@
 pragma solidity ^0.8.20;
 
 library Utils {
-    function addressListEq(
-        address[] memory list1,
-        address[] memory list2
-    )
-        internal
-        pure
-        returns (bool)
-    {
+    function addressListEq(address[] memory list1, address[] memory list2) internal pure returns (bool) {
         uint256 len = list1.length;
         if (list2.length != len) return false;
         for (uint256 i = 0; i < len;) {
@@ -22,14 +15,7 @@ library Utils {
         return true;
     }
 
-    function addressListContains(
-        address[] memory list,
-        address addr
-    )
-        internal
-        pure
-        returns (bool)
-    {
+    function addressListContains(address[] memory list, address addr) internal pure returns (bool) {
         uint256 length = list.length;
         for (uint256 i = 0; i < length;) {
             if (list[i] == addr) {
@@ -42,12 +28,7 @@ library Utils {
         return false;
     }
 
-    function addressListRemove(
-        address[] storage list,
-        address addr
-    )
-        internal
-    {
+    function addressListRemove(address[] storage list, address addr) internal {
         uint256 len = list.length;
         uint256 index;
         for (uint256 i = 0; i < len;) {

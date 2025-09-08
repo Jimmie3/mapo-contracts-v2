@@ -10,6 +10,10 @@ contract Parameters is BaseImplementation, IParameters {
 
     mapping(bytes32 => uint256) private values;
 
+    function initialize(address _defaultAdmin) public initializer {
+        __BaseImplementation_init(_defaultAdmin);
+    }
+
     function set(string calldata key, uint256 value) external restricted {
         values[keccak256(bytes(key))] = value;
         emit Set(key, value);

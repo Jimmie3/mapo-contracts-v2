@@ -7,7 +7,7 @@ import {IParameters} from "./interfaces/IParameters.sol";
 import {ITSSManager} from "./interfaces/ITSSManager.sol";
 import {IRelay} from "./interfaces/IRelay.sol";
 import {IMaintainers} from "./interfaces/IMaintainers.sol";
-import {TxInItem, TxOutItem, TxOutType} from "./libs/Types.sol";
+import {TxInItem, TxOutItem, TxType} from "./libs/Types.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
@@ -86,6 +86,10 @@ contract TSSManager is BaseImplementation, ITSSManager {
         _;
     }
 
+    function initialize(address _defaultAdmin) public initializer {
+        __BaseImplementation_init(_defaultAdmin);
+    }
+
     function set(address _maintainer, address _relay, address _parameter) external restricted {
         require(_maintainer != address(0) && _parameter != address(0) && _relay != address(0));
         parameters = IParameters(_parameter);
@@ -152,7 +156,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         retireEpoch.status = TSSStatus.RETIRING;
         activeEpoch.status = TSSStatus.MIGRATING;
 
-        _getRelay().rotate(retirePubkey, activePubkey);
+        _getRelay().rotate(retireEpoch.pubkey, activeEpoch.pubkey);
         // todo: emit event
     }
 
@@ -318,11 +322,11 @@ contract TSSManager is BaseImplementation, ITSSManager {
         Proposal storage p = proposals[hash];
         uint256 delaySlashPoint;
         uint256 jailBlock;
-        if (txOutItem.txOutType == TxOutType.TRANSFER) {
-            delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
-        } else {
+        if (txOutItem.txOutType == TxType.MIGRATE) {
             delaySlashPoint = _getParameter(Constant.MIGRATION_DELAY_SLASH_POINT);
             jailBlock = _getParameter(Constant.MIGRATION_DELAY_JAIL_BLOCK);
+        } else {
+            delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
         }
         _beforePropose(jailBlock, delaySlashPoint, user, p, e);
         if (_consensus(p, e.maintainers.length)) {
@@ -457,7 +461,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
             abi.encodePacked(
                 txInItem.txInType,
                 txInItem.orderId,
-                txInItem.chain,
+                txInItem.chainAndGasLimit,
                 txInItem.height,
                 txInItem.token,
                 txInItem.amount,
@@ -473,8 +477,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
             abi.encodePacked(
                 txOutItem.txOutType,
                 txOutItem.orderId,
+                txOutItem.chainAndGasLimit,
                 txOutItem.height,
-                txOutItem.chain,
                 txOutItem.gasUsed,
                 txOutItem.sequence,
                 txOutItem.sender,

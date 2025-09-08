@@ -57,6 +57,10 @@ contract Maintainers is BaseImplementation, IMaintainers {
         _;
     }
 
+    function initialize(address _defaultAdmin) public initializer {
+        __BaseImplementation_init(_defaultAdmin);
+    }
+
     receive() external payable {}
 
     function set(address _manager, address _parameter) external restricted {
@@ -74,7 +78,6 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     function register(bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress)
         external
-        restricted
     {
         address user = msg.sender;
         MaintainerInfo storage info = maintainerInfos[user];
@@ -113,6 +116,19 @@ contract Maintainers is BaseImplementation, IMaintainers {
         delete maintainerInfos[user];
         emit Deregister(user);
     }
+
+    function getMaintainerInfos(address[] calldata ms) external view returns(MaintainerInfo[] memory infos) {
+        uint256 len = ms.length;
+        infos  = new MaintainerInfo[](len);
+        for (uint i = 0; i < len; i++) {
+            infos[i] = maintainerInfos[ms[i]];
+        }
+    }
+
+    function getEpochInfo(uint256 epochId) external view returns(EpochInfo memory info) {
+        epochId = epochId == 0 ? currentEpoch : epochId;
+        info = epochInfos[epochId];
+    } 
 
     function orchestrate() external {
         if (electionEpoch == 0) {

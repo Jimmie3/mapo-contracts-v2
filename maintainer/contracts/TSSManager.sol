@@ -32,8 +32,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
         uint256 epochId;
         bytes pubkey;
-        address[] maintainers;
-        // EnumerableSet.AddressSet maintainerList;
+        // address[] maintainers;
+        EnumerableSet.AddressSet maintainers;
     }
 
     //
@@ -116,7 +116,9 @@ contract TSSManager is BaseImplementation, ITSSManager {
         bytes32 keyHash = epochKeys[currentEpoch];
         TSSInfo storage currentTSS = tssInfos[keyHash];
 
-        if (Utils.addressListEq(currentTSS.maintainers, _maintainers)) {
+        address[] memory currentMaintainers = currentTSS.maintainers.values();
+
+        if (Utils.addressListEq(currentMaintainers, _maintainers)) {
             // no need rotate
             epochKeys[_epochId] = activePubkey;
             currentTSS.epochId = _epochId;
@@ -130,10 +132,15 @@ contract TSSManager is BaseImplementation, ITSSManager {
         // voteUpdateTssPool time out reElect
         if (e.electBlock > 0) {
             _resetSlashPoint(_epochId, _maintainers);
+
+            e.maintainers.clear();
         }
         e.electBlock = _getBlock();
 
-        e.maintainers = _maintainers;
+        for (uint256 i = 0; i < _maintainers.length; i++) {
+            e.maintainers.add(_maintainers[i]);
+        }
+        // e.maintainers = _maintainers;
         e.epochId = _epochId;
 
         e.status = TSSStatus.KEYGEN_PENDING;
@@ -222,10 +229,10 @@ contract TSSManager is BaseImplementation, ITSSManager {
         }
         _beforePropose(delaySlashPoint, user, p, e);
         if (keyGen) {
-            if (!Utils.addressListEq(param.members, e.maintainers)) revert invalid_members();
+            if (!Utils.addressListEq(param.members, e.maintainers.values())) revert invalid_members();
             _checkSig(param.pubkey, param.signature);
 
-            if (_consensus(p, e.maintainers.length)) {
+            if (_consensus(p, e.maintainers.length())) {
                 // todo: update status
                 _handleConsensus(param.epoch, delaySlashPoint, p, e.maintainers);
             }
@@ -244,7 +251,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
             }
         } else {
             // keyGen failed;
-            if (_consensus(p, e.maintainers.length)) {
+            if (_consensus(p, e.maintainers.length())) {
                 // add blames to jail
                 _batchAddToJail(param.blames);
                 _handleConsensus(param.epoch, delaySlashPoint, p, e.maintainers);
@@ -278,7 +285,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         Proposal storage p = proposals[hash];
         uint256 delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
         _beforePropose(delaySlashPoint, user, p, e);
-        if (_consensus(p, e.maintainers.length)) {
+        if (_consensus(p, e.maintainers.length())) {
             _getRelay().postNetworkFee(chain, height, transactionSize, transactionSizeWithCall, transactionRate);
             _handleConsensus(e.epochId, delaySlashPoint, p, e.maintainers);
         }
@@ -300,7 +307,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         Proposal storage p = proposals[hash];
         uint256 delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
         _beforePropose(delaySlashPoint, user, p, e);
-        if (_consensus(p, e.maintainers.length)) {
+        if (_consensus(p, e.maintainers.length())) {
             _getRelay().executeTxIn(txInItem);
             _handleConsensus(e.epochId, delaySlashPoint, p, e.maintainers);
         }
@@ -328,7 +335,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
             delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
         }
         _beforePropose(delaySlashPoint, user, p, e);
-        if (_consensus(p, e.maintainers.length)) {
+        if (_consensus(p, e.maintainers.length())) {
             p.consensusBlock = _getBlock();
             _getRelay().executeTxOut(txOutItem);
             _handleConsensus( e.epochId, delaySlashPoint, p, e.maintainers);
@@ -379,9 +386,10 @@ contract TSSManager is BaseImplementation, ITSSManager {
         Proposal storage p,
         TSSInfo storage e
     ) internal {
-        if (!Utils.addressListContains(e.maintainers, maintainer)) {
-            revert no_access();
-        }
+        if (!e.maintainers.contains(maintainer)) revert no_access();
+        //if (!Utils.addressListContains(e.maintainers, maintainer)) {
+        //    revert no_access();
+        //}
         if (p.proposed[maintainer]) revert already_propose();
         p.proposed[maintainer] = true;
         p.count += 1;
@@ -402,17 +410,17 @@ contract TSSManager is BaseImplementation, ITSSManager {
         uint256 epochId,
         uint256 delaySlashPoint,
         Proposal storage p,
-        address[] memory maintainers
+        EnumerableSet.AddressSet storage maintainers
     ) internal {
         p.consensusBlock = _getBlock();
-        uint256 len = maintainers.length;
+        uint256 len = maintainers.length();
         // maintainers submitted propose before Consensus
         address[] memory subs = new address[](p.count);
         // maintainers no-submitted propose before Consensus
         address[] memory adds = new address[](len - p.count);
         uint256 index;
         for (uint256 i = 0; i < len;) {
-            address a = maintainers[i];
+            address a = maintainers.at(i);
             if (p.proposed[a]) {
                 subs[index] = a;
                 ++index;

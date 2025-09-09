@@ -44,13 +44,6 @@ contract TSSManager is BaseImplementation, ITSSManager {
     // epoch => address => point
     mapping(uint256 => mapping(address => uint256)) private slashPoints;
 
-    // mapping(address => uint256) private jail;
-
-    struct KeyShare {
-        bytes pubkey;
-        bytes keyShare;
-    }
-
     mapping(address => KeyShare) private keyShares;
 
     struct Proposal {
@@ -70,10 +63,14 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
     event VoteTxIn(TxInItem txInItem);
     event VoteTxOut(TxOutItem txOutItem);
+    event VoteNetworkFee(uint256 epoch, uint256 chain, uint256 height, uint256 limit, uint256 price);
 
     event Set(address _maintainer, address _relay, address _parameter);
+    event Rotate(uint256 currentId, uint256 nextId);
+    event Retire(uint256 retireEpochId, uint256 activeEpochId);
+    event MigrateCompleted(uint256 epochId);
     event UpdateKeyShare(address maitainer, bytes pubkey, bytes keyShare);
-    event VoteNetworkFee(uint256 epoch, uint256 chain, uint256 height, uint256 limit, uint256 price);
+
 
     error no_access();
     error invalid_sig();
@@ -104,6 +101,10 @@ contract TSSManager is BaseImplementation, ITSSManager {
         TSSInfo storage e = tssInfos[keyHash];
 
         return e.status;
+    }
+
+    function getKeyShare(address m) external view returns(KeyShare memory keyShare) {
+        keyShare = keyShares[m];
     }
 
     function elect(uint256 _epochId, address[] calldata _maintainers)
@@ -140,11 +141,10 @@ contract TSSManager is BaseImplementation, ITSSManager {
         for (uint256 i = 0; i < _maintainers.length; i++) {
             e.maintainers.add(_maintainers[i]);
         }
-        // e.maintainers = _maintainers;
+
         e.epochId = _epochId;
 
         e.status = TSSStatus.KEYGEN_PENDING;
-        // todo emit new election members
 
         return true;
     }
@@ -164,7 +164,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
         activeEpoch.status = TSSStatus.MIGRATING;
 
         _getRelay().rotate(retireEpoch.pubkey, activeEpoch.pubkey);
-        // todo: emit event
+        
+        emit Rotate(currentId, nextId);
     }
 
     function retire(uint256 retireEpochId, uint256 activeEpochId) external override onlyMaintainers {
@@ -176,8 +177,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
         retireTSS.status = TSSStatus.RETIRED;
         activeTSS.status = TSSStatus.ACTIVE;
-
-        // todo: emit event
+        
+        emit Retire(retireEpochId, activeEpochId);
     }
 
     function migrate() external override onlyMaintainers {
@@ -187,8 +188,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
             TSSInfo storage activeEpoch = tssInfos[activePubkey];
             if (activeEpoch.status == TSSStatus.MIGRATING) {
                 activeEpoch.status = TSSStatus.MIGRATED;
-
-                // todo: emit event
+                emit MigrateCompleted(activeEpoch.epochId);
             }
         }
     }
@@ -222,6 +222,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
         bool keyGen = (param.blames.length == 0);
         uint256 delaySlashPoint;
         if (keyGen) {
+            // KEY_GEN_DELAY_SLASH_POINT must gt MAX_SLASH_POINT_FOR_ELECT
+            // It means that if there is a KEY_GEN_DELAY, they cannot be elected in the next election.
             delaySlashPoint = _getParameter(Constant.KEY_GEN_DELAY_SLASH_POINT);
         } else {
             // keyGen failed
@@ -233,8 +235,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
             _checkSig(param.pubkey, param.signature);
 
             if (_consensus(p, e.maintainers.length())) {
-                // todo: update status
                 _handleConsensus(param.epoch, delaySlashPoint, p, e.maintainers);
+                e.status = TSSStatus.KEYGEN_CONSENSUS;
             }
             // all members commit
             if (p.count == param.members.length) {
@@ -247,7 +249,6 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
                 te.pubkey = param.pubkey;
                 te.threshold = uint64(param.members.length) * 2 / 3;
-                //te.startBlock = _getBlock();
             }
         } else {
             // keyGen failed;
@@ -255,9 +256,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
                 // add blames to jail
                 _batchAddToJail(param.blames);
                 _handleConsensus(param.epoch, delaySlashPoint, p, e.maintainers);
+                e.status = TSSStatus.KEYGEN_FAILED;
             }
-
-            e.status = TSSStatus.KEYGEN_FAILED;
         }
 
         emit VoteUpdateTssPool(param);
@@ -387,9 +387,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         TSSInfo storage e
     ) internal {
         if (!e.maintainers.contains(maintainer)) revert no_access();
-        //if (!Utils.addressListContains(e.maintainers, maintainer)) {
-        //    revert no_access();
-        //}
+
         if (p.proposed[maintainer]) revert already_propose();
         p.proposed[maintainer] = true;
         p.count += 1;

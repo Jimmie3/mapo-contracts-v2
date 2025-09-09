@@ -56,9 +56,10 @@ contract Maintainers is BaseImplementation, IMaintainers {
     event Deregister(address user);
     event Set(address _manager, address _parameter);
     event UpdateMaintainerLimit(uint256 limit);
-    event AddScore(uint256 epoch, address[] ms, uint256 score);
-    event AddToJail(uint256 epoch, address m, uint256 slashPonit);
+    event ReleaseFromJail(address m);
+    event AddToJail(address m, uint256 jailBlock);
     event DistributeReward(uint256 epoch, address m, uint256 value);
+    event Elect(uint256 epochId, address[] maintainers, bool maintainersUpdate);
     event Update(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
     event Register(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
 
@@ -146,13 +147,14 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
         maintainerInfos[_maintainer].status = MaintainerStatus.JAILED;
 
-        jailList.set(_maintainer, block.number + _getParameter(JAIL_BLOCK));
+        uint256 jailBlock = block.number + _getParameter(JAIL_BLOCK);
 
-        // todo: emit event
+        jailList.set(_maintainer, jailBlock);
+        emit AddToJail(_maintainer, jailBlock);
     }
 
     function _releaseFromJail() internal {
-        uint256 blockNumber = block.chainid;
+        uint256 blockNumber = block.number;
         address[] memory maintainers = jailList.keys();
         for (uint256 i = 0; i < maintainers.length; i++) {
             address m = maintainers[i];
@@ -161,7 +163,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
             }
             jailList.remove(m);
             maintainerInfos[m].status = MaintainerStatus.STANDBY;
-            // todo: emit event
+            emit ReleaseFromJail(m);
         }
     }
 
@@ -258,8 +260,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
             // keep current epoch elected maintainers status ACTIVE
             _switchMaintainerStatus(maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.READY);
         }
-
-        // todo: emit epoch info
+        emit Elect(electionEpoch, maintainers, maintainersUpdate);
     }
 
 
@@ -339,7 +340,6 @@ contract Maintainers is BaseImplementation, IMaintainers {
         address[] memory validators = _getCurrentValidatorSigners();
         uint256 length = validators.length;
 
-        // maintainers = new address[](selectedCount);
         address[] memory maintainers = new address[](maintainerLimit);
         uint256 selectedCount;
         ITSSManager m = tssManager;
@@ -356,7 +356,6 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 ++i;
             }
         }
-        // if (selectedCount != 0) revert maintainer_not_enough();
 
         return (maintainers, selectedCount);
     }
@@ -373,7 +372,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
     function _needReElect(ITSSManager.TSSStatus status, EpochInfo storage epoch) internal view returns (bool) {
         return status == ITSSManager.TSSStatus.KEYGEN_FAILED
             || (
-                status == ITSSManager.TSSStatus.KEYGEN_PENDING
+                status == ITSSManager.TSSStatus.KEYGEN_CONSENSUS
                     && (epoch.electedBlock + _getParameter(MAX_BLOCKS_FOR_UPDATE_TSS) < block.number)
             );
     }

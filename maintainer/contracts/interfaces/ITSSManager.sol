@@ -73,7 +73,7 @@ interface ITSSManager {
 
     function getSlashPoint(uint256 epoch, address m) external view returns (uint256 point);
 
-    function getJailBlock(address m) external view returns (uint256 jailBlock);
+    // function getJailBlock(address m) external view returns (uint256 jailBlock);
 
     function batchGetSlashPoint(uint256 epoch, address[] calldata ms) external view returns (uint256[] memory points);
 }

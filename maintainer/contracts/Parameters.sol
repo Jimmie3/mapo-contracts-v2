@@ -41,4 +41,8 @@ contract Parameters is BaseImplementation, IParameters {
         return values[Constant.KEY_GEN_DELAY_SLASH_POINT];
     }
 
+    function getJailedBlock() external view returns (uint256) {
+        return values[Constant.KEY_GEN_FAIL_JAIL_BLOCK];
+    }
+
 }

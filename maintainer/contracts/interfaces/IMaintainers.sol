@@ -8,16 +8,7 @@ interface IMaintainers {
         STANDBY, // waiting to participate tss
         READY, // selected, the new tss member
         ACTIVE, // current tss member
-        DISABLED
-    }
-
-    enum ElectionStatus {
-        NONE,
-        SCHEDULED,
-        IN_PROGRESS,
-        COMPLETED,
-        INIT // waiting for tss setup
-
+        JAILED
     }
 
     struct MaintainerInfo {
@@ -45,8 +36,9 @@ interface IMaintainers {
     function update(bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress) external;
     function revoke() external;
     function deregister() external;
+
     function getMaintainerInfos(address[] calldata ms) external view returns(MaintainerInfo[] memory infos);
     function getEpochInfo(uint256 epochId) external view returns(EpochInfo memory info);
-    // function onKeyGenCompleted(bool success, bytes32 publicKeyHash) external;
-    // function onRotationCompleted(bool success) external;
+
+    function jail(address maintainer) external;
 }

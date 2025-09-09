@@ -49,6 +49,7 @@ interface ITSSManager {
     enum TSSStatus {
         UNKNOWN,            // Initial state, TSS not initialized
         KEYGEN_PENDING,     // TSS key generation in progress, waiting for off-chain MPC computation
+        KEYGEN_CONSENSUS,   // TSS key generation consensus, waiting for completed
         KEYGEN_COMPLETED,   // TSS key generation completed, ready to be activated
         KEYGEN_FAILED,      // TSS key generation failed, requires re-election
 
@@ -73,7 +74,12 @@ interface ITSSManager {
 
     function getSlashPoint(uint256 epoch, address m) external view returns (uint256 point);
 
-    // function getJailBlock(address m) external view returns (uint256 jailBlock);
-
     function batchGetSlashPoint(uint256 epoch, address[] calldata ms) external view returns (uint256[] memory points);
+
+    struct KeyShare {
+        bytes pubkey;
+        bytes keyShare;
+    }
+    
+    function getKeyShare(address m) external view returns(KeyShare memory keyShare);
 }

@@ -31,7 +31,7 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
     // token => feature
     mapping(address => uint256) public tokenFeatureList;
 
-    mapping (bytes32 => bool) public failedHash;
+    mapping(bytes32 => bool) public failedHash;
 
     event SetWToken(address _wToken);
     event UpdateTokens(address token, uint256 feature);
@@ -66,19 +66,14 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
     );
 
     event BridgeFailed(
-        bytes32 indexed orderId,
-        address token,
-        uint256 amount,
-        bytes from,
-        address to,
-        bytes data,
-        bytes reason
+        bytes32 indexed orderId, address token, uint256 amount, bytes from, address to, bytes data, bytes reason
     );
 
     error transfer_in_failed();
     error transfer_out_failed();
     error order_executed();
     error zero_address();
+    error invalid_refund_address();
     error invalid_signature();
     error not_bridge_able();
     error invalid_target_chain();
@@ -96,7 +91,6 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
         tss = _tss;
         emit UpdateTSS(bytes32(0), bytes(""), _tss);
     }
-
 
     function updateTokens(address[] calldata _tokens, uint256 _feature) external restricted {
         for (uint256 i = 0; i < _tokens.length; i++) {
@@ -117,8 +111,8 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
         return _isBridgeAble(_token);
     }
 
-    function _isBridgeAble(address _token) internal view returns(bool) {
-        ((tokenFeatureList[_token] & BRIDGABLE_TOKEN) == BRIDGABLE_TOKEN);
+    function _isBridgeAble(address _token) internal view returns (bool) {
+        return ((tokenFeatureList[_token] & BRIDGABLE_TOKEN) == BRIDGABLE_TOKEN);
     }
 
     function deposit(address token, uint256 amount, address to, address refund)
@@ -131,27 +125,31 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
         require(amount != 0);
         address user = msg.sender;
         if (to == ZERO_ADDRESS) revert zero_address();
+        if (refund == ZERO_ADDRESS) revert invalid_refund_address();
         bytes memory receiver = abi.encodePacked(to);
         address outToken = _safeReceiveToken(token, user, amount);
-        orderId = _getOrderId(user, outToken, amount);
-        address from = (refund == address(0)) ? user : refund;
-        emit BridgeOut(orderId, selfChainId << 192, TxType.DEPOSIT, tss, outToken, amount, from, receiver, bytes(""));
+        orderId = _getOrderId(user);
+        //address from = (refund == address(0)) ? user : refund;
+        emit BridgeOut(orderId, selfChainId << 192, TxType.DEPOSIT, tss, outToken, amount, user, receiver, bytes(""));
     }
 
-    function bridgeOut(address token, uint256 amount, uint256 toChain, bytes memory to, address refund, bytes memory payload)
-        external
-        payable
-        whenNotPaused
-        nonReentrant
-        returns (bytes32 orderId)
-    {
+    function bridgeOut(
+        address token,
+        uint256 amount,
+        uint256 toChain,
+        bytes memory to,
+        address refund,
+        bytes memory payload
+    ) external payable whenNotPaused nonReentrant returns (bytes32 orderId) {
         require(amount != 0 && toChain != selfChainId);
+        if (refund == ZERO_ADDRESS) revert invalid_refund_address();
+
         address user = msg.sender;
         address outToken = _safeReceiveToken(token, user, amount);
-        orderId = _getOrderId(user, outToken, amount);
-        address from = (refund == address(0)) ? user : refund;
+        orderId = _getOrderId(user);
+        // address from = (refund == address(0)) ? user : refund;
         uint256 chainAndGasLimit = selfChainId << 192 | toChain << 128;
-        emit BridgeOut(orderId, chainAndGasLimit, TxType.TRANSFER, tss, outToken, amount, from, to, payload);
+        emit BridgeOut(orderId, chainAndGasLimit, TxType.TRANSFER, tss, outToken, amount, user, to, payload);
     }
 
     struct BridgeInParams {
@@ -165,39 +163,53 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
         bytes payload;
     }
 
-    function bridgeIn(bytes32 orderId, bytes calldata vault, bytes calldata params, bytes calldata signature) external whenNotPaused nonReentrant {
+    function bridgeIn(bytes32 orderId, bytes calldata vault, bytes calldata params, bytes calldata signature)
+        external
+        whenNotPaused
+        nonReentrant
+    {
         if (orderExecuted[orderId]) revert order_executed();
-        if (!_checkSignature(orderId, vault, params, signature)) revert invalid_signature();
-        BridgeInParams memory bridgeParam;
-        bytes memory to;
-        bytes memory token;
-        (bridgeParam.chainAndGasLimit, bridgeParam.txType, bridgeParam.sequence, token, bridgeParam.amount, bridgeParam.from, to, bridgeParam.payload) = 
-        abi.decode(params, (uint256,TxType,uint256,bytes,uint256,bytes,bytes,bytes));
+
+        BridgeInParams memory bridgeParam = abi.decode(params, (BridgeInParams));
+        if (!_checkSignature(orderId, vault, signature, bridgeParam)) revert invalid_signature();
+
         _checkVault(bridgeParam.sequence, vault);
         _checkTargetChain(bridgeParam.chainAndGasLimit);
-        bridgeParam.token = _fromBytes(token);
-        bridgeParam.to = _fromBytes(to);
+        //bridgeParam.token = _fromBytes(token);
+        //bridgeParam.to = _fromBytes(to);
         emit BridgeIn(
-            orderId, bridgeParam.chainAndGasLimit, bridgeParam.txType, vault, bridgeParam.sequence, msg.sender, bridgeParam.token, bridgeParam.amount, bridgeParam.from, bridgeParam.to, bridgeParam.payload
+            orderId,
+            bridgeParam.chainAndGasLimit,
+            bridgeParam.txType,
+            vault,
+            bridgeParam.sequence,
+            msg.sender,
+            bridgeParam.token,
+            bridgeParam.amount,
+            bridgeParam.from,
+            bridgeParam.to,
+            bridgeParam.payload
         );
-        if(bridgeParam.txType == TxType.MIGRATE) {
-           _updateTSS(orderId, bridgeParam.sequence, bridgeParam.payload);
-        } else if(bridgeParam.txType == TxType.TRANSFER || bridgeParam.txType == TxType.REFUND) {
-           _bridgeTokenIn(orderId, bridgeParam);
+        if (bridgeParam.txType == TxType.MIGRATE) {
+            _updateTSS(orderId, bridgeParam.sequence, bridgeParam.payload);
+        } else if (bridgeParam.txType == TxType.TRANSFER || bridgeParam.txType == TxType.REFUND) {
+            _bridgeTokenIn(orderId, bridgeParam);
         } else {
             revert invalid_in_tx_type();
         }
     }
 
     function _bridgeTokenIn(bytes32 orderId, BridgeInParams memory param) internal {
-        if(param.amount > 0 && param.to != address(0)) {
+        if (param.amount > 0 && param.to != address(0)) {
             bool call = _needCall(param.to, param.payload.length);
             bool result = _safeTransferOut(param.token, param.to, param.amount, call);
             if (result) {
-                if(call) {
+                if (call) {
                     uint256 fromChain = param.chainAndGasLimit >> 192;
                     uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
-                    try IReceiver(param.to).onReceived{gas: gasForCall}(orderId, param.token, param.amount, fromChain, param.from, param.payload) {} catch {}
+                    try IReceiver(param.to).onReceived{gas: gasForCall}(
+                        orderId, param.token, param.amount, fromChain, param.from, param.payload
+                    ) {} catch {}
                 }
                 return;
             }
@@ -213,34 +225,17 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
     }
 
     function _bridgeFailed(bytes32 orderId, BridgeInParams memory param, bytes memory reason) internal {
-        bytes32 hash = keccak256(abi.encodePacked(
-            orderId,
-            param.token, 
-            param.amount,
-            param.from,
-            param.to,
-            param.payload
-        ));
+        bytes32 hash =
+            keccak256(abi.encodePacked(orderId, param.token, param.amount, param.from, param.to, param.payload));
         failedHash[hash] = true;
-        emit BridgeFailed(
-            orderId,
-            param.token,
-            param.amount,
-            param.from,
-            param.to,
-            param.payload,
-            reason
-        );
+        emit BridgeFailed(orderId, param.token, param.amount, param.from, param.to, param.payload, reason);
     }
 
     function isOrderExecuted(bytes32 orderId) external view returns (bool) {
         return orderExecuted[orderId];
     }
 
-    function _safeTransferOut(address token, address to, uint256 value, bool needCall)
-        internal
-        returns (bool result)
-    {
+    function _safeTransferOut(address token, address to, uint256 value, bool needCall) internal returns (bool result) {
         address _wToken = wToken;
         if (token == _wToken && !needCall) {
             bool success;
@@ -257,7 +252,7 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
             }
             result = (success && (data.length == 0 || abi.decode(data, (bool))));
         } else {
-            if(_isMintable(token)) IMintableToken(token).mint(address(this), value);
+            if (_isMintable(token)) IMintableToken(token).mint(address(this), value);
             // bytes4(keccak256(bytes('transfer(address,uint256)')));  transfer
             (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, value));
             result = (success && (data.length == 0 || abi.decode(data, (bool))));
@@ -284,24 +279,44 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
             }
             uint256 balanceAfter = IERC20(token).balanceOf(to);
             if (balanceAfter - balanceBefore != value) revert transfer_in_failed();
-            if(_isMintable(outToken)) IMintableToken(outToken).burn(value);
+            if (_isMintable(outToken)) IMintableToken(outToken).burn(value);
         }
-        if(!_isBridgeAble(outToken)) revert not_bridge_able();
+        if (!_isBridgeAble(outToken)) revert not_bridge_able();
     }
 
-    function _checkSignature(bytes32 orderId, bytes calldata vault, bytes calldata params, bytes calldata signature) internal pure returns (bool) {
-        bytes32 hash = keccak256(abi.encodePacked(orderId, params));
+    function _checkSignature(
+        bytes32 orderId,
+        bytes calldata vault,
+        bytes calldata signature,
+        BridgeInParams memory params
+    ) internal pure returns (bool) {
+        // todo: encodePack whole data
+        bytes32 hash = keccak256(
+            abi.encodePacked(
+                orderId,
+                params.chainAndGasLimit,
+                params.txType,
+                vault,
+                params.sequence,
+                params.token,
+                params.amount,
+                params.from,
+                params.to,
+                params.payload
+            )
+        );
+        // bytes32 hash = keccak256(abi.encodePacked(orderId, params));
         address signer = ECDSA.recover(hash, signature);
         return signer == _publicKeyToAddress(vault);
     }
 
     function _checkVault(uint256 sequence, bytes memory vault) internal view {
-       if(!_checkBytes(_getTss(sequence), vault)) revert invalid_vault();
+        if (!_checkBytes(_getTss(sequence), vault)) revert invalid_vault();
     }
 
     function _checkTargetChain(uint256 chainAndGasLimit) internal view {
-        uint256 tochain = (chainAndGasLimit >> 128) & (1 << 64 - 1);
-        if(tochain != selfChainId) revert invalid_target_chain(); 
+        uint256 toChain = (chainAndGasLimit >> 128) & (1 << 64 - 1);
+        if (toChain != selfChainId) revert invalid_target_chain();
     }
 
     function _publicKeyToAddress(bytes calldata publicKey) public pure returns (address) {
@@ -316,8 +331,15 @@ contract Gateway is BaseImplementation, ReentrancyGuardUpgradeable {
         _tss = (sequence > retireSequence) ? tss : retireTss;
     }
 
-    function _getOrderId(address user, address token, uint256 amount) internal returns (bytes32 orderId) {
-        return keccak256(abi.encodePacked(selfChainId, user, token, amount, ++nonce));
+    function _getOrderId(address user) internal returns (bytes32 orderId) {
+        return keccak256(abi.encodePacked(address(this), selfChainId, user, ++nonce));
+    }
+
+    function _getOrderId(uint256 _fromChain, uint256 _toChain, address _from, bytes memory _to)
+        internal
+        returns (bytes32)
+    {
+        return keccak256(abi.encodePacked(address(this), nonce++, _fromChain, _toChain, _from, _to));
     }
 
     function _checkBytes(bytes memory a, bytes memory b) internal pure returns (bool) {

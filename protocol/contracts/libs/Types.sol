@@ -36,8 +36,9 @@ struct TxInItem {
     uint128 height;
     bytes token;
     uint256 amount;
-    bytes from;
     bytes vault;
+    bytes from;
+    bytes refundAddr;
     bytes to;
     bytes payload;
 }

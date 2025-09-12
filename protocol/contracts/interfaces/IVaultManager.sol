@@ -35,9 +35,17 @@ interface IVaultManager {
 
     function transferIn(uint256 fromChain, bytes memory vault, address token, uint256 amount) external returns (bool);
 
-    function transferOut(uint256 chain, bytes memory vault, address token, uint256 amount, uint256 relayGasUsed, uint256 relayGasEstimated) external;
+    function transferOut(
+        uint256 chain,
+        bytes memory vault,
+        address token,
+        uint256 amount,
+        uint256 relayGasUsed,
+        uint256 relayGasEstimated
+    ) external;
 
-    function doTransfer(uint256 toChain, bytes memory vault, address token, uint256 amount, uint256 estimatedGas) external;
+    function doTransfer(uint256 toChain, bytes memory vault, address token, uint256 amount, uint256 estimatedGas)
+        external;
 
-    function checkVault(bytes calldata vault) external view returns(bool);
+    function checkVault(uint256 fromChain, bytes calldata vault) external view returns (bool);
 }

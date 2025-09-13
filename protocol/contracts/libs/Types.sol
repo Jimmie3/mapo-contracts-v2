@@ -58,3 +58,28 @@ struct TxOutItem {
     bytes vault;
     bytes data;
 }
+
+    struct TxOutBaseItem {
+        uint64 height;
+        uint64 gasUsed;
+        address sender;
+    }
+
+    struct TxBaseItem {
+        TxType txOutType;
+        bytes32 orderId;
+        uint256 chainAndGasLimit;
+        bytes vault;
+    }
+
+
+    struct BridgeParams {
+        uint256 chainAndGasLimit;
+        TxType txType;
+        uint256 sequence;
+        bytes token;
+        uint256 amount;
+        bytes to;
+        bytes from;
+        bytes payload;
+    }

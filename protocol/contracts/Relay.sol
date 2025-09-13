@@ -10,12 +10,11 @@ import {IRegistry} from "./interfaces/IRegistry.sol";
 import {IMintableToken} from "./interfaces/IMintableToken.sol";
 import {IGasService} from "./interfaces/IGasService.sol";
 import {IPeriphery} from "./interfaces/IPeriphery.sol";
-import {IRegistry} from "./interfaces/IRegistry.sol";
 import {IVaultManager} from "./interfaces/IVaultManager.sol";
 import {ISwap} from "./interfaces/ISwap.sol";
 import {IAffiliateFeeManager} from "./interfaces/IAffiliateFeeManager.sol";
 
-import {TxType, TxInItem, TxOutItem, ChainType, TxItem} from "./libs/Types.sol";
+import {TxType, TxInItem, TxOutItem, ChainType, TxItem, BridgeParams} from "./libs/Types.sol";
 
 import {Errs} from "./libs/Errors.sol";
 
@@ -78,19 +77,24 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
 
     event TransferIn(bytes32 orderId, address token, uint256 amount, address to, bool result);
 
-    event BridgeRelay( // abi.encodePack(orderId, txType, vault, sequence, token, amount, from, to, data);
-        // tss sign base on this hash
+    event BridgeRelay(
         bytes32 indexed orderId,
         // fromChain (8 bytes) | toChain (8 bytes) | txRate (8 bytes) | txSize (8 bytes)
         uint256 indexed chainAndGasLimit,
         TxType txType,
         bytes vault,
-        uint256 sequence,
-        bytes32 hash,
+        bytes to,
         bytes token,
         uint256 amount,
+
+        uint256 sequence,
+
+        // tss sign base on this hash
+        // abi.encodePack(orderId, txType, vault, sequence, token, amount, from, to, data);
+        bytes32 hash,
+
         bytes from,
-        bytes to,
+
         // tokenOut: bytes(payload)
         // migrate: bytes("vault")
         bytes data
@@ -117,20 +121,19 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         bytes data
     );
 
-    event BridgeIn( // maintainer, will receive gas on relay chain
-        // migration: new vault
+    event BridgeIn(
         bytes32 indexed orderId,
         // fromChain (8 bytes) | toChain (8 bytes) | reserved (8 bytes) | gasUsed (8 bytes)
         uint256 indexed chainAndGasLimit,
         TxType txInType,
         bytes vault,
         uint256 sequence,
-        address sender,
+        address sender,     // maintainer, will receive gas on relay chain
         address token,
         uint256 amount,
         bytes from,
         address to,
-        bytes data
+        bytes data          // migration: new vault
     );
 
     event BridgeFeeCollected(bytes32 indexed orderId, address token, uint256 amount);
@@ -214,27 +217,24 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
 
     function relaySigned(
         bytes32 orderId,
-        uint256 chainAndGasLimit,
         bytes calldata vault,
         bytes calldata relayData,
         bytes calldata signature
     ) external {
-        uint256 last = orderIdToBlockNumber[orderId];
         OrderInfo storage order = orderInfos[orderId];
         if (order.signed) return;
 
-        bytes32 vaultKey = keccak256(vault);
-        // if (vaultKey != order.vaultKey) revert Errs.invalid_vault();
+        BridgeParams memory outItem = abi.decode(relayData, (BridgeParams));
 
-        // todo: check the hash in bridgeRelay
+        bytes32 hash = _getSignHash(orderId, vault, outItem);
+        if (hash != order.hash) revert Errs.invalid_signature();
 
-        if (!_checkSignature(orderId, vault, relayData, signature)) revert Errs.invalid_signature();
-        // if(!vaultManager.checkVault(vault)) revert Errs.invalid_vault();
+        address signer = ECDSA.recover(hash, signature);
+        if (signer != _publicKeyToAddress(vault)) revert Errs.invalid_signature();
 
         order.signed = true;
-        _updateLastScanBlock(selfChainId, last);
 
-        emit BridgeRelaySigned(orderId, chainAndGasLimit, vault, relayData, signature);
+        emit BridgeRelaySigned(orderId, outItem.chainAndGasLimit, vault, relayData, signature);
     }
 
     function bridgeOut(address token, uint256 amount, uint256 toChain, bytes memory to, bytes memory payload)
@@ -566,49 +566,42 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
     }
 
     function _emitRelay(TxType txType, uint256 fromChain, TxItem memory txItem, uint256 gasEstimated) internal {
-        bytes memory toChainToken;
-        uint256 toChainAmount;
-        if (!(txType == TxType.MIGRATE && _getRegistry().getChainType(txItem.chain) == ChainType.CONTRACT)) {
-            _checkAndBurn(txItem.token, txItem.amount);
-            toChainToken = _getToChainToken(txItem.chain, txItem.token);
-            toChainAmount = _getToChainAmount(txItem.chain, txItem.token, txItem.amount);
-        }
+        BridgeParams memory outItem = _getTxOutItem(txType, fromChain, txItem);
 
         OrderInfo storage order = orderInfos[txItem.orderId];
         order.estimateGas = gasEstimated;
 
-        uint256 chainAndGas = _getChainAndGas(fromChain, txItem.chain, txItem.transactionRate, txItem.transactionSize);
-
-        // todo: save signed hash
-        uint256 sequence = ++chainSequence[txItem.chain];
-        order.hash = keccak256(
-            abi.encodePacked(
-                txItem.orderId,
-                chainAndGas,
-                txType,
-                txItem.vault,
-                sequence,
-                toChainToken,
-                toChainAmount,
-                txItem.from,
-                txItem.to,
-                txItem.payload
-            )
-        );
+        order.hash = _getSignHash(txItem.orderId, txItem.vault, outItem);
 
         emit BridgeRelay(
             txItem.orderId,
-            chainAndGas,
-            txType,
+            outItem.chainAndGasLimit,
+            outItem.txType,
             txItem.vault,
-            sequence,
+            outItem.to,
+            outItem.token,
+            outItem.amount,
+
+            outItem.sequence,
             order.hash,
-            toChainToken,
-            toChainAmount,
-            txItem.from,
-            txItem.to,
-            txItem.payload
+            outItem.from,
+            outItem.payload
         );
+    }
+
+    function _getTxOutItem(TxType txType, uint256 fromChain, TxItem memory txItem) internal returns (BridgeParams memory bridgeParams) {
+        if (!(txType == TxType.MIGRATE && _getRegistry().getChainType(txItem.chain) == ChainType.CONTRACT)) {
+            _checkAndBurn(txItem.token, txItem.amount);
+            bridgeParams.token = _getToChainToken(txItem.chain, txItem.token);
+            bridgeParams.amount = _getToChainAmount(txItem.chain, txItem.token, txItem.amount);
+        }
+
+        bridgeParams.chainAndGasLimit = _getChainAndGas(fromChain, txItem.chain, txItem.transactionRate, txItem.transactionSize);
+        bridgeParams.sequence = ++chainSequence[txItem.chain];
+        bridgeParams.from = txItem.from;
+        bridgeParams.to = txItem.to;
+        bridgeParams.payload = txItem.payload;
+        bridgeParams.txType = txType;
     }
 
 
@@ -676,14 +669,24 @@ contract Relay is BaseImplementation, ReentrancyGuardUpgradeable, IRelay {
         chainAndGas = ((_fromChain << 192) | (_toChain << 128) | (_transactionRate << 64) | _transactionSize);
     }
 
-    function _checkSignature(bytes32 orderId, bytes calldata vault, bytes calldata relayData, bytes calldata signature)
-        internal
-        pure
-        returns (bool)
-    {
-        bytes32 hash = keccak256(abi.encodePacked(orderId, relayData));
-        address signer = ECDSA.recover(hash, signature);
-        return signer == _publicKeyToAddress(vault);
+
+    function _getSignHash(bytes32 orderId, bytes memory vault, BridgeParams memory outItem) internal pure returns (bytes32) {
+        bytes32 hash = keccak256(
+            abi.encodePacked(
+                orderId,
+                outItem.chainAndGasLimit,
+                outItem.txType,
+                vault,
+                outItem.sequence,
+                outItem.token,
+                outItem.amount,
+                outItem.from,
+                outItem.to,
+                outItem.payload
+            )
+        );
+
+        return hash;
     }
 
     function _publicKeyToAddress(bytes calldata publicKey) public pure returns (address) {

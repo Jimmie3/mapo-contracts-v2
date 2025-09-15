@@ -27,7 +27,7 @@ interface IVaultManager {
         external
         returns (bool toMigrate, bytes memory fromVault, bytes memory toVault, uint256 amount);
 
-    function migrationOut(TxItem memory txItem, bytes memory toVault, uint256 estimatedGas, uint256 usedGas) external;
+    function migrationOut(TxItem memory txItem, bytes memory fromVault, bytes memory toVault, uint256 estimatedGas, uint256 usedGas) external;
 
     function chooseVault(uint256 chain, address token, uint256 amount, uint256 gas)
         external
@@ -48,4 +48,6 @@ interface IVaultManager {
         external;
 
     function checkVault(uint256 fromChain, bytes calldata vault) external view returns (bool);
+
+    function getActiveVault() external view returns (bytes memory);
 }

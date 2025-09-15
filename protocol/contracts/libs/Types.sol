@@ -13,73 +13,46 @@ enum TxType {
     MIGRATE,
     REFUND, //
     MESSAGE // todo
-
 }
 
-struct TxItem {
-    uint256 chain;
-    bytes32 orderId;
-    address token;
-    uint256 amount;
-    uint256 transactionRate;
-    uint256 transactionSize;
+    struct TxItem {
+        bytes32 orderId;
+        address vaultAddress;
+        uint256 chain;
+        address token;
+        uint256 amount;
+        address to;
+        uint256 transactionRate;
+        uint256 transactionSize;
+    }
+
+
+struct BridgeItem {
+    uint256 chainAndGasLimit;
     bytes vault;
+    TxType txType;
+    uint256 sequence;
+    bytes token;
+    uint256 amount;
     bytes from;
     bytes to;
     bytes payload;
 }
 
 struct TxInItem {
-    TxType txInType;
     bytes32 orderId;
-    uint256 chainAndGasLimit;
+    BridgeItem bridgeItem;
     uint128 height;
-    bytes token;
-    uint256 amount;
-    bytes vault;
-    bytes from;
     bytes refundAddr;
-    bytes to;
-    bytes payload;
 }
 
 struct TxOutItem {
-    TxType txOutType;
     bytes32 orderId;
-    uint256 chainAndGasLimit;
+    BridgeItem bridgeItem;
     uint128 height;
     uint128 gasUsed;
-    uint256 sequence;
-    uint256 amount;
     address sender;
-    bytes token;
-    bytes from;
-    bytes to;
-    bytes vault;
-    bytes data;
 }
 
-    struct TxOutBaseItem {
-        uint64 height;
-        uint64 gasUsed;
-        address sender;
-    }
-
-    struct TxBaseItem {
-        TxType txOutType;
-        bytes32 orderId;
-        uint256 chainAndGasLimit;
-        bytes vault;
-    }
 
 
-    struct BridgeParams {
-        uint256 chainAndGasLimit;
-        TxType txType;
-        uint256 sequence;
-        bytes token;
-        uint256 amount;
-        bytes to;
-        bytes from;
-        bytes payload;
-    }

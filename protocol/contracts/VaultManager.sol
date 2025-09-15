@@ -198,12 +198,12 @@ contract VaultManager is BaseImplementation, IVaultManager {
         return bytes("");
     }
 
-    function migrationOut(TxItem memory txItem, bytes memory toVault, uint256 estimatedGas, uint256 usedGas)
+    function migrationOut(TxItem memory txItem, bytes memory fromVault, bytes memory toVault, uint256 estimatedGas, uint256 usedGas)
         external
         override
         onlyRelay
     {
-        bytes32 vaultKey = keccak256(txItem.vault);
+        bytes32 vaultKey = keccak256(fromVault);
         bytes32 targetVaultKey = keccak256(toVault);
         if (vaultKey != retiringVaultKey || targetVaultKey != activeVaultKey) revert Errs.invalid_vault();
 
@@ -318,6 +318,10 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
         bytes32 vaultKey = keccak256(vault);
         return (vaultKey == retiringVaultKey || vaultKey == activeVaultKey);
+    }
+
+    function getActiveVault() external view override returns (bytes memory) {
+        return vaultList[activeVaultKey].pubkey;
     }
 
     function updateVault(uint256 fromChain, uint256 toChain, address token, uint256 amount) external override {}

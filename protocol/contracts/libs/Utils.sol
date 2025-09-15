@@ -2,32 +2,6 @@
 pragma solidity ^0.8.0;
 
 library Utils {
-    function addressListEq(address[] memory list1, address[] memory list2) internal pure returns (bool) {
-        uint256 len = list1.length;
-        if (list2.length != len) return false;
-        for (uint256 i = 0; i < len;) {
-            address addr = list2[i];
-            if (!addressListContains(list1, addr)) return false;
-            unchecked {
-                ++i;
-            }
-        }
-        return true;
-    }
-
-    function addressListContains(address[] memory lsit, address addr) internal pure returns (bool) {
-        uint256 length = lsit.length;
-        for (uint256 i = 0; i < length;) {
-            if (lsit[i] == addr) {
-                return true;
-            }
-            unchecked {
-                ++i;
-            }
-        }
-        return false;
-    }
-
     function uintListContains(uint256[] memory lsit, uint256 v) internal pure returns (bool) {
         uint256 length = lsit.length;
         for (uint256 i = 0; i < length;) {
@@ -103,5 +77,9 @@ library Utils {
 
     function toBytes(address self) internal pure returns (bytes memory b) {
         b = abi.encodePacked(self);
+    }
+
+    function getAddressFromPublicKey(bytes memory publicKey) internal pure returns (address) {
+        return address(uint160(uint256(keccak256(publicKey))));
     }
 }

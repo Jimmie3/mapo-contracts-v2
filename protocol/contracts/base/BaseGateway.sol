@@ -20,7 +20,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     address internal constant ZERO_ADDRESS = address(0);
     uint256 internal constant MIN_GAS_FOR_LOG = 20_000;
 
-    uint256 constant MINTABLE_TOKEN = 0x03;
+    uint256 constant MINTABLE_TOKEN = 0x02;
     uint256 constant BRIDGABLE_TOKEN = 0x01;
 
     uint256 public immutable selfChainId = block.chainid;
@@ -177,28 +177,15 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     ) internal virtual {}
 
     function _bridgeTokenIn(bytes32 orderId, BridgeItem memory bridgeItem, TxItem memory txItem) internal {
-        emit BridgeIn(
-            orderId,
-            bridgeItem.chainAndGasLimit,
-            bridgeItem.txType,
-            bridgeItem.vault,
-            bridgeItem.sequence,
-            msg.sender,
-            txItem.token,
-            bridgeItem.amount,
-            // param.from,
-            txItem.to,
-            bridgeItem.payload
-        );
 
-        if (bridgeItem.amount > 0 && txItem.to != address(0)) {
+        if (txItem.amount > 0 && txItem.to != address(0)) {
             bool needCall = _needCall(txItem.to, bridgeItem.payload.length);
-            bool result = _safeTransferOut(txItem.token, txItem.to, bridgeItem.amount, needCall);
+            bool result = _safeTransferOut(txItem.token, txItem.to, txItem.amount, needCall);
             if (result && needCall) {
                 uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
                 uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
                 try IReceiver(txItem.to).onReceived{gas: gasForCall}(
-                    orderId, txItem.token, bridgeItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
+                    orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
                 ) {} catch {}
 
                 return;
@@ -232,7 +219,6 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
             }
             result = (success && (data.length == 0 || abi.decode(data, (bool))));
         } else {
-            _checkAndMint(token, value);
             // bytes4(keccak256(bytes('transfer(address,uint256)')));  transfer
             (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, value));
             result = (success && (data.length == 0 || abi.decode(data, (bool))));

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {ISwap} from "./interfaces/ISwap.sol";
 import {IGasService} from "./interfaces/IGasService.sol";
 import {IPeriphery} from "./interfaces/IPeriphery.sol";
 import {IRegistry} from "./interfaces/IRegistry.sol";
@@ -18,19 +19,30 @@ contract GasService is BaseImplementation, IGasService {
         uint256 transactionSizeWithCall;
     }
 
-    IHiveSwapV3Quoter public quoter;
+    ISwap public swap;
     IPeriphery public periphery;
     mapping(uint256 => NetworkFee) public chainNetworkFee;
 
+    event SetSwap(address _swap);
     event SetPeriphery(address _periphery);
     event PostNetworkFee(
         uint256 chain, uint256 height, uint256 transactionSize, uint256 transactionSizeWithCall, uint256 transactionRate
     );
 
+    function initialize(address _defaultAdmin) public initializer {
+        __BaseImplementation_init(_defaultAdmin);
+    }
+
     function setPeriphery(address _periphery) external restricted {
         require(_periphery != address(0));
         periphery = IPeriphery(_periphery);
         emit SetPeriphery(_periphery);
+    }
+
+    function setSwap(address _swap) external restricted {
+        require(_swap != address(0));
+        swap = ISwap(_swap);
+        emit SetSwap(_swap);
     }
 
     function postNetworkFee(
@@ -61,21 +73,10 @@ contract GasService is BaseImplementation, IGasService {
         returns (uint256 networkFee)
     {
         uint256 fee = _getNetworkFee(chain, withCall);
-
-        address gasToken = _getTokenRegistry().getChainGasToken(chain);
-
-        IHiveSwapV3Quoter.QuoteExactInputSingleParams memory params = IHiveSwapV3Quoter.QuoteExactInputSingleParams({
-            tokenIn: gasToken,
-            tokenOut: token,
-            amountIn: fee,
-            fee: 3000, // Assuming a standard fee of 0.3%
-            sqrtPriceLimitX96: 0
-        });
-        // Use staticcall to simulate the non-view function inside a view function
-        (bool success, bytes memory data) =
-            address(quoter).staticcall(abi.encodeWithSelector(quoter.quoteExactInputSingle.selector, params));
-        require(success);
-        (networkFee,,,) = abi.decode(data, (uint256, uint160, uint32, uint256));
+        IRegistry r = _getTokenRegistry();
+        address gasToken = r.getChainGasToken(chain);
+        uint256 relayChainFeeAmount = r.getRelayChainAmount(r.getToChainToken(gasToken, chain), chain, fee);
+        networkFee = swap.getAmountOut(gasToken, token, relayChainFeeAmount);
     }
 
     function _getNetworkFee(uint256 chain, bool withCall) internal view returns (uint256 networkFee) {

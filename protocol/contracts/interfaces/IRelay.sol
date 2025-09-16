@@ -7,7 +7,6 @@ interface IRelay {
     function addChain(uint256 chain, uint256 startBlock) external;
 
     function removeChain(uint256 chain) external;
-    // function updateLastScanBlock(uint256 chain, uint256 height) external;
 
     function rotate(bytes memory retiringVault, bytes memory activeVault) external;
 
@@ -23,4 +22,6 @@ interface IRelay {
         uint256 transactionSizeWithCall,
         uint256 transactionRate
     ) external;
+
+    function getChainLastScanBlock(uint256 chain) external view returns(uint256);
 }

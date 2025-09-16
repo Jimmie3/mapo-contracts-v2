@@ -28,9 +28,14 @@ contract Gateway is BaseGateway {
     error invalid_vault();
     error invalid_in_tx_type();
 
+    function initialize(address _defaultAdmin) public initializer {
+        __BaseImplementation_init(_defaultAdmin);
+    }
+
     function setTssAddress(bytes calldata _tss) external restricted {
         require(tss.length == 0 && _tss.length != 0);
         tss = _tss;
+        activeTssAddress = Utils.getAddressFromPublicKey(_tss);
         emit UpdateTSS(bytes32(0), bytes(""), _tss);
     }
 
@@ -78,7 +83,6 @@ contract Gateway is BaseGateway {
             sender,
             txItem.token,
             txItem.amount,
-            // bridgeParam.from,
             txItem.to,
             bridgeItem.payload
         );
@@ -86,6 +90,7 @@ contract Gateway is BaseGateway {
         if (bridgeItem.txType == TxType.MIGRATE) {
             _updateTSS(orderId, bridgeItem.sequence, bridgeItem.payload);
         } else if (bridgeItem.txType == TxType.TRANSFER || bridgeItem.txType == TxType.REFUND) {
+            _checkAndMint(txItem.token, txItem.amount);
             _bridgeTokenIn(orderId, bridgeItem, txItem);
         } else {
             revert invalid_in_tx_type();
@@ -94,8 +99,10 @@ contract Gateway is BaseGateway {
 
     function _updateTSS(bytes32 orderId, uint256 sequence, bytes memory newVault) internal whenNotPaused nonReentrant {
         retireTss = tss;
+        retireTssAddress = activeTssAddress;
         tss = newVault;
         retireSequence = sequence;
+        activeTssAddress = Utils.getAddressFromPublicKey(newVault);
         emit UpdateTSS(orderId, retireTss, newVault);
     }
 
@@ -111,7 +118,7 @@ contract Gateway is BaseGateway {
     }
 
     function _checkTargetChain(uint256 chainAndGasLimit) internal view {
-        uint256 toChain = (chainAndGasLimit >> 128) & (1 << 64 - 1);
+        uint256 toChain = (chainAndGasLimit >> 128) & 0xFFFFFFFFFFFFFFFF;
         if (toChain != selfChainId) revert invalid_target_chain();
     }
 

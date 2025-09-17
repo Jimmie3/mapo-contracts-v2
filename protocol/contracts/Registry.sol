@@ -7,11 +7,14 @@ import {Utils} from "./libs/Utils.sol";
 
 import {IVaultToken} from "./interfaces/IVaultToken.sol";
 import {IRegistry, ChainType} from "./interfaces/IRegistry.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 contract Registry is BaseImplementation, IRegistry {
+    using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.BytesSet;
     uint256 constant MAX_RATE_UNIT = 1_000_000;
 
     struct FeeRate {
@@ -43,13 +46,13 @@ contract Registry is BaseImplementation, IRegistry {
         address gasToken;
         bytes router;
         string name;
-        bytes[] tokens;
+        EnumerableSet.BytesSet tokens;
     }
 
     uint256 public immutable selfChainId = block.chainid;
 
     IRelay public relay;
-    uint256[] private chains;
+    EnumerableSet.UintSet private chainList;
     mapping(uint256 => string) private chainToNames;
     mapping(string => uint256) private nameToChain;
     mapping(uint256 => ChainInfo) private chainInfos;
@@ -117,6 +120,11 @@ contract Registry is BaseImplementation, IRegistry {
     error zero_address();
     error register_chain_first();
 
+
+    function initialize(address _defaultAdmin) public initializer {
+        __BaseImplementation_init(_defaultAdmin);
+    }
+
     function setRelay(address _relay) external restricted checkAddress(_relay) {
         relay = IRelay(_relay);
         emit SetRelay(_relay);
@@ -138,20 +146,17 @@ contract Registry is BaseImplementation, IRegistry {
         string memory oldName = chainToNames[_chain];
         delete nameToChain[oldName];
         nameToChain[_chainName] = _chain;
-        // if (_lastScanBlock > 0) relay.updateLastScanBlock(_chain, _lastScanBlock);
-        if (!Utils.uintListContains(chains, _chain)) {
-            chains.push(_chain);
-        }
+        chainList.add(_chain);
         relay.addChain(_chain, _lastScanBlock);
         emit RegisterChain(_chain, _chainType, _router, _chainName, _gasToken);
     }
 
     function removeChain(uint256 _chain) external restricted {
         ChainInfo storage chainInfo = chainInfos[_chain];
-        if (chainInfo.tokens.length != 0) revert unmap_token_first();
+        if (chainInfo.tokens.values().length != 0) revert unmap_token_first();
         delete nameToChain[chainInfo.name];
         delete chainInfos[_chain];
-        Utils.uintListRemove(chains, _chain);
+        chainList.remove(_chain);
         relay.removeChain(_chain);
         emit RemoveChain(_chain);
     }
@@ -174,9 +179,7 @@ contract Registry is BaseImplementation, IRegistry {
         token.mappingList[chainId] = tokenBytes;
         token.decimals[chainId] = IERC20Metadata(_token).decimals();
         ChainInfo storage chainInfo = chainInfos[chainId];
-        if (!Utils.bytesListContains(chainInfo.tokens, tokenBytes)) {
-            chainInfo.tokens.push(tokenBytes);
-        }
+        chainInfo.tokens.add(tokenBytes);
         emit RegisterToken(_id, _token, _vaultToken);
     }
 
@@ -192,11 +195,9 @@ contract Registry is BaseImplementation, IRegistry {
         token.mappingList[_fromChain] = _fromToken;
         tokenMappingList[_fromChain][_fromToken] = _token;
 
-        if (!Utils.uintListContains(chains, _fromChain)) revert register_chain_first();
+        if (!chainList.contains(_fromChain)) revert register_chain_first();
         ChainInfo storage chainInfo = chainInfos[_fromChain];
-        if (!Utils.bytesListContains(chainInfo.tokens, _fromToken)) {
-            chainInfo.tokens.push(_fromToken);
-        }
+        chainInfo.tokens.add(_fromToken);
         emit MapToken(_token, _fromChain, _fromToken, _decimals);
     }
 
@@ -211,7 +212,7 @@ contract Registry is BaseImplementation, IRegistry {
                 delete token.decimals[_fromChain];
                 delete token.mappingList[_fromChain];
                 ChainInfo storage chainInfo = chainInfos[_fromChain];
-                Utils.bytesListRemove(chainInfo.tokens, _fromToken);
+                chainInfo.tokens.remove(_fromToken);
             }
         }
         delete tokenMappingList[_fromChain][_fromToken];
@@ -577,11 +578,11 @@ contract Registry is BaseImplementation, IRegistry {
     }
 
     function getChains() external view override returns (uint256[] memory) {
-        return chains;
+        return chainList.values();
     }
 
     function getChainTokens(uint256 chain) external view override returns (bytes[] memory) {
-        return chainInfos[chain].tokens;
+        return chainInfos[chain].tokens.values();
     }
 
     function getChainRouters(uint256 chain) external view override returns (bytes memory) {

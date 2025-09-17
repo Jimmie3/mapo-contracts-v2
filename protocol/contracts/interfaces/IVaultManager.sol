@@ -50,4 +50,7 @@ interface IVaultManager {
     function checkVault(uint256 fromChain, bytes calldata vault) external view returns (bool);
 
     function getActiveVault() external view returns (bytes memory);
+
+    function getTokenAllowance(address token, uint256 chain) external view  returns (uint256);
+    function getVaultTokenAllowance(uint256 chain, bytes calldata pubkey) external view  returns (uint256);
 }

@@ -44,11 +44,11 @@ contract VaultManager is BaseImplementation, IVaultManager {
     bytes32 public activeVaultKey;
     bytes32 public retiringVaultKey;
 
-    mapping(bytes32 => Vault) vaultList;
+    mapping(bytes32 => Vault) private vaultList;
 
-    EnumerableMap.AddressToAddressMap tokenList;
+    // EnumerableMap.AddressToAddressMap tokenList;
 
-    EnumerableSet.UintSet chainList;
+    // EnumerableSet.UintSet chainList;
 
     address public relay;
 
@@ -56,22 +56,41 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     // for rebalancing calculation
     // token => totalWeight
-    mapping(address => uint256) tokenTotalWeights;
+    mapping(address => uint256) public tokenTotalWeights;
     // token => chain => weight
-    mapping(address => mapping(uint256 => uint256)) tokenChainWeights;
+    mapping(address => mapping(uint256 => uint256)) public tokenChainWeights;
     // token => totalAllowance
-    mapping(address => uint256) tokenTotalAllowance;
+    mapping(address => uint256) public tokenTotalAllowance;
 
     // token => chain => targetBalance
-    mapping(address => mapping(uint256 => uint256)) tokenTargetBalances;
+    // mapping(address => mapping(uint256 => uint256)) public tokenTargetBalances;
 
     // token => chain => allowance
-    mapping(address => mapping(uint256 => uint256)) tokenAllowances;
-    mapping(address => mapping(uint256 => uint256)) tokenPendingOutAllowances;
+    mapping(address => mapping(uint256 => uint256)) public tokenAllowances;
+    mapping(address => mapping(uint256 => uint256)) public tokenPendingOutAllowances;
+
+    event SetRelay(address _relay);
+    event SetPeriphery(address _periphery);
 
     modifier onlyRelay() {
         if (msg.sender != address(relay)) revert Errs.no_access();
         _;
+    }
+
+    function initialize(address _defaultAdmin) public initializer {
+        __BaseImplementation_init(_defaultAdmin);
+    }
+
+    function setRelay(address _relay) external restricted {
+        require(_relay != address(0));
+        relay = _relay;
+        emit SetRelay(_relay);
+    }
+
+    function setPeriphery(address _periphery) external restricted {
+        require(_periphery != address(0));
+        periphery = IPeriphery(_periphery);
+        emit SetPeriphery(_periphery);
     }
 
     function rotate(bytes memory retiringVault, bytes memory activeVault) external override onlyRelay {
@@ -168,7 +187,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
     function chooseVault(uint256 chain, address token, uint256 amount, uint256 gas)
         external
         view
-        onlyRelay
         returns (bytes memory vault)
     {
         uint256 allowance;
@@ -322,6 +340,15 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     function getActiveVault() external view override returns (bytes memory) {
         return vaultList[activeVaultKey].pubkey;
+    }
+
+    function getTokenAllowance(address token, uint256 chain) external view override returns (uint256) {
+        return tokenAllowances[token][chain] - tokenPendingOutAllowances[token][chain];
+    }
+
+    function getVaultTokenAllowance(uint256 chain, bytes calldata pubkey) external view  returns (uint256) {
+        ChainAllowance storage ca = vaultList[keccak256(pubkey)].chainAllowances[chain];
+        return ca.tokenAllowances - ca.tokenPendingOutAllowances;
     }
 
     function updateVault(uint256 fromChain, uint256 toChain, address token, uint256 amount) external override {}

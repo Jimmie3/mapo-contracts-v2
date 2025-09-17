@@ -28,6 +28,10 @@ contract Periphery is BaseImplementation, IPeriphery {
     event SetTSSManager(address _tssManager);
     event SetTokenRegister(address _tokenRegister);
 
+    function initialize(address _defaultAdmin) public initializer {
+        __BaseImplementation_init(_defaultAdmin);
+    }
+    
     function setRelay(address _relay) external restricted {
         require(_relay != address(0));
         relay = _relay;

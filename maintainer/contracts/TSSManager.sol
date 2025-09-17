@@ -302,7 +302,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
     function voteTxIn(TxInItem calldata txInItem) external {
         bytes32 hash = _getTxInItemHash(txInItem);
         address user = msg.sender;
-        bytes32 tssKey = keccak256(txInItem.vault);
+        bytes32 tssKey = keccak256(txInItem.bridgeItem.vault);
         TSSInfo storage e = tssInfos[tssKey];
         Proposal storage p = proposals[hash];
         uint256 delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
@@ -325,11 +325,11 @@ contract TSSManager is BaseImplementation, ITSSManager {
     function voteTxOut(TxOutItem calldata txOutItem) external {
         bytes32 hash = _getTxOutItemHash(txOutItem);
         address user = msg.sender;
-        bytes32 tssKey = keccak256(txOutItem.vault);
+        bytes32 tssKey = keccak256(txOutItem.bridgeItem.vault);
         TSSInfo storage e = tssInfos[tssKey];
         Proposal storage p = proposals[hash];
         uint256 delaySlashPoint;
-        if (txOutItem.txOutType == TxType.MIGRATE) {
+        if (txOutItem.bridgeItem.txType == TxType.MIGRATE) {
             delaySlashPoint = _getParameter(Constant.MIGRATION_DELAY_SLASH_POINT);
         } else {
             delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
@@ -433,7 +433,6 @@ contract TSSManager is BaseImplementation, ITSSManager {
         _batchSubSlashPoint(epochId, subs, _getParameter(Constant.OBSERVE_SLASH_POINT));
         // non-participants apply DELAY_SLASH_POINT.
         _batchAddSlashPoint(epochId, adds, delaySlashPoint);
-        // if (jailBlock > 0) _batchAddToJail(adds, jailBlock);
     }
 
     function _checkSig(bytes calldata pubkey, bytes calldata signature) internal pure {
@@ -452,50 +451,42 @@ contract TSSManager is BaseImplementation, ITSSManager {
     }
 
     function _getUpdateTSSPoolHash(TssPoolParam calldata param) internal pure returns (bytes32 hash) {
-        hash = keccak256(abi.encodePacked(param.pubkey, param.members, param.epoch, param.blames));
+        hash = keccak256(abi.encodePacked(param.epoch, param.pubkey, param.members, param.epoch, param.blames));
     }
 
     function _getTxInItemHash(TxInItem calldata txInItem) internal pure returns (bytes32) {
-        return keccak256(
-            abi.encodePacked(
-                txInItem.txInType,
-                txInItem.orderId,
-                txInItem.chainAndGasLimit,
-                txInItem.height,
-                txInItem.token,
-                txInItem.amount,
-                txInItem.from,
-                txInItem.vault,
-                txInItem.to
-            )
-        );
+
+        bytes memory en = abi.encodePacked(
+                txInItem.bridgeItem.chainAndGasLimit,
+                txInItem.bridgeItem.vault,
+                txInItem.bridgeItem.txType,
+                txInItem.bridgeItem.token,
+                txInItem.bridgeItem.amount,
+                txInItem.bridgeItem.from,
+                txInItem.bridgeItem.to,
+                txInItem.bridgeItem.payload
+            );
+        return keccak256(abi.encodePacked(en, txInItem.orderId, txInItem.height, txInItem.refundAddr));
     }
 
     function _getTxOutItemHash(TxOutItem calldata txOutItem) internal pure returns (bytes32) {
-        return keccak256(
-            abi.encodePacked(
-                txOutItem.txOutType,
-                txOutItem.orderId,
-                txOutItem.chainAndGasLimit,
-                txOutItem.height,
-                txOutItem.gasUsed,
-                txOutItem.sequence,
-                txOutItem.sender,
-                txOutItem.to,
-                txOutItem.vault
-            )
-        );
+
+        bytes memory en = abi.encodePacked(
+                txOutItem.bridgeItem.chainAndGasLimit,
+                txOutItem.bridgeItem.vault,
+                txOutItem.bridgeItem.txType,
+                txOutItem.bridgeItem.sequence,
+                txOutItem.bridgeItem.token,
+                txOutItem.bridgeItem.amount,
+                txOutItem.bridgeItem.from,
+                txOutItem.bridgeItem.to,
+                txOutItem.bridgeItem.payload
+            );
+        return keccak256(abi.encodePacked(en, txOutItem.orderId, txOutItem.height, txOutItem.gasUsed, txOutItem.sender));
     }
 
     function _batchAddToJail(address[] memory ms) internal {
-        uint256 len = ms.length;
-        for (uint256 i = 0; i < len;) {
-            maintainerManager.jail(ms[i]);
-
-            unchecked {
-                ++i;
-            }
-        }
+        maintainerManager.jail(ms);
     }
 
 

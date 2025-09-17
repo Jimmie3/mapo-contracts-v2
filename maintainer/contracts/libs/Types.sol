@@ -16,33 +16,30 @@ enum TxType {
 
 }
 
-
-struct TxInItem {
-    TxType txInType;
-    bytes32 orderId;
+struct BridgeItem {
     uint256 chainAndGasLimit;
-    uint128 height;
+    bytes vault;
+    TxType txType;
+    uint256 sequence;
     bytes token;
     uint256 amount;
     bytes from;
-    bytes vault;
     bytes to;
     bytes payload;
 }
 
-struct TxOutItem {
-    TxType txOutType;
+struct TxInItem {
     bytes32 orderId;
-    uint256 chainAndGasLimit;
+    BridgeItem bridgeItem;
+    uint128 height;
+    bytes refundAddr;
+}
+
+struct TxOutItem {
+    bytes32 orderId;
+    BridgeItem bridgeItem;
     uint128 height;
     uint128 gasUsed;
-    uint256 sequence;
-    uint256 amount;
     address sender;
-    bytes token;
-    bytes from;
-    bytes to;
-    bytes vault;
-    bytes data;
 }
 

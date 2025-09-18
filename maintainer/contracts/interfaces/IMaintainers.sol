@@ -40,5 +40,5 @@ interface IMaintainers {
     function getMaintainerInfos(address[] calldata ms) external view returns(MaintainerInfo[] memory infos);
     function getEpochInfo(uint256 epochId) external view returns(EpochInfo memory info);
 
-    function jail(address maintainer) external;
+    function jail(address[] calldata maintainers) external;
 }

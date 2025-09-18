@@ -15,7 +15,7 @@ optimizer = true
 optimizer_runs = 200
 via_ir = false
 evm_version = "london"
-
+script = "scripts/foundry"
 # Test settings
 test = "test"
 cache_path = "cache_forge"
@@ -23,3 +23,11 @@ cache_path = "cache_forge"
 # Hardhat compatibility
 fs_permissions = [{ access = "read-write", path = "./" }]
 
+
+
+[etherscan]
+Mapo = { url = "https://explorer-api.chainservice.io/api", key = " "}
+
+[rpc_endpoints]
+Mapo = "https://rpc.maplabs.io"    
+Makalu = "https://testnet-rpc.maplabs.io"   

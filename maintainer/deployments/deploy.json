@@ -1,0 +1,16 @@
+{
+  "Makalu": {
+    "Authority": "0xB7447cf2832906d1d7566D34c5A378E9369e110F",
+    "Maintainers": "",
+    "TSSManager": "",
+    "Parameters": "",
+    "Relay": "0x566a6dDfDffB719469114968AFE372392b5873a0"
+  },
+  "Mapo": {
+    "Authority": "0xB7447cf2832906d1d7566D34c5A378E9369e110F",
+    "Maintainers": "",
+    "TSSManager": "",
+    "Parameters": "",
+    "Relay": ""
+  }
+}

@@ -4,7 +4,7 @@ import "@nomicfoundation/hardhat-ethers";
 import { HardhatRuntimeEnvironment } from "hardhat/types/runtime";
 
 
-let file_path = "../deployments/";
+let file_path = "../../deployments/";
 let fileName = "deploy.json";
 
 type Deployment = {
@@ -35,11 +35,11 @@ export async function deployProxy(hre: HardhatRuntimeEnvironment, impl:string, a
     let I = await ethers.getContractFactory("Parameters");
     let init_data = I.interface.encodeFunctionData("initialize", [authority]);
 
-    let ContractProxy = await ethers.getContractFactory("ContractProxy");
+    let ContractProxy = await ethers.getContractFactory("ERC1967Proxy");
     let c = await (await ContractProxy.deploy(impl, init_data)).waitForDeployment();
     let addr = await c.getAddress()
     console.log("proxy deploy to:", addr);
-    await verify(hre, addr, [impl, init_data], "ContractProxy");
+    await verify(hre, addr, [impl, init_data], "node_modules/@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy");
     return c.getAddress();
 }
 

@@ -11,8 +11,6 @@ interface IVaultManager {
         view
         returns (uint256, bool);
 
-    function updateVault(uint256 fromChain, uint256 toChain, address token, uint256 amount) external;
-
     // function getVaultBalanceByToken(uint256 chain, bytes memory token) external view returns (uint256 vaultBalance);
 
     function rotate(bytes memory retiringVault, bytes memory activeVault) external;
@@ -51,6 +49,4 @@ interface IVaultManager {
 
     function getActiveVault() external view returns (bytes memory);
 
-    function getTokenAllowance(address token, uint256 chain) external view  returns (uint256);
-    function getVaultTokenAllowance(uint256 chain, bytes calldata pubkey) external view  returns (uint256);
 }

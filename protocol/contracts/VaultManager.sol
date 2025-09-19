@@ -20,18 +20,18 @@ import {IPeriphery} from "./interfaces/IPeriphery.sol";
 contract VaultManager is BaseImplementation, IVaultManager {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableMap for EnumerableMap.AddressToAddressMap;
 
     uint256 private constant MAX_MIGRATION_AMOUNT = 3;
+    bytes32 private constant NON_VAULT_KEY = bytes32(0x00);
 
-    // for contract chain
-    // migration don't include the migration token number, so how to update balance for new vault
-    // if keep a unique balance, how to check should use the old or new vault
+
     struct ChainAllowance {
         bool migrationPending; // set true after start a migration, reset after migration txOut on relay chain.
         // used by non-contract chain
         uint8 migrationIndex;
-        uint256 tokenAllowances;
-        uint256 tokenPendingOutAllowances;
+        uint128 tokenAllowances;
+        uint128 tokenPendingOutAllowances;
     }
 
     struct Vault {
@@ -41,33 +41,39 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     // only one active vault and one retiring vault at a time
+    // after migration, only one active vault, no retiring vault
     bytes32 public activeVaultKey;
     bytes32 public retiringVaultKey;
 
     mapping(bytes32 => Vault) private vaultList;
 
-    // EnumerableMap.AddressToAddressMap tokenList;
+    // token => vaultToken
+    EnumerableMap.AddressToAddressMap tokenList;
 
-    // EnumerableSet.UintSet chainList;
+    EnumerableSet.UintSet chainList;        // all support chains
 
     address public relay;
 
     IPeriphery public periphery;
 
-    // for rebalancing calculation
-    // token => totalWeight
-    mapping(address => uint256) public tokenTotalWeights;
-    // token => chain => weight
-    mapping(address => mapping(uint256 => uint256)) public tokenChainWeights;
-    // token => totalAllowance
-    mapping(address => uint256) public tokenTotalAllowance;
+    struct ChainTokenState {
+        bool mintable;              // token is mintable at this chain
+                                    // if token is mintable, all other data will be 0
+        uint64 weight;              // chain weight for target balance
+        uint128 balance;            // token balance
+        uint128 pendingOut;         // token pendingOut balance
+        uint128 reserved;           // reserved for transfer out
+        uint128 target;             // target balance
+    }
 
-    // token => chain => targetBalance
-    // mapping(address => mapping(uint256 => uint256)) public tokenTargetBalances;
+    struct TotalTokenState {
+        uint128 totalBalance;
+        uint128 totalPendingOut;
+        uint64 totalWeight;
+    }
 
-    // token => chain => allowance
-    mapping(address => mapping(uint256 => uint256)) public tokenAllowances;
-    mapping(address => mapping(uint256 => uint256)) public tokenPendingOutAllowances;
+    mapping(address => TotalTokenState) public totalStates;
+    mapping(address => mapping(uint256 => ChainTokenState)) public chainStates;
 
     event SetRelay(address _relay);
     event SetPeriphery(address _periphery);
@@ -93,6 +99,37 @@ contract VaultManager is BaseImplementation, IVaultManager {
         emit SetPeriphery(_periphery);
     }
 
+    function updateTokenWeights(address token, uint256[] memory chains, uint256[] memory weights) external restricted {
+        uint256 len = chains.length;
+        require(len == weights.length);
+        uint256 i;
+        uint256 chain;
+
+        TotalTokenState storage totalState = totalStates[token];
+        for (i = 0; i < len; i++) {
+            chain = chains[i];
+
+            ChainTokenState storage chainState = chainStates[token][chain];
+            totalState.totalWeight = totalState.totalWeight - chainState.weight + uint64(weights[i]);
+            chainState.weight = uint64(weights[i]);
+        }
+        // update target balance
+        _updateTokenTargetBalance(token);
+    }
+
+    function _updateTokenTargetBalance(address token) internal {
+        TotalTokenState memory totalState = totalStates[token];
+        uint256 len = chainList.length();
+        for (uint i = 0; i < len; i++) {
+            uint256 chain = chainList.at(i);
+            ChainTokenState storage chainState = chainStates[token][chain];
+            if (chainState.weight == 0 && chainState.target == 0) {
+                continue;
+            }
+            chainState.target = totalState.totalBalance * chainState.weight / totalState.totalWeight;
+        }
+    }
+
     function rotate(bytes memory retiringVault, bytes memory activeVault) external override onlyRelay {
         activeVaultKey = keccak256(activeVault);
         retiringVaultKey = keccak256(retiringVault);
@@ -100,21 +137,26 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     function addChain(uint256 chain) external override onlyRelay {
-        vaultList[activeVaultKey].chains.add(chain);
+        chainList.add(chain);
+        // vaultList[activeVaultKey].chains.add(chain);
+
+        // todo: emit event
     }
 
     function removeChain(uint256 chain) external override onlyRelay {
-        if (periphery.getChainType(chain) != ChainType.CONTRACT) {
-            if (vaultList[activeVaultKey].chainAllowances[chain].tokenAllowances > 0) {
-                revert Errs.token_allowance_not_zero();
-            }
+        // check all balance
+        address[] memory tokens = tokenList.keys();
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (totalStates[tokens[i]].totalBalance > 0) revert Errs.token_allowance_not_zero();
         }
-        vaultList[activeVaultKey].chains.remove(chain);
+        chainList.remove(chain);
+        // vaultList[activeVaultKey].chains.remove(chain);
+        // todo: emit event
     }
 
     function checkMigration() external override onlyRelay returns (bool completed, uint256 toMigrateChain) {
         // check the retiring vault first
-        if (retiringVaultKey == bytes32(0x00)) {
+        if (retiringVaultKey == NON_VAULT_KEY) {
             // no retiring vault, no need migration
             return (true, 0);
         }
@@ -136,11 +178,11 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
         // retiring vault migration completed
         // return and wait update tss vault status
-        retiringVaultKey = bytes32(0x00);
+        retiringVaultKey = NON_VAULT_KEY;
         return (true, 0);
     }
 
-    function migrate(uint256 _chain, uint256 fee)
+    function migrate(uint256 _chain, uint256 gasFee)
         external
         onlyRelay
         returns (bool toMigrate, bytes memory fromVault, bytes memory toVault, uint256 migrationAmount)
@@ -158,7 +200,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         uint256 amount = p.tokenAllowances - p.tokenPendingOutAllowances;
 
         // todo: add min amount
-        if (amount <= fee) {
+        if (amount <= gasFee) {
             // no need migration
 
             if (p.tokenPendingOutAllowances > 0) {
@@ -174,12 +216,16 @@ contract VaultManager is BaseImplementation, IVaultManager {
         vaultList[retiringVaultKey].chainAllowances[_chain].migrationPending = true;
 
         migrationAmount = amount / (MAX_MIGRATION_AMOUNT - p.migrationIndex);
-        if (migrationAmount <= fee || (amount - migrationAmount) <= fee) {
+        if (migrationAmount <= gasFee || (amount - migrationAmount) <= gasFee) {
             migrationAmount = amount;
         }
         p.migrationIndex++;
 
-        p.tokenPendingOutAllowances += (migrationAmount + fee);
+        p.tokenPendingOutAllowances += uint128(migrationAmount + gasFee);
+
+        // todo: update total balance
+        // ChainBalance storage chainBalance = tokenChainBalances[txItem.token][_chain];
+        // chainBalance.pendingOut += gasFee;
 
         return (true, vaultList[retiringVaultKey].pubkey, vaultList[activeVaultKey].pubkey, migrationAmount);
     }
@@ -191,7 +237,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
     {
         uint256 allowance;
         if (periphery.getChainType(chain) == ChainType.CONTRACT) {
-            allowance = tokenAllowances[token][chain] - tokenPendingOutAllowances[token][chain];
+            ChainTokenState storage chainBalance = chainStates[token][chain];
+            allowance = chainBalance.balance - chainBalance.pendingOut;
             if (allowance < amount) return bytes("");
             if (vaultList[activeVaultKey].chains.contains(chain)) {
                 return vaultList[activeVaultKey].pubkey;
@@ -232,23 +279,19 @@ contract VaultManager is BaseImplementation, IVaultManager {
             ChainAllowance storage p = vaultList[vaultKey].chainAllowances[txItem.chain];
             p.migrationPending = false;
 
-            p.tokenAllowances -= (txItem.amount + usedGas);
-            p.tokenPendingOutAllowances -= (txItem.amount + estimatedGas);
+            p.tokenAllowances -= uint128(txItem.amount + usedGas);
+            p.tokenPendingOutAllowances -= uint128(txItem.amount + estimatedGas);
 
             vaultList[targetVaultKey].chains.add(txItem.chain);
-            vaultList[targetVaultKey].chainAllowances[txItem.chain].tokenAllowances += txItem.amount;
+            vaultList[targetVaultKey].chainAllowances[txItem.chain].tokenAllowances += uint128(txItem.amount);
 
-            tokenTotalAllowance[txItem.token] -= usedGas;
-            tokenAllowances[txItem.token][txItem.chain] -= usedGas;
+            totalStates[txItem.token].totalBalance -= uint128(usedGas);
+            ChainTokenState storage chainBalance = chainStates[txItem.token][txItem.chain];
+            chainBalance.balance -= uint128(usedGas);
+            chainBalance.pendingOut -= uint128(estimatedGas);
+
+            // todo: update target ?
         }
-    }
-
-    function deposit(uint256 chain, bytes32 vaultKey, address token, uint256 amount) external onlyRelay {
-        // todo: update target allowance
-    }
-
-    function withdraw(uint256 chain, bytes32 vaultKey, address token, uint256 amount) external onlyRelay {
-        // todo: update target allowance
     }
 
     // tx in, add liquidity or swap in
@@ -263,16 +306,21 @@ contract VaultManager is BaseImplementation, IVaultManager {
             return false;
         }
 
-        tokenTotalAllowance[token] += amount;
-        tokenAllowances[token][fromChain] += amount;
+        totalStates[token].totalBalance += uint128(amount);
+
+        ChainTokenState storage chainBalance = chainStates[token][fromChain];
+        chainBalance.balance += uint128(amount);
+
+        _updateTokenTargetBalance(token);
+
+        vaultList[vaultKey].chains.add(fromChain);
 
         if (periphery.getChainType(fromChain) == ChainType.CONTRACT) {
-            // todo: add chain to active vault ?
             return true;
         }
 
-        vaultList[vaultKey].chains.add(fromChain);
-        vaultList[vaultKey].chainAllowances[fromChain].tokenAllowances += amount;
+        // vaultList[vaultKey].chains.add(fromChain);
+        vaultList[vaultKey].chainAllowances[fromChain].tokenAllowances += uint128(amount);
 
         return true;
     }
@@ -290,17 +338,27 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
         if (vaultKey != retiringVaultKey || vaultKey != activeVaultKey) revert Errs.invalid_vault();
 
-        tokenTotalAllowance[token] -= amount;
-        tokenAllowances[token][chain] -= amount;
-        tokenPendingOutAllowances[token][chain] -= (amount + relayGasEstimated);
-
+        TotalTokenState storage totalState = totalStates[token];
+        ChainTokenState storage chainState = chainStates[token][chain];
         if (periphery.getChainType(chain) != ChainType.CONTRACT) {
-            tokenTotalAllowance[token] -= relayGasUsed;
-            tokenAllowances[token][chain] -= relayGasUsed;
 
-            vaultList[vaultKey].chainAllowances[chain].tokenAllowances -= (amount + relayGasUsed);
-            vaultList[vaultKey].chainAllowances[chain].tokenPendingOutAllowances -= (amount + relayGasEstimated);
+            totalState.totalBalance -= uint128(amount + relayGasUsed);
+            totalState.totalPendingOut -= uint128(amount + relayGasEstimated);
+
+            chainState.balance -= uint128(amount + relayGasUsed);
+            chainState.pendingOut -= uint128(amount + relayGasEstimated);
+
+            vaultList[vaultKey].chainAllowances[chain].tokenAllowances -= uint128(amount + relayGasUsed);
+            vaultList[vaultKey].chainAllowances[chain].tokenPendingOutAllowances -= uint128(amount + relayGasEstimated);
+        } else {
+            totalState.totalBalance -= uint128(amount);
+            totalState.totalPendingOut -= uint128(amount);
+
+            chainState.balance -= uint128(amount);
+            chainState.pendingOut -= uint128(amount);
         }
+
+        _updateTokenTargetBalance(token);
     }
 
     // bridge
@@ -317,16 +375,23 @@ contract VaultManager is BaseImplementation, IVaultManager {
             return;
         }
 
+        TotalTokenState storage totalState = totalStates[token];
+        ChainTokenState storage chainState = chainStates[token][toChain];
+
         if (periphery.getChainType(toChain) == ChainType.CONTRACT) {
-            tokenPendingOutAllowances[token][toChain] += amount;
+
+            totalState.totalPendingOut += uint128(amount);
+
+            chainState.pendingOut += uint128(amount);
 
             return;
         }
 
-        tokenPendingOutAllowances[token][toChain] += (amount + estimatedGas);
+        totalState.totalPendingOut += uint128(amount + estimatedGas);
+        chainState.pendingOut += uint128(amount + estimatedGas);
 
         vaultList[vaultKey].chains.add(toChain);
-        vaultList[vaultKey].chainAllowances[toChain].tokenPendingOutAllowances += (amount + estimatedGas);
+        vaultList[vaultKey].chainAllowances[toChain].tokenPendingOutAllowances += uint128(amount + estimatedGas);
     }
 
     function checkVault(uint256 fromChain, bytes calldata vault) external view returns (bool) {
@@ -341,17 +406,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
     function getActiveVault() external view override returns (bytes memory) {
         return vaultList[activeVaultKey].pubkey;
     }
-
-    function getTokenAllowance(address token, uint256 chain) external view override returns (uint256) {
-        return tokenAllowances[token][chain] - tokenPendingOutAllowances[token][chain];
-    }
-
-    function getVaultTokenAllowance(uint256 chain, bytes calldata pubkey) external view  returns (uint256) {
-        ChainAllowance storage ca = vaultList[keccak256(pubkey)].chainAllowances[chain];
-        return ca.tokenAllowances - ca.tokenPendingOutAllowances;
-    }
-
-    function updateVault(uint256 fromChain, uint256 toChain, address token, uint256 amount) external override {}
 
     function getBalanceFee(uint256 fromChain, uint256 toChain, address token, uint256 amount)
         external

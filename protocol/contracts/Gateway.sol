@@ -14,7 +14,7 @@ import {BaseGateway} from "./base/BaseGateway.sol";
 contract Gateway is BaseGateway {
     address public activeTssAddress;
     address public retireTssAddress;
-    bytes public tss;
+    bytes public activeTss;
     bytes public retireTss;
     uint256 public retireSequence;
 
@@ -33,8 +33,8 @@ contract Gateway is BaseGateway {
     }
 
     function setTssAddress(bytes calldata _tss) external restricted {
-        require(tss.length == 0 && _tss.length != 0);
-        tss = _tss;
+        require(activeTss.length == 0 && _tss.length != 0);
+        activeTss = _tss;
         activeTssAddress = Utils.getAddressFromPublicKey(_tss);
         emit UpdateTSS(bytes32(0), bytes(""), _tss);
     }
@@ -43,10 +43,10 @@ contract Gateway is BaseGateway {
         internal
         override
     {
-        bytes memory receiver = abi.encodePacked(to);
+        bytes memory receiver = abi.encode(to);
 
         emit BridgeOut(
-            orderId, selfChainId << 192, TxType.DEPOSIT, tss, outToken, amount, from, refundAddr, receiver, bytes("")
+            orderId, selfChainId << 192, TxType.DEPOSIT, activeTss, outToken, amount, from, refundAddr, receiver, bytes("")
         );
     }
 
@@ -98,11 +98,12 @@ contract Gateway is BaseGateway {
     }
 
     function _updateTSS(bytes32 orderId, uint256 sequence, bytes memory newVault) internal whenNotPaused nonReentrant {
-        retireTss = tss;
+        retireTss = activeTss;
         retireTssAddress = activeTssAddress;
-        tss = newVault;
+        activeTss = newVault;
         retireSequence = sequence;
         activeTssAddress = Utils.getAddressFromPublicKey(newVault);
+
         emit UpdateTSS(orderId, retireTss, newVault);
     }
 
@@ -123,6 +124,6 @@ contract Gateway is BaseGateway {
     }
 
     function _getActiveVault() internal view override returns (bytes memory vault) {
-        return tss;
+        return activeTss;
     }
 }

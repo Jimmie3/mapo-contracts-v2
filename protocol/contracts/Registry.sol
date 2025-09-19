@@ -20,7 +20,7 @@ contract Registry is BaseImplementation, IRegistry {
     struct FeeRate {
         uint256 lowest;
         uint256 highest;
-        uint256 rate; // unit is parts per million
+        uint256 rate;   // unit is parts per million
     }
 
     struct BaseFee {

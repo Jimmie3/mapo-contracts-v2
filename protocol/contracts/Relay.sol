@@ -78,7 +78,7 @@ contract Relay is BaseGateway, IRelay {
         uint256 amount,
         uint256 sequence,
         // tss sign base on this hash
-        // abi.encodePack(orderId, txType, vault, sequence, token, amount, from, to, data);
+        // abi.encodePacked(orderId | chainAndGasLimit | txOutType | vault | sequence | token | amount| from | to | keccak256(data)
         bytes32 hash,
         bytes from,
         // tokenOut: bytes(payload)
@@ -86,8 +86,8 @@ contract Relay is BaseGateway, IRelay {
         bytes data
     );
 
-    // sign: encodePack(orderId | relayData);
-    event BridgeRelaySigned( // abi.encode(chainAndGasLimit | txOutType | sequence | token | amount| from | to | data)
+
+    event BridgeRelaySigned(
         bytes32 indexed orderId,
         // fromChain (8 bytes) | toChain (8 bytes) | txRate (8 bytes) | txSize (8 bytes)
         uint256 indexed chainAndGasLimit,
@@ -98,7 +98,7 @@ contract Relay is BaseGateway, IRelay {
 
     event BridgeCompleted(
         bytes32 indexed orderId,
-        // fromChain (8 bytes) | toChain (8 bytes) | txRate (8 bytes) | txSize (8 bytes)
+        // fromChain (8 bytes) | toChain (8 bytes) | reserved (16 bytes)
         uint256 indexed chainAndGasLimit,
         TxType txOutType,
         bytes vault,
@@ -163,7 +163,7 @@ contract Relay is BaseGateway, IRelay {
         uint256 gasEstimated;
 
         (gasEstimated, txItem.transactionRate, txItem.transactionSize) = _getTransferOutGas(false, txItem.chain);
-        gasEstimated = _getRelayChainGasAmount(txItem.chain, gasEstimated);
+        // gasEstimated = _getRelayChainGasAmount(txItem.chain, gasEstimated);
         bool toMigrate;
         bytes memory toVault;
         (toMigrate, bridgeItem.vault, toVault, txItem.amount) = vaultManager.migrate(txItem.chain, gasEstimated);
@@ -178,6 +178,7 @@ contract Relay is BaseGateway, IRelay {
         _checkAccess(3);
         _updateLastScanBlock(chain, startBlock);
         vaultManager.addChain(chain);
+        // todo: emit event
     }
 
     function removeChain(uint256 chain) external override {
@@ -186,6 +187,7 @@ contract Relay is BaseGateway, IRelay {
         (bool completed,) = vaultManager.checkMigration();
         if (!completed) revert Errs.migration_not_completed();
         vaultManager.removeChain(chain);
+        // todo: emit event
     }
 
     function withdraw(address _vaultToken, uint256 _vaultAmount) external whenNotPaused {
@@ -360,7 +362,7 @@ contract Relay is BaseGateway, IRelay {
                 txItem.chain = fromChain;
                 bridgeItem.to = txInItem.refundAddr;
 
-                _refund(bridgeItem, txItem, bridgeItem.vault);  
+                _refund(bridgeItem, txItem, bridgeItem.vault);
             }
         }
     }
@@ -378,7 +380,7 @@ contract Relay is BaseGateway, IRelay {
         uint256 gasEstimated;
         (gasEstimated, txItem.transactionRate, txItem.transactionSize) =
             _getTransferOutGas(targetLoad.length > 0, txItem.chain);
-        gasEstimated = _getRelayChainGasAmount(txItem.chain, gasEstimated);
+        //gasEstimated = _getRelayChainGasAmount(txItem.chain, gasEstimated);
 
         (bridgeItem.vault) = vaultManager.chooseVault(txItem.chain, txItem.token, txItem.amount, gasEstimated);
         if (bridgeItem.vault.length == 0) revert Errs.invalid_vault();
@@ -502,7 +504,7 @@ contract Relay is BaseGateway, IRelay {
     function _refund(BridgeItem memory bridgeItem, TxItem memory txItem, bytes memory vault) internal {
         uint256 gasEstimated;
         (gasEstimated, txItem.transactionRate, txItem.transactionSize) = _getTransferOutGas(false, txItem.chain);
-        gasEstimated = _getRelayChainGasAmount(txItem.chain, gasEstimated);
+        //gasEstimated = _getRelayChainGasAmount(txItem.chain, gasEstimated);
 
         // refund from the from vault
         vaultManager.doTransfer(txItem.chain, vault, txItem.token, txItem.amount, gasEstimated);
@@ -599,10 +601,11 @@ contract Relay is BaseGateway, IRelay {
     }
 
 
+    // return the
     function _getTransferOutGas(bool withCall, uint256 chain)
     internal
     view
-    returns (uint256 gasFee, uint256 transactionRate, uint256 transactionSize)
+    returns (uint256 relayGasFee, uint256 transactionRate, uint256 transactionSize)
     {
         IGasService gasService = IGasService(periphery.getAddress(1));
         uint256 transactionSizeWithCall;
@@ -610,7 +613,8 @@ contract Relay is BaseGateway, IRelay {
         if (withCall) {
             transactionSize = transactionSizeWithCall;
         }
-        gasFee = transactionSize * transactionRate;
+        uint256 gasFee = transactionSize * transactionRate;
+        relayGasFee = _getRelayChainGasAmount(chain, gasFee);
     }
 
     function _getToChainTokenAndAmount(uint256 chain, address relayToken, uint256 relayAmount) internal view returns (bytes memory token, uint256 amount){

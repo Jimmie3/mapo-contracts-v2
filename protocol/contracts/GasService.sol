@@ -13,14 +13,14 @@ import {Errs} from "./libs/Errors.sol";
 
 contract GasService is BaseImplementation, IGasService {
     struct NetworkFee {
-        uint256 height;
-        uint256 transactionRate;
-        uint256 transactionSize;
-        uint256 transactionSizeWithCall;
+        uint64 height;
+        uint128 transactionRate;
+        uint128 transactionSize;
+        uint128 transactionSizeWithCall;
     }
 
-    ISwap public swap;
     IPeriphery public periphery;
+
     mapping(uint256 => NetworkFee) public chainNetworkFee;
 
     event SetSwap(address _swap);
@@ -39,12 +39,6 @@ contract GasService is BaseImplementation, IGasService {
         emit SetPeriphery(_periphery);
     }
 
-    function setSwap(address _swap) external restricted {
-        require(_swap != address(0));
-        swap = ISwap(_swap);
-        emit SetSwap(_swap);
-    }
-
     function postNetworkFee(
         uint256 chain,
         uint256 height,
@@ -55,57 +49,60 @@ contract GasService is BaseImplementation, IGasService {
         _checkAccess(4);
 
         NetworkFee storage fee = chainNetworkFee[chain];
-        fee.height = height;
-        fee.transactionRate = transactionRate;
-        fee.transactionSize = transactionSize;
-        fee.transactionSizeWithCall = transactionSizeWithCall;
+        fee.height = uint64(height);
+        fee.transactionRate = uint128(transactionRate);
+        fee.transactionSize = uint128(transactionSize);
+        fee.transactionSizeWithCall = uint128(transactionSizeWithCall);
         emit PostNetworkFee(chain, height, transactionSize, transactionSizeWithCall, transactionRate);
     }
 
     function getNetworkFee(uint256 chain, bool withCall) external view override returns (uint256 networkFee) {
-        return _getNetworkFee(chain, withCall);
+        (uint256 transactionRate, uint256 transactionSize, uint256 transactionSizeWithCall) = _getNetworkFeeInfo(chain);
+
+        if (withCall) {
+            transactionSize = transactionSizeWithCall;
+        }
+
+        networkFee = transactionSize * transactionRate;
     }
 
-    function getNetworkFeeWithToken(uint256 chain, bool withCall, address token)
+
+    function getNetworkFeeInfo(uint256 chain, bool withCall)
         external
         view
         override
-        returns (uint256 networkFee)
+        returns (uint256 networkFee, uint256 transactionRate, uint256 transactionSize)
     {
-        uint256 fee = _getNetworkFee(chain, withCall);
-        IRegistry r = _getTokenRegistry();
-        address gasToken = r.getChainGasToken(chain);
-        uint256 relayChainFeeAmount = r.getRelayChainAmount(r.getToChainToken(gasToken, chain), chain, fee);
-        networkFee = swap.getAmountOut(gasToken, token, relayChainFeeAmount);
-    }
+        uint256 transactionSizeWithCall;
 
-    function _getNetworkFee(uint256 chain, bool withCall) internal view returns (uint256 networkFee) {
-        NetworkFee storage fee = chainNetworkFee[chain];
-        require(fee.transactionRate > 0);
-        uint256 rate = (fee.transactionRate * 3) / 2;
-        uint256 limit;
+        (transactionRate, transactionSize, transactionSizeWithCall) = _getNetworkFeeInfo(chain);
+
         if (withCall) {
-            limit = fee.transactionSizeWithCall;
-        } else {
-            limit = fee.transactionSize;
+            transactionSize = transactionSizeWithCall;
         }
-        return rate * limit;
+
+        networkFee = transactionSize * transactionRate;
     }
 
     function getNetworkFeeInfo(uint256 chain)
-        external
-        view
-        override
-        returns (uint256 transactionRate, uint256 transactionSize, uint256 transactionSizeWithCall)
+    external
+    view
+    override
+    returns (uint256 transactionRate, uint256 transactionSize, uint256 transactionSizeWithCall)
     {
-        NetworkFee storage fee = chainNetworkFee[chain];
+        return _getNetworkFeeInfo(chain);
+    }
+
+
+    function _getNetworkFeeInfo(uint256 chain)
+    internal
+    view
+    returns (uint256 transactionRate, uint256 transactionSize, uint256 transactionSizeWithCall)
+    {
+        NetworkFee memory fee = chainNetworkFee[chain];
         transactionRate = (fee.transactionRate * 3) / 2; // 1.5x rate
         transactionSize = fee.transactionSize;
         transactionSizeWithCall = fee.transactionSizeWithCall;
-    }
-
-    function _getTokenRegistry() internal view returns (IRegistry tokenRegistry) {
-        tokenRegistry = IRegistry(periphery.getAddress(3));
     }
 
     function _checkAccess(uint256 t) internal view {

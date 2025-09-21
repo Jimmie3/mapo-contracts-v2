@@ -3,8 +3,7 @@ pragma solidity ^0.8.0;
 
 enum ChainType {
     CONTRACT,
-    UTXO,
-    ACCOUNT
+    NON_CONTRACT
 }
 
 enum TxType {
@@ -15,16 +14,14 @@ enum TxType {
     MESSAGE // todo
 }
 
-    struct TxItem {
-        bytes32 orderId;
-        address vaultAddress;
-        uint256 chain;
-        address token;
-        uint256 amount;
-        address to;
-        uint256 transactionRate;
-        uint256 transactionSize;
-    }
+struct TxItem {
+    bytes32 orderId;
+    uint256 chain;
+    ChainType chainType;
+    address token;
+    uint256 amount;
+    address to;
+}
 
 
 struct BridgeItem {
@@ -42,14 +39,14 @@ struct BridgeItem {
 struct TxInItem {
     bytes32 orderId;
     BridgeItem bridgeItem;
-    uint128 height;
+    uint64 height;
     bytes refundAddr;
 }
 
 struct TxOutItem {
     bytes32 orderId;
     BridgeItem bridgeItem;
-    uint128 height;
+    uint64 height;
     uint128 gasUsed;
     address sender;
 }

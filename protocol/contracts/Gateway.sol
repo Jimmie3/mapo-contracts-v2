@@ -61,12 +61,12 @@ contract Gateway is BaseGateway {
 
         BridgeItem memory bridgeItem = abi.decode(params, (BridgeItem));
 
-        txItem.vaultAddress = Utils.getAddressFromPublicKey(bridgeItem.vault);
+        address vaultAddr = Utils.getAddressFromPublicKey(bridgeItem.vault);
 
-        if (!_checkSignature(orderId, txItem.vaultAddress, signature, bridgeItem)) revert invalid_signature();
+        if (!_checkSignature(orderId, vaultAddr, signature, bridgeItem)) revert invalid_signature();
 
         address tssAddr = (bridgeItem.sequence > retireSequence) ? activeTssAddress : retireTssAddress;
-        if (tssAddr != txItem.vaultAddress) revert invalid_vault();
+        if (tssAddr != vaultAddr) revert invalid_vault();
 
         _checkTargetChain(bridgeItem.chainAndGasLimit);
 

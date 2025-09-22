@@ -23,6 +23,11 @@ struct TxItem {
     address to;
 }
 
+struct GasInfo {
+    uint256 estimateGas;
+    uint256 transactionRate;
+    uint256 transactionSize;
+}
 
 struct BridgeItem {
     uint256 chainAndGasLimit;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ChainType, TxItem} from "../libs/Types.sol";
+import {ChainType, TxItem, GasInfo} from "../libs/Types.sol";
 
 interface IVaultManager {
     // function getVaultToken(address _token) external view returns (address);
@@ -21,17 +21,22 @@ interface IVaultManager {
 
     function checkMigration() external returns (bool completed, uint256 toMigrateChain);
 
-    function migrate(uint256 _chain, uint256 fee)
-        external
-        returns (bool toMigrate, bytes memory fromVault, bytes memory toVault, uint256 amount);
+    function chooseVault(TxItem memory txItem, bool withCall)
+    external
+    view
+    returns (bool chooseVault, uint256 outAmount, bytes memory vault, GasInfo memory gasInfo);
 
-    function migrationOut(TxItem memory txItem, bytes memory fromVault, bytes memory toVault, uint256 estimatedGas, uint256 usedGas) external;
+    function checkVault(ChainType chainType, uint256 fromChain, bytes calldata vault) external view returns (bool);
 
-    function chooseVault(uint256 chain, address token, uint256 amount, uint256 gas)
-        external
-        returns (bytes memory vault);
+    function getActiveVault() external view returns (bytes memory);
 
-    function refund(TxItem memory txItem, bytes memory vault, uint256 estimateGas) external returns (bool, uint256 refundAmount);
+    function migrate() external returns (bool completed, TxItem memory txItem, GasInfo memory gasInfo, bytes memory fromVault, bytes memory toVault);
+
+    function chooseAndTransfer(TxItem memory txItem, bool withCall)
+    external
+    returns (bool choose, uint256 outAmount, bytes memory vault, GasInfo memory gasInfo);
+
+    function refund(TxItem memory txItem, bytes memory vault) external returns  (uint256 refundAmount, GasInfo memory gasInfo);
 
     function deposit(TxItem memory txItem, bytes memory vault) external;
 
@@ -46,11 +51,7 @@ interface IVaultManager {
         uint256 relayGasEstimated
     ) external;
 
-    function doTransfer(uint256 toChain, bytes memory vault, address token, uint256 amount, uint256 estimatedGas)
-        external;
+    function migrationOut(TxItem memory txItem, bytes memory fromVault, bytes memory toVault, uint256 estimatedGas, uint256 usedGas) external;
 
-    function checkVault(ChainType chainType, uint256 fromChain, bytes calldata vault) external view returns (bool);
-
-    function getActiveVault() external view returns (bytes memory);
 
 }

@@ -15,18 +15,23 @@ import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/B
 contract Registry is BaseImplementation, IRegistry {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.BytesSet;
-    uint256 constant MAX_RATE_UNIT = 1_000_000;
+    uint256 constant MAX_RATE_UNIT = 1_000_000;         // unit is 0.01 bps
+
+    bytes32 public constant SECURITY_FEE_KEY = keccak256("fee.security");
+    bytes32 public constant VAULT_FEE_KEY = keccak256("fee.vault");
 
     struct FeeRate {
         uint256 lowest;
-        uint256 highest;
-        uint256 rate;   // unit is parts per million
+        uint256 highest;        // 0 will be no highest limit
+        uint256 rate;           // unit is parts per million
     }
 
     struct BaseFee {
         uint256 withSwap;
         uint256 noSwap;
     }
+
+    mapping(bytes32 => FeeRate) feeRates;
 
     struct Token {
         uint96 id;
@@ -43,6 +48,9 @@ contract Registry is BaseImplementation, IRegistry {
 
     struct ChainInfo {
         ChainType chainType;
+        // default gas token address on relay chain
+        // for Bitcoin, will be the BTC token address on relay chain
+        // for Kaia, will be the USDT address on Kaia
         address gasToken;
         bytes router;
         string name;
@@ -76,6 +84,8 @@ contract Registry is BaseImplementation, IRegistry {
 
     // hash(fromChain,caller,token) => rate;
     mapping(bytes32 => uint256) public fromChainFeeList;
+
+
 
     modifier checkAddress(address _address) {
         if (_address == address(0)) revert zero_address();
@@ -424,10 +434,8 @@ contract Registry is BaseImplementation, IRegistry {
         uint256 _fromChain,
         uint256 _toChain,
         bool _withSwap
-    ) external view override returns (address baseReceiver, uint256 baseFee, uint256 bridgeFee) {
-        (, baseFee, bridgeFee) = _getToChainFee(_caller, _token, _amount, _fromChain, _toChain, _withSwap);
-
-        baseReceiver = baseFeeReceiver;
+    ) external view override returns (uint256 securityFee, uint256 vaultFee) {
+        return _getToChainFeeV1(_caller, _token, _amount, _fromChain, _toChain, _withSwap);
     }
 
     // get bridge fee info based on the relay chain token and amount
@@ -476,10 +484,10 @@ contract Registry is BaseImplementation, IRegistry {
 
     function _getFee(FeeRate memory _feeRate, uint256 _amount) internal pure returns (uint256) {
         uint256 fee = (_amount * (_feeRate.rate)) / MAX_RATE_UNIT;
-        if (fee > _feeRate.highest) {
-            return _feeRate.highest;
-        } else if (fee < _feeRate.lowest) {
+        if (fee < _feeRate.lowest) {
             return _feeRate.lowest;
+        } else if (_feeRate.highest > 0 && fee > _feeRate.highest) {
+            return _feeRate.highest;
         }
         return fee;
     }
@@ -691,7 +699,26 @@ contract Registry is BaseImplementation, IRegistry {
         }
     }
 
-    function _getToChainFee(
+
+    function _getToChainFeeV1(
+        bytes memory,
+        address _relayToken,
+        uint256 _relayAmount,
+        uint256,
+        uint256,
+        bool
+    ) internal view returns (uint256 securityFee, uint256 vaultFee) {
+        Token storage token = tokenList[_relayToken];
+        if (token.tokenAddress == address(0)) revert invalid_relay_token();
+
+        FeeRate memory rate = feeRates[SECURITY_FEE_KEY];
+        securityFee = _getFee(rate, _relayAmount);
+
+        rate = feeRates[VAULT_FEE_KEY];
+        vaultFee = _getFee(rate, _relayAmount);
+    }
+
+    function _getToChainFeeV0(
         bytes memory _caller,
         address _relayToken,
         uint256 _relayAmount,

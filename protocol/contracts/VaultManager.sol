@@ -56,20 +56,19 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     IPeriphery public periphery;
 
+    // not used for mintable token
     struct ChainTokenState {
-        bool mintable;              // token is mintable at this chain
-                                    // if token is mintable, all other data will be 0
         uint64 weight;              // chain weight for target balance
-        uint128 balance;            // token balance
-        uint128 pendingOut;         // token pendingOut balance
+        uint128 balance;             // token balance
+        uint128 pendingOut;          // token pendingOut balance
         uint128 reserved;           // reserved for transfer out
         uint128 target;             // target balance
     }
 
     struct TotalTokenState {
+        uint64 totalWeight;
         uint128 totalBalance;
         uint128 totalPendingOut;
-        uint64 totalWeight;
     }
 
     mapping(address => TotalTokenState) public totalStates;
@@ -113,8 +112,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
             totalState.totalWeight = totalState.totalWeight - chainState.weight + uint64(weights[i]);
             chainState.weight = uint64(weights[i]);
         }
-        // update target balance
-        _updateTokenTargetBalance(token);
+        // todo: update target balance
+        // _updateTokenTargetBalance(token);
     }
 
     function _updateTokenTargetBalance(address token) internal {
@@ -202,7 +201,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
         // todo: add min amount
         if (amount <= gasFee) {
             // no need migration
-
             if (p.tokenPendingOutAllowances > 0) {
                 return (false, fromVault, toVault, 0);
             }
@@ -219,6 +217,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         if (migrationAmount <= gasFee || (amount - migrationAmount) <= gasFee) {
             migrationAmount = amount;
         }
+        migrationAmount -= gasFee;
         p.migrationIndex++;
 
         p.tokenPendingOutAllowances += uint128(migrationAmount + gasFee);
@@ -235,7 +234,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         view
         returns (bytes memory vault)
     {
-        uint256 allowance;
+        uint128 allowance;
         if (periphery.getChainType(chain) == ChainType.CONTRACT) {
             ChainTokenState storage chainBalance = chainStates[token][chain];
             allowance = chainBalance.balance - chainBalance.pendingOut;
@@ -294,6 +293,60 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
     }
 
+    function refund(TxItem memory txItem, bytes memory vault, uint256 estimateGas)
+    external
+    onlyRelay
+    returns (bool, uint256)
+    {
+        bytes32 vaultKey = keccak256(vault);
+
+        totalStates[txItem.token].totalBalance += uint128(txItem.amount);
+
+
+        ChainTokenState storage chainBalance = chainStates[txItem.token][txItem.chain];
+        chainBalance.balance += uint128(txItem.amount);
+
+        if (txItem.amount <= estimateGas) {
+            return (false, 0);
+        }
+
+        uint256 amount = txItem.amount - estimateGas;
+        if (txItem.chainType == ChainType.CONTRACT) {
+            totalStates[txItem.token].totalPendingOut += uint128(amount);
+            chainBalance.pendingOut += uint128(amount);
+        } else {
+            // out amount + gas
+            totalStates[txItem.token].totalPendingOut += uint128(txItem.amount);
+            chainBalance.pendingOut += uint128(txItem.amount);
+
+            vaultList[vaultKey].chainAllowances[txItem.chain].tokenAllowances += uint128(txItem.amount);
+        }
+
+        // todo
+        // _updateTokenTargetBalance(token);
+
+        return (true, amount);
+    }
+
+    function deposit(TxItem memory txItem, bytes memory vault)
+    external
+    onlyRelay
+    {
+        bytes32 vaultKey = keccak256(vault);
+
+        totalStates[txItem.token].totalBalance += uint128(txItem.amount);
+
+        ChainTokenState storage chainBalance = chainStates[txItem.token][txItem.chain];
+        chainBalance.balance += uint128(txItem.amount);
+
+        if (txItem.chainType != ChainType.CONTRACT) {
+            vaultList[vaultKey].chainAllowances[txItem.chain].tokenAllowances += uint128(txItem.amount);
+        }
+
+        // todo
+        // _updateTokenTargetBalance(token);
+    }
+
     // tx in, add liquidity or swap in
     function transferIn(uint256 fromChain, bytes memory vault, address token, uint256 amount)
         external
@@ -311,7 +364,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
         ChainTokenState storage chainBalance = chainStates[token][fromChain];
         chainBalance.balance += uint128(amount);
 
-        _updateTokenTargetBalance(token);
+        // todo
+        // _updateTokenTargetBalance(token);
 
         vaultList[vaultKey].chains.add(fromChain);
 
@@ -357,8 +411,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
             chainState.balance -= uint128(amount);
             chainState.pendingOut -= uint128(amount);
         }
-
-        _updateTokenTargetBalance(token);
+        // todo
+        // _updateTokenTargetBalance(token);
     }
 
     // bridge
@@ -394,9 +448,9 @@ contract VaultManager is BaseImplementation, IVaultManager {
         vaultList[vaultKey].chainAllowances[toChain].tokenPendingOutAllowances += uint128(amount + estimatedGas);
     }
 
-    function checkVault(uint256 fromChain, bytes calldata vault) external view returns (bool) {
-        if (periphery.getChainType(fromChain) == ChainType.CONTRACT) {
-            // not check vault if source chain is a contract chain, checked by source gateway contract
+    function checkVault(ChainType chainType, uint256, bytes calldata vault) external view returns (bool) {
+        if (chainType == ChainType.CONTRACT) {
+            // checked by source gateway contract for a contract chain
             return true;
         }
         bytes32 vaultKey = keccak256(vault);
@@ -412,5 +466,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         view
         override
         returns (uint256, bool)
-    {}
+    {
+
+    }
 }

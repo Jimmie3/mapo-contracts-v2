@@ -42,8 +42,6 @@ contract Relay is BaseGateway, IRelay {
         bytes32 hash;
     }
 
-
-
     mapping(bytes32 => OrderInfo) public orderInfos;
 
     // token => amount
@@ -105,7 +103,7 @@ contract Relay is BaseGateway, IRelay {
         bytes data
     );
 
-    event BridgeFeeCollected(bytes32 indexed orderId, address token, uint256 amount);
+    event BridgeFeeCollected(bytes32 indexed orderId, address token, uint256 securityFee, uint256 vaultFee);
 
 
     function initialize(address _defaultAdmin) public initializer {
@@ -304,6 +302,7 @@ contract Relay is BaseGateway, IRelay {
         BridgeItem memory bridgeItem = txInItem.bridgeItem;
 
         uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
+        uint256 toChain = bridgeItem.chainAndGasLimit >> 128 & 0xFFFFFFFFFFFFFFFF;
 
         _updateLastScanBlock(fromChain, txInItem.height);
 
@@ -311,64 +310,66 @@ contract Relay is BaseGateway, IRelay {
         txItem.orderId = txInItem.orderId;
         (txItem.token, txItem.amount) = _getRelayTokenAndAmount(fromChain, bridgeItem.token, bridgeItem.amount);
         _checkAndMint(txItem.token, txItem.amount);
+
         txItem.chain = fromChain;
         txItem.chainType = periphery.getChainType(fromChain);
-
-        // will refund if vault is retired
         if (!vaultManager.checkVault(txItem.chainType, txItem.chain, bridgeItem.vault)) {
-            // refund
+            // refund if vault is retired
             bridgeItem.to = txInItem.refundAddr;
             bridgeItem.payload = bytes("");
 
             return _refund(bridgeItem, txItem);
         }
 
-        // if (!vaultManager.transferIn(txItem.chain, bridgeItem.vault, txItem.token, txItem.amount)) return;
-
         if (bridgeItem.txType == TxType.DEPOSIT) {
             // todo: affiliate fee ?
+            // todo: mint vault token in vaultManager
             vaultManager.deposit(txItem, bridgeItem.vault);
             _depositIn(
                 txItem.orderId, fromChain, txItem.token, txItem.amount, bridgeItem.from, Utils.fromBytes(bridgeItem.to)
             );
         } else {
-            // _increaseVaultBalance(txItem.chain, txItem.token, txItem.amount);
             (bytes memory affiliateData, bytes memory relayData, bytes memory targetData) =
                 abi.decode(bridgeItem.payload, (bytes, bytes, bytes));
 
             // collect affiliate and bridge fee first
-            uint256 toChain = bridgeItem.chainAndGasLimit >> 128 & 0xFFFFFFFFFFFFFFFF;
             txItem.amount = _collectAffiliateAndBridgeFee(txItem, bridgeItem.from, toChain, affiliateData, targetData.length > 0);
             if (txItem.amount == 0) {
-                // todo: update vault
                 // emit complete event
                 return;
             }
 
             txItem.chain = toChain;
             txItem.chainType = periphery.getChainType(txItem.chain);
-            if (txItem.chain == selfChainId) {
-                // todo: update vault
-                return _bridgeIn(txItem, bridgeItem);
-            }
 
-            try this.execute(bridgeItem, txItem, fromChain, relayData, targetData) {}
-            catch (bytes memory) {
+            try this.execute(bridgeItem, txItem, fromChain, relayData, targetData) returns (uint256 amount) {
+                txItem.amount = amount;
+            } catch (bytes memory) {
                 txItem.chain = fromChain;
                 txItem.chainType = periphery.getChainType(fromChain);
 
                 bridgeItem.to = txInItem.refundAddr;
+                bridgeItem.payload = bytes("");
 
                 _refund(bridgeItem, txItem);
+
+                return;
+            }
+
+            if (txItem.chain == selfChainId) {
+                return _bridgeIn(txItem, bridgeItem);
             }
         }
     }
 
 
-    function execute(BridgeItem memory bridgeItem, TxItem memory txItem, uint256 fromChain, bytes memory relayPayload, bytes memory targetPayload) public {
+    function execute(BridgeItem memory bridgeItem, TxItem memory txItem, uint256 fromChain, bytes memory relayPayload, bytes memory targetPayload) public returns (uint256) {
+        require(msg.sender == address(this));
 
         if (relayPayload.length > 0) {
             // todo: update transfer in vault
+
+            // collect fee
 
             (address tokenOut, uint256 amountOutMin) = abi.decode(relayPayload, (address, uint256));
             txItem.amount = swap.swap(txItem.token, txItem.amount, tokenOut, amountOutMin);
@@ -383,26 +384,30 @@ contract Relay is BaseGateway, IRelay {
             txItem.amount += balanceFee;
         } else {
             if (txItem.amount < balanceFee) {
-                txItem.amount -= ( balanceFee);
+                txItem.amount -= balanceFee;
             } else {
                 revert Errs.zero_amount_out();
             }
         }
 
-        bool choose;
-        GasInfo memory gasInfo;
-        (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.chooseAndTransfer(txItem, targetPayload.length > 0);
-        if (!choose) {
-            // no vault
-            revert Errs.invalid_vault();
-        }
-        // todo: check relay min amount
-
-
         bridgeItem.payload = targetPayload;
         bridgeItem.txType = TxType.TRANSFER;
 
-        _emitRelay(fromChain, bridgeItem, txItem, gasInfo);
+        if (txItem.chain != selfChainId) {
+            bool choose;
+            GasInfo memory gasInfo;
+            (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.chooseAndTransfer(txItem, targetPayload.length > 0);
+            if (!choose) {
+                // no vault
+                revert Errs.invalid_vault();
+            }
+
+            _emitRelay(fromChain, bridgeItem, txItem, gasInfo);
+        }
+
+        // todo: check relay min amount
+
+        return txItem.amount;
     }
 
     function _bridgeIn(TxItem memory txItem, BridgeItem memory bridgeItem) internal {
@@ -420,7 +425,6 @@ contract Relay is BaseGateway, IRelay {
             bridgeItem.payload
         );
         _bridgeTokenIn(txItem.orderId, bridgeItem, txItem);
-        // _reduceVaultBalance(txItem.chain, txItem.token, txItem.amount);
     }
 
     function _getActiveVault() internal view override returns (bytes memory vault) {
@@ -452,14 +456,14 @@ contract Relay is BaseGateway, IRelay {
         bridgeItem.from = Utils.toBytes(msg.sender);
         bridgeItem.to = to;
 
-        (bytes memory affiliateData, bytes memory relayLoad, bytes memory targetLoad) =
+        (bytes memory affiliateData, bytes memory relayPayload, bytes memory targetPayload) =
             abi.decode(payload, (bytes, bytes, bytes));
 
-        if(affiliateData.length > 0) {
-            txItem.amount -= _collectAffiliateFee(txItem.orderId, txItem.token, txItem.amount, affiliateData);
-        }
+        // collect affiliate and bridge fee first
+        txItem.amount = _collectAffiliateAndBridgeFee(txItem, bridgeItem.from, toChain, affiliateData, targetPayload.length > 0);
+        if (txItem.amount == 0) revert Errs.zero_amount_out();
 
-        execute(bridgeItem, txItem, selfChainId, relayLoad, targetLoad);
+        execute(bridgeItem, txItem, selfChainId, relayPayload, targetPayload);
     }
 
     function _collectToChainFee(bytes memory from, TxItem memory txItem, uint256 fromChain, bool withCall)
@@ -478,37 +482,25 @@ contract Relay is BaseGateway, IRelay {
         }
     }
 
-    function _collectAffiliateFee(bytes32 orderId, address token, uint256 amount, bytes memory feeData)
-        internal
-        returns (uint256 fee)
-    {
-        // todo: send fee first or approve to affiliateFeeManager
-        try affiliateFeeManager.collectAffiliatesFee(orderId, token, amount, feeData) returns (uint256 totalFee) {
-            _sendToken(token, amount, address(affiliateFeeManager), true);
-            fee = totalFee;
-        } catch (bytes memory) {
-            // do nothing
-        }
-    }
-
-    function _collectAffiliateAndBridgeFee(TxItem memory txItem, bytes memory from, uint256 toChain, bytes memory feeData, bool withSwap)
+    function _collectAffiliateAndBridgeFee(TxItem memory txItem, bytes memory from, uint256 toChain, bytes memory feeData, bool withCall)
     internal
     returns (uint256)
     {
-        uint256 amount = txItem.amount;
         uint256 affiliateFee;
         if (feeData.length > 0) {
             // todo: send fee first or approve to affiliateFeeManager
             try affiliateFeeManager.collectAffiliatesFee(txItem.orderId, txItem.token, txItem.amount, feeData) returns (uint256 totalFee) {
-                _sendToken(txItem.token, txItem.amount, address(affiliateFeeManager), true);
                 affiliateFee = totalFee;
+                _sendToken(txItem.token, affiliateFee, address(affiliateFeeManager), true);
+
             } catch (bytes memory) {
                 // do nothing
             }
         }
 
+        uint256 amount = txItem.amount;
         (uint256 securityFee, uint256 vaultFee) =
-                                _getRegistry().getTransferOutFee(from, txItem.token, txItem.amount,  txItem.chain, toChain,withSwap);
+                                _getRegistry().getTransferOutFee(from, txItem.token, txItem.amount,  txItem.chain, toChain, withCall);
 
         if (txItem.amount > affiliateFee + securityFee + vaultFee) {
             amount -= (affiliateFee + securityFee + vaultFee);
@@ -519,7 +511,18 @@ contract Relay is BaseGateway, IRelay {
             securityFee = txItem.amount - affiliateFee;
             vaultFee = 0;
             amount = 0;
+        } else {
+            securityFee = 0;
+            vaultFee = 0;
+            amount = 0;
         }
+
+        vaultFeeInfos[txItem.token] += vaultFee;
+        if (securityFee > 0) {
+            _sendToken(txItem.token, securityFee, securityFeeReceiver, true);
+        }
+
+        emit BridgeFeeCollected(txItem.orderId, txItem.token, securityFee, vaultFee);
 
         return amount;
     }

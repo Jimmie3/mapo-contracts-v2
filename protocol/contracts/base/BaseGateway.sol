@@ -21,7 +21,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     uint256 internal constant MIN_GAS_FOR_LOG = 20_000;
 
     uint256 constant MINTABLE_TOKEN = 0x02;
-    uint256 constant BRIDGABLE_TOKEN = 0x01;
+    uint256 constant BRIDGEABLE_TOKEN = 0x01;
 
     uint256 public immutable selfChainId = block.chainid;
 
@@ -122,7 +122,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     }
 
     function isBridgeable(address _token) external view returns (bool) {
-        return _isBridgeAble(_token);
+        return _isBridgeable(_token);
     }
 
     function _deposit(bytes32 orderId, address token, uint256 amount, address from, address to, address refundAddr)
@@ -142,7 +142,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
 
         address user = msg.sender;
         address outToken = _safeReceiveToken(token, user, amount);
-        if (!_isBridgeAble(outToken)) revert not_bridge_able();
+        if (!_isBridgeable(outToken)) revert not_bridge_able();
 
         // address from = (refund == address(0)) ? user : refund;
         uint256 chainAndGasLimit = selfChainId << 192 | toChain << 128;
@@ -297,8 +297,8 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         return (tokenFeatureList[_token] & MINTABLE_TOKEN) == MINTABLE_TOKEN;
     }
 
-    function _isBridgeAble(address _token) internal view returns (bool) {
-        return ((tokenFeatureList[_token] & BRIDGABLE_TOKEN) == BRIDGABLE_TOKEN);
+    function _isBridgeable(address _token) internal view returns (bool) {
+        return ((tokenFeatureList[_token] & BRIDGEABLE_TOKEN) == BRIDGEABLE_TOKEN);
     }
 
     function _needCall(address target, uint256 len) internal view returns (bool) {

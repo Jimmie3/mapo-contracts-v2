@@ -17,6 +17,63 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 import {IPeriphery} from "./interfaces/IPeriphery.sol";
 
+/**
+ * @title VaultManager
+ * @dev Core vault management contract for cross-chain asset transfers
+ *
+ * ## Overview
+ * VaultManager is responsible for managing vault operations across multiple chains,
+ * handling vault rotations, migrations, and tracking token balances and allowances.
+ * It maintains both active and retiring vaults to ensure smooth transitions during
+ * vault updates.
+ *
+ * ## Vault Management Principles
+ *
+ * ### 1. Vault Selection Strategy
+ * - **Contract Chains**: Always use the active vault for outgoing transfers by default.
+ *   The contract maintains chain-specific vault assignments during migrations.
+ * - **Non-Contract Chains**: Select vault based on available token allowances,
+ *   prioritizing active vault first, then falling back to retiring vault if needed.
+ *
+ * ### 2. Refund Mechanism
+ * - **Retired Vault**: If a vault is retired (not active or retiring), execute refund
+ *   to return assets to the sender.
+ * - **Insufficient Funds After Swap**: If after relay chain fee deduction and token swap,
+ *   the amount is less than expected minimum, trigger refund. Affiliate fees and
+ *   security fees are still deducted before refund.
+ *
+ * ### 3. Fee Structure for Transfers
+ * - **Target Chain Transfer**: Deduct base fee (gas fee) when transferring to target chain.
+ *   If balance is below the base fee, initiate refund process.
+ * - **Balance Fee**: Additional fees may apply based on vault balance management needs,
+ *   can be positive (incentive) or negative (fee) depending on rebalancing requirements.
+ *
+ * ### 4. Refund Fee Management
+ * - **Gas Fee Deduction**: During refund, source chain gas fees are deducted.
+ * - **Minimum Amount Check**: If the refund amount after gas fee is below minimum
+ *   threshold, the refund is cancelled to avoid dust transactions.
+ *
+ * ### 5. Migration Process
+ * - **Contract Chains**: Only update vault key mappings, no actual asset migration.
+ *   The chain is immediately assigned to the new active vault.
+ * - **Non-Contract Chains**: Physically migrate assets from retiring vault address
+ *   to new active vault address. Migration includes:
+ *   - Calculate and reserve gas fees for migration transaction
+ *   - Transfer tokens in batches (max 3 migrations per chain)
+ *   - Update allowances for both vaults accordingly
+ *
+ * ### 6. Balance and Allowance Tracking
+ * - Maintains per-chain, per-token balance states including:
+ *   - Current balance and pending outgoing amounts
+ *   - Reserved amounts for confirmed transfers
+ *   - Target balances for rebalancing operations
+ * - Vault-specific chain allowances track migration status and token limits
+ *
+ * ### 7. Access Control
+ * - Only the Relay contract can invoke state-changing operations
+ * - Administrative functions restricted to authorized roles
+ * - Periphery contract provides chain configuration and fee calculations
+ */
 contract VaultManager is BaseImplementation, IVaultManager {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -351,14 +408,15 @@ contract VaultManager is BaseImplementation, IVaultManager {
     onlyRelay
     {
         bytes32 vaultKey = keccak256(vault);
+        uint128 amount = uint128(txItem.amount);
 
-        totalStates[txItem.token].totalBalance += uint128(txItem.amount);
+        totalStates[txItem.token].totalBalance += amount;
 
         ChainTokenState storage chainBalance = chainStates[txItem.token][txItem.chain];
-        chainBalance.balance += uint128(txItem.amount);
+        chainBalance.balance += amount;
 
         if (txItem.chainType != ChainType.CONTRACT) {
-            vaultList[vaultKey].chainAllowances[txItem.chain].tokenAllowances += uint128(txItem.amount);
+            vaultList[vaultKey].chainAllowances[txItem.chain].tokenAllowances += amount;
         }
 
         // todo

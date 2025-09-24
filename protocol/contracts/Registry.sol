@@ -48,10 +48,12 @@ contract Registry is BaseImplementation, IRegistry {
 
     struct ChainInfo {
         ChainType chainType;
-        // default gas token address on relay chain
-        // for Bitcoin, will be the BTC token address on relay chain
-        // for Kaia, will be the USDT address on Kaia
-        address gasToken;
+        address gasToken;           // the chain native token address mapped on relay chain
+        address baseFeeToken;       // the base fee token address mapped on relay chain
+                                    // by default, it will be the chain native token address on relay chain
+                                    // like BTC for Bitcoin, ETH for Ethereum, Base, etc.
+                                    // but the protocol might not support the chain native token bridge, like Kaia, it will be USDT.
+                                    // it will be used when not specify bridge token, such as migration
         bytes router;
         string name;
         EnumerableSet.BytesSet tokens;

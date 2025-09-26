@@ -214,9 +214,10 @@ contract TSSManager is BaseImplementation, ITSSManager {
      */
     function voteUpdateTssPool(TssPoolParam calldata param) external {
         address user = msg.sender;
-        TSSInfo storage e = tssInfos[ELECTING_PUBKEY_HASH];
-        _checkTssPoolStatus(param.epoch, e);
+        if (epochKeys[param.epoch] != ELECTING_PUBKEY_HASH) revert invalid_status();
 
+        TSSInfo storage e = tssInfos[ELECTING_PUBKEY_HASH];
+        if(!_checkTssPoolStatus(e)) return;
         _updateKeyShare(user, param.pubkey, param.keyShare);
         Proposal storage p = proposals[_getUpdateTSSPoolHash(param)];
         bool keyGen = (param.blames.length == 0);
@@ -399,7 +400,6 @@ contract TSSManager is BaseImplementation, ITSSManager {
                 // non-participants submit within the specified block range,
                 // reverted the DELAY_SLASH_POINT applied after consensus.
                 _subSlashPoint(e.epochId, maintainer, delayRecoverPoint);
-                // if (jailBlock > 0) _releaseFromJail(maintainer, jailBlock);
             }
         }
     }
@@ -456,7 +456,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
     function _getTxInItemHash(TxInItem calldata txInItem) internal pure returns (bytes32) {
 
-        bytes memory en = abi.encodePacked(
+        bytes32 en = keccak256(abi.encodePacked(
                 txInItem.bridgeItem.chainAndGasLimit,
                 txInItem.bridgeItem.vault,
                 txInItem.bridgeItem.txType,
@@ -465,13 +465,13 @@ contract TSSManager is BaseImplementation, ITSSManager {
                 txInItem.bridgeItem.from,
                 txInItem.bridgeItem.to,
                 txInItem.bridgeItem.payload
-            );
+            ));
         return keccak256(abi.encodePacked(en, txInItem.orderId, txInItem.height, txInItem.refundAddr));
     }
 
     function _getTxOutItemHash(TxOutItem calldata txOutItem) internal pure returns (bytes32) {
 
-        bytes memory en = abi.encodePacked(
+        bytes32 en = keccak256(abi.encodePacked(
                 txOutItem.bridgeItem.chainAndGasLimit,
                 txOutItem.bridgeItem.vault,
                 txOutItem.bridgeItem.txType,
@@ -481,7 +481,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
                 txOutItem.bridgeItem.from,
                 txOutItem.bridgeItem.to,
                 txOutItem.bridgeItem.payload
-            );
+            ));
         return keccak256(abi.encodePacked(en, txOutItem.orderId, txOutItem.height, txOutItem.gasUsed, txOutItem.sender));
     }
 
@@ -535,9 +535,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
         }
     }
 
-    function _checkTssPoolStatus(uint256 epoch, TSSInfo storage e) internal view {
-        if (epochKeys[epoch] != ELECTING_PUBKEY_HASH) revert invalid_status();
-        if ((e.electBlock + _getParameter(Constant.MAX_BLOCKS_FOR_UPDATE_TSS)) < _getBlock()) revert invalid_status();
+    function _checkTssPoolStatus(TSSInfo storage e) internal view returns(bool) {
+        return e.status == TSSStatus.KEYGEN_PENDING || (e.status == TSSStatus.KEYGEN_CONSENSUS && (e.electBlock + _getParameter(Constant.MAX_BLOCKS_FOR_UPDATE_TSS)) >= _getBlock());
     }
 
     function _getParameter(bytes32 hash) internal view returns (uint256) {

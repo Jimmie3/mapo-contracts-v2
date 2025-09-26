@@ -4,10 +4,6 @@
             "value": 100
         },
         {
-            "key": "KEY_GEN_FAIL_JAIL_BLOCK",
-            "value": 50000
-        },
-        {
             "key": "JAIL_BLOCK",
             "value": 50000
         },
@@ -30,10 +26,6 @@
         {
             "key": "MIGRATION_DELAY_SLASH_POINT",
             "value": 300
-        },
-        {
-            "key": "MIN_BLOCKS_PER_EPOCH",
-            "value": 5000
         },
         {
             "key": "MAX_BLOCKS_FOR_UPDATE_TSS",

@@ -36,7 +36,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
     uint256 public currentEpoch;
     uint256 public electionEpoch;
 
-    uint256 public maintainerLimit = 5;
+    uint256 public maintainerLimit;
 
     ITSSManager public tssManager;
     IParameters public parameters;
@@ -49,10 +49,12 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     error no_access();
     error empty_pubkey();
+    error invalid_pubkey();
     error empty_p2pAddress();
     error maintainer_not_enough();
     error only_validator_can_register();
 
+    event Heartbeat(address m);
     event Deregister(address user);
     event Set(address _manager, address _parameter);
     event UpdateMaintainerLimit(uint256 limit);
@@ -64,7 +66,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
     event Register(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
 
     modifier onlyVm() {
-        //if (msg.sender != address(0)) revert no_access();
+        if (msg.sender != address(0)) revert no_access();
         _;
     }
 
@@ -93,7 +95,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         address user = msg.sender;
         MaintainerInfo storage info = maintainerInfos[user];
         require(info.status == MaintainerStatus.UNKNOWN);
-        _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress);
+        _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress, user);
         if (!_isValidator(user)) revert only_validator_can_register();
         info.status = MaintainerStatus.STANDBY;
         info.p2pAddress = p2pAddress;
@@ -107,11 +109,18 @@ contract Maintainers is BaseImplementation, IMaintainers {
         address user = msg.sender;
         MaintainerInfo storage info = maintainerInfos[user];
         require(info.status == MaintainerStatus.STANDBY);
-        _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress);
+        _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress, user);
         info.p2pAddress = p2pAddress;
         info.secp256Pubkey = secp256Pubkey;
         info.ed25519Pubkey = ed25519PubKey;
         emit Update(user, secp256Pubkey, ed25519PubKey, p2pAddress);
+    }
+
+    function heartbeat() external {
+        MaintainerInfo storage info = maintainerInfos[msg.sender];
+        require(info.status != MaintainerStatus.UNKNOWN);
+        info.lastHeartbeatTime = block.timestamp;
+        emit Heartbeat(msg.sender);
     }
 
     // will not participate tss
@@ -176,13 +185,13 @@ contract Maintainers is BaseImplementation, IMaintainers {
             if (_needElect(currentEpoch)) {
                 _releaseFromJail();
 
-                (address[] memory maintainers, uint256 amount) = _chooseMaintainers();
-                if (amount < TSS_MIN_NUMBER) {
+                (address[] memory maintainers, uint256 selectedCount) = _chooseMaintainers();
+                if (selectedCount < TSS_MIN_NUMBER) {
                     return;
                 }
                 electionEpoch = currentEpoch + 1;
                 EpochInfo storage epoch = epochInfos[electionEpoch];
-                _elect(epoch, maintainers, amount);
+                _elect(epoch, maintainers);
 
                 return;
             }
@@ -193,8 +202,8 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 // todo: slash and re-elect maintainers
                 _releaseFromJail();
 
-                (address[] memory maintainers, uint256 amount) = _chooseMaintainers();
-                if (amount < TSS_MIN_NUMBER) {
+                (address[] memory maintainers, uint256 selectedCount) = _chooseMaintainers();
+                if (selectedCount < TSS_MIN_NUMBER) {
                     return;
                 }
 
@@ -204,7 +213,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 }
                 _switchMaintainerStatus(epoch.maintainers, MaintainerStatus.ACTIVE, MaintainerStatus.STANDBY);
 
-                _elect(epoch, maintainers, amount);
+                _elect(epoch, maintainers);
                 return;
             } else if (status == ITSSManager.TSSStatus.KEYGEN_COMPLETED) {
                 // finish tss keygen, start migration
@@ -236,15 +245,12 @@ contract Maintainers is BaseImplementation, IMaintainers {
         tssManager.migrate();
     }
 
-    function _elect(EpochInfo storage epoch, address[] memory maintainers, uint256 amount) internal {
+    function _elect(EpochInfo storage epoch, address[] memory maintainers) internal {
 
         uint64 _block = _getBlock();
         epoch.electedBlock = _block;
 
-        for (uint256 i = 0; i < amount; i++) {
-            epoch.maintainers.push(maintainers[i]);
-        }
-
+        epoch.maintainers = maintainers;
         bool maintainersUpdate = tssManager.elect(electionEpoch, epoch.maintainers);
         if (!maintainersUpdate) {
             // no need rotate
@@ -319,12 +325,10 @@ contract Maintainers is BaseImplementation, IMaintainers {
         internal
     {
         uint256 len = maintainers.length;
-        for (uint256 i = 0; i < len;) {
+        for (uint256 i = 0; i < len; i++) {
             MaintainerInfo storage info = maintainerInfos[maintainers[i]];
-            if (info.status != keep) info.status = target;
-            unchecked {
-                ++i;
-            }
+            if(info.status == keep || info.status == MaintainerStatus.REVOKED || info.status == MaintainerStatus.JAILED) continue;
+            info.status = target;
         }
     }
 
@@ -360,8 +364,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 ++i;
             }
         }
-
-        return (maintainers, selectedCount);
+        return (_subList(maintainers, selectedCount), selectedCount);
     }
 
     function _needElect(uint256 epochId) internal view returns (bool) {
@@ -398,12 +401,18 @@ contract Maintainers is BaseImplementation, IMaintainers {
     function _checkRegisterParameters(
         bytes calldata secp256Pubkey,
         bytes calldata ed25519PubKey,
-        string calldata p2pAddress
+        string calldata p2pAddress,
+        address user
     ) internal pure {
         if (secp256Pubkey.length == 0 || ed25519PubKey.length == 0) {
             revert empty_pubkey();
         }
         if (bytes(p2pAddress).length == 0) revert empty_p2pAddress();
+        if(_getAddressFromPublicKey(secp256Pubkey) != user) revert invalid_pubkey();
+    }
+
+    function _getAddressFromPublicKey(bytes memory publicKey) internal pure returns (address) {
+        return address(uint160(uint256(keccak256(publicKey))));
     }
 
     function _getCurrentValidatorSigners() internal view returns (address[] memory signers) {
@@ -425,6 +434,18 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 ++i;
             }
         }
+    }
+
+    function _subList(address[] memory list, uint256 count) internal pure returns(address[] memory) {
+        if(count >= list.length) return list;
+        address[] memory subs = new address[](count);
+        for (uint i = 0; i < count;) {
+            subs[i] = list[i];
+            unchecked {
+                ++i;
+            }
+        }
+        return subs;
     }
 
     function _getBlock() internal view returns (uint64) {

@@ -14,6 +14,7 @@ interface IMaintainers {
     struct MaintainerInfo {
         MaintainerStatus status;
         address account;
+        uint256 lastHeartbeatTime;
         uint256 lastActiveEpoch;
         bytes secp256Pubkey;
         bytes ed25519Pubkey;

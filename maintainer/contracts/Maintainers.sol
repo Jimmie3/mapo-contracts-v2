@@ -387,7 +387,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     function _checkCandidacy(ITSSManager m, uint256 epochId, address v) internal view returns (bool) {
         MaintainerStatus status = maintainerInfos[v].status;
-        if (status != MaintainerStatus.STANDBY && status != MaintainerStatus.ACTIVE) {
+        if (status != MaintainerStatus.STANDBY && status != MaintainerStatus.ACTIVE && status != MaintainerStatus.READY) {
             return false;
         }
         // check election epoch point when reelecting

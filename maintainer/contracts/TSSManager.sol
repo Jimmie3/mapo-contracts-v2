@@ -233,23 +233,35 @@ contract TSSManager is BaseImplementation, ITSSManager {
         _beforePropose(delaySlashPoint, user, p, e);
         if (keyGen) {
             if (!Utils.addressListEq(param.members, e.maintainers.values())) revert invalid_members();
-            _checkSig(param.pubkey, param.signature);
+
+            if(p.consensusBlock == 0) {
+                _checkSig(param.pubkey, param.signature);
+            }
 
             if (_consensus(p, e.maintainers.length())) {
                 _handleConsensus(param.epoch, delaySlashPoint, p, e.maintainers);
                 e.status = TSSStatus.KEYGEN_CONSENSUS;
             }
+            
+            uint256 length = param.members.length;
             // all members commit
-            if (p.count == param.members.length) {
+            if (p.count == length) {
                 bytes32 tssKey = keccak256(param.pubkey);
 
                 epochKeys[param.epoch] = tssKey;
 
                 TSSInfo storage te = tssInfos[tssKey];
-                te.status = TSSStatus.KEYGEN_COMPLETED;
-
+                te.epochId = e.epochId;
                 te.pubkey = param.pubkey;
-                te.threshold = uint64(param.members.length) * 2 / 3;
+                te.electBlock = e.electBlock;
+                te.status = TSSStatus.KEYGEN_COMPLETED;
+                te.threshold = uint64(length) * 2 / 3;
+                for (uint256 i = 0; i < length; i++) {
+                    te.maintainers.add(param.members[i]);
+                }
+
+                e.electBlock = 0;
+                e.maintainers.clear();
             }
         } else {
             // keyGen failed;
@@ -447,6 +459,9 @@ contract TSSManager is BaseImplementation, ITSSManager {
     }
 
     function _consensus(Proposal storage p, uint256 maintainerCount) internal view returns (bool) {
+        if(maintainerCount % 3 == 0) {
+            return p.consensusBlock == 0 && (p.count >= ((maintainerCount * 2) / 3));
+        }
         return p.consensusBlock == 0 && (p.count > ((maintainerCount * 2) / 3));
     }
 

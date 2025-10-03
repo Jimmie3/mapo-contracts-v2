@@ -1,20 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ChainType, TxItem, GasInfo} from "../libs/Types.sol";
+import {ChainType, TxItem, GasInfo, FeeInfo} from "../libs/Types.sol";
 
 interface IVaultManager {
-
+    // function getVaultToken(address _token) external view returns (address);
     function getBalanceFee(uint256 fromChain, uint256 toChain, address token, uint256 amount)
-        external
-        view
-        returns (uint256, bool);
-
-    function rotate(bytes memory retiringVault, bytes memory activeVault) external;
-
-    function addChain(uint256 chain) external;
-
-    function removeChain(uint256 chain) external;
+    external
+    view
+    returns (bool, uint256);
 
     function checkMigration() external returns (bool completed, uint256 toMigrateChain);
 
@@ -27,9 +21,13 @@ interface IVaultManager {
 
     function getActiveVault() external view returns (bytes memory);
 
-    function getRetiringVault() external view returns (bytes memory);
 
-    function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view returns(uint256 balance, uint256 pendingOut);
+    function rotate(bytes memory retiringVault, bytes memory activeVault) external;
+
+    function addChain(uint256 chain) external;
+
+    function removeChain(uint256 chain) external;
+
 
     function migrate() external returns (bool completed, TxItem memory txItem, GasInfo memory gasInfo, bytes memory fromVault, bytes memory toVault);
 
@@ -41,9 +39,13 @@ interface IVaultManager {
 
     function deposit(TxItem memory txItem, bytes memory vault) external;
 
-    function transferIn(uint256 fromChain, bytes memory vault, address token, uint256 amount) external returns (bool);
+    function bridge(TxItem memory txItem, bytes memory fromVault, uint256 toChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
 
-    function transferOut(
+    function transferIn(TxItem memory txItem, bytes memory fromVault, uint256 toChain) external returns (uint256 outAmount);
+
+    function transferOut(TxItem memory txItem, uint256 fromChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
+
+    function transferComplete(
         uint256 chain,
         bytes memory vault,
         address token,

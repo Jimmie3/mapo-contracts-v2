@@ -29,6 +29,12 @@ struct GasInfo {
     uint256 transactionSize;
 }
 
+struct FeeInfo {
+    uint256 vaultFee;
+    uint256 balanceFee;
+    bool incentive;
+}
+
 struct BridgeItem {
     uint256 chainAndGasLimit;
     bytes vault;

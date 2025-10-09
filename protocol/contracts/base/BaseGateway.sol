@@ -78,6 +78,12 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     error zero_address();
     error invalid_refund_address();
     error not_bridge_able();
+    error expired();
+
+    modifier ensure(uint deadline) {
+        if(deadline < block.timestamp) revert expired();
+        _;
+    }
 
     function setWtoken(address _wToken) external restricted {
         require(_wToken != ZERO_ADDRESS);
@@ -92,12 +98,13 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         }
     }
 
-    function deposit(address token, uint256 amount, address to, address refundAddr)
+    function deposit(address token, uint256 amount, address to, address refundAddr, uint256 deadline)
         external
         payable
         override
         whenNotPaused
         nonReentrant
+        ensure(deadline)
         returns (bytes32 orderId)
     {
         require(amount != 0);
@@ -135,26 +142,28 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         uint256 toChain,
         bytes memory to,
         address refundAddr,
-        bytes memory payload
-    ) external payable override whenNotPaused nonReentrant returns (bytes32 orderId) {
+        bytes memory payload,
+        uint256 deadline
+    ) external payable override whenNotPaused nonReentrant ensure(deadline) returns (bytes32 orderId) {
         require(amount != 0 && toChain != selfChainId);
         if (refundAddr == ZERO_ADDRESS) revert invalid_refund_address();
 
-        address user = msg.sender;
-        address outToken = _safeReceiveToken(token, user, amount);
+        // address user = msg.sender;
+        address outToken = _safeReceiveToken(token, msg.sender, amount);
         if (!_isBridgeable(outToken)) revert not_bridge_able();
 
         // address from = (refund == address(0)) ? user : refund;
-        uint256 chainAndGasLimit = selfChainId << 192 | toChain << 128;
-
+        // uint256 chainAndGasLimit = selfChainId << 192 | toChain << 128;
+        orderId = _getOrderId(msg.sender);
         emit BridgeOut(
             orderId,
-            chainAndGasLimit,
+            // uint256 chainAndGasLimit = selfChainId << 192 | toChain << 128;
+            (selfChainId << 192 | toChain << 128),
             TxType.TRANSFER,
             _getActiveVault(),
             outToken,
             amount,
-            user,
+            msg.sender,
             refundAddr,
             to,
             payload
@@ -267,7 +276,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         }
     }
 
-    function _getSignHash(bytes32 orderId, bytes memory vault, BridgeItem memory bridgeItem)
+    function _getSignHash(bytes32 orderId, BridgeItem memory bridgeItem)
     internal
     pure
     returns (bytes32)
@@ -280,7 +289,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
                 orderId,
                 bridgeItem.chainAndGasLimit,
                 bridgeItem.txType,
-                vault,
+                bridgeItem.vault,
                 bridgeItem.sequence,
                 bridgeItem.token,
                 bridgeItem.amount,

@@ -113,7 +113,7 @@ contract Gateway is BaseGateway {
         bytes calldata signature,
         BridgeItem memory params
     ) internal pure returns (bool) {
-        bytes32 hash = _getSignHash(orderId, params.vault, params);
+        bytes32 hash = _getSignHash(orderId, params);
         address signer = ECDSA.recover(hash, signature);
         return signer == vaultAddress;
     }

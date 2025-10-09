@@ -69,4 +69,7 @@ interface ITSSManager {
     function migrate() external;
 
     function getTSSStatus(uint256 epochId) external view returns (TSSStatus status);
+
+    function getMembers(bytes calldata pubkey) external view returns (address[] memory members);
+
 }

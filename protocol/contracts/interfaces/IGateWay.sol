@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 interface IGateway {
-    function deposit(address token, uint256 amount, address to, address refund)
+    function deposit(address token, uint256 amount, address to, address refund, uint256 deadline)
         external
         payable
         returns (bytes32 orderId);
@@ -13,6 +13,7 @@ interface IGateway {
         uint256 toChain,
         bytes memory to,
         address refundAddr,
-        bytes memory payload
+        bytes memory payload,
+        uint256 deadline
     ) external payable returns (bytes32 orderId);
 }

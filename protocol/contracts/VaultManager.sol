@@ -268,6 +268,24 @@ contract VaultManager is BaseImplementation, IVaultManager {
         return vaultList[activeVaultKey].pubkey;
     }
 
+    function getRetiringVault() external view override returns (bytes memory) {
+        if(retiringVaultKey != NON_VAULT_KEY) return vaultList[retiringVaultKey].pubkey;
+        else return bytes("");
+    }
+
+    function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view override returns(uint256 balance, uint256 pendingOut) {
+        ChainType chainType = periphery.getChainType(chain);
+        if(chainType == ChainType.CONTRACT) {
+           ChainTokenState storage state =  chainStates[token][chain];
+           balance = state.balance;
+           pendingOut = state.pendingOut;
+        } else {
+           ChainAllowance storage allowance = vaultList[keccak256(vault)].chainAllowances[chain];
+           balance = allowance.tokenAllowances;
+           pendingOut = allowance.tokenPendingOutAllowances;
+        }
+    }
+
     function getBalanceFee(uint256 fromChain, uint256 toChain, address token, uint256 amount)
     external
     view
@@ -314,17 +332,19 @@ contract VaultManager is BaseImplementation, IVaultManager {
                 return (false, txItem, gasInfo, vaultList[retiringVaultKey].pubkey, vaultList[activeVaultKey].pubkey);
             }
 
-            bool pendingOut;
-            (pendingOut, txItem.amount) = _migrate(chain, gasInfo.estimateGas);
-            if (pendingOut) {
-                completed = false;
+            bool chainCompleted;
+            (chainCompleted, txItem.amount) = _migrate(chain, txItem.token, gasInfo.estimateGas);
+
+            // There is a chain migration that has not been completed. The migration status is incomplete.
+            if (completed) {
+                completed = chainCompleted;
             }
             if (txItem.amount == 0) {
                 // migrating or have pending out tx
                 continue;
             }
 
-            return (true, txItem, gasInfo, vaultList[retiringVaultKey].pubkey, vaultList[activeVaultKey].pubkey);
+            return (completed, txItem, gasInfo, vaultList[retiringVaultKey].pubkey, vaultList[activeVaultKey].pubkey);
         }
 
         txItem.chain = 0;
@@ -523,7 +543,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
     }
 
-    function _migrate(uint256 _chain, uint256 gasFee) internal returns (bool completed, uint256 migrationAmount) {
+    function _migrate(uint256 _chain, address token, uint256 gasFee) internal returns (bool completed, uint256 migrationAmount) {
         ChainAllowance storage p = vaultList[retiringVaultKey].chainAllowances[_chain];
         uint256 amount = p.tokenAllowances - p.tokenPendingOutAllowances;
 
@@ -556,7 +576,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
         // todo: update total balance
         // ChainBalance storage chainBalance = tokenChainBalances[txItem.token][_chain];
         // chainBalance.pendingOut += gasFee;
-
+        ChainTokenState storage chainBalance = chainStates[token][_chain];
+        chainBalance.pendingOut += uint128(gasFee);
         return (false, migrationAmount);
     }
 

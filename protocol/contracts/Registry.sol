@@ -31,7 +31,7 @@ contract Registry is BaseImplementation, IRegistry {
         uint256 noSwap;
     }
 
-    mapping(bytes32 => FeeRate) feeRates;
+    mapping(bytes32 => FeeRate) public feeRates;
 
     struct Token {
         uint96 id;
@@ -119,6 +119,8 @@ contract Registry is BaseImplementation, IRegistry {
     event SetFromChainWhitelistFeeRate(
         address _token, uint256 _fromChain, bytes _caller, uint256 _rate, bool _isWhitelist
     );
+
+    event SetFeeRate(bytes32 key, uint256 highest, uint256 lowest, uint256 rate);
 
     error invalid_relay_token();
     error invalid_relay_router();
@@ -244,6 +246,16 @@ contract Registry is BaseImplementation, IRegistry {
     function setBaseFeeReceiver(address _baseFeeReceiver) external restricted checkAddress(_baseFeeReceiver) {
         baseFeeReceiver = _baseFeeReceiver;
         emit SetBaseFeeReceiver(_baseFeeReceiver);
+    }
+
+    function setFeeRate(bytes32 key, uint256 highest, uint256 lowest, uint256 rate) external restricted {
+        if (highest < lowest) revert invalid_highest_and_lowest();
+        if (rate > MAX_RATE_UNIT) revert invalid_proportion_value();
+        FeeRate storage f = feeRates[key];
+        f.highest = highest;
+        f.lowest = lowest;
+        f.rate = rate;
+        emit SetFeeRate(key, highest, lowest, rate); 
     }
 
     function setFromChainFee(address _token, uint256 _fromChain, uint256 _lowest, uint256 _highest, uint256 _rate)
@@ -373,7 +385,7 @@ contract Registry is BaseImplementation, IRegistry {
     {
         address tokenAddr = _getRelayChainToken(_fromChain, _fromToken);
         (toToken, decimals) = _getTargetToken(_toChain, tokenAddr);
-        vaultBalance = getVaultBalance(tokenAddr, _toChain);
+        // vaultBalance = getVaultBalance(tokenAddr, _toChain);
     }
 
     function _getTargetToken(uint256 _toChain, address _relayToken)
@@ -523,7 +535,7 @@ contract Registry is BaseImplementation, IRegistry {
 
         relayToken = _getRelayChainToken(_fromChain, _fromToken);
 
-        toChainVault = getVaultBalance(_bridgeToken, _toChain);
+        // toChainVault = getVaultBalance(_bridgeToken, _toChain);
 
         relayAmount = _getTargetAmount(relayToken, _fromChain, chainId, _fromAmount);
         (feeAmount,,) = _getTransferFee(_caller, relayToken, relayAmount, _fromChain, _toChain, _withSwap);
@@ -563,29 +575,29 @@ contract Registry is BaseImplementation, IRegistry {
         return _getFromChainCallerFeeRate(_token, _fromChain, _caller);
     }
 
-    function getVaultBalance(address _token, uint256 _chainId) public view returns (uint256) {
-        Token storage token = tokenList[_token];
-        if (token.tokenAddress == address(0)) revert invalid_relay_token();
+    // function getVaultBalance(address _token, uint256 _chainId) public view returns (uint256) {
+    //     Token storage token = tokenList[_token];
+    //     if (token.tokenAddress == address(0)) revert invalid_relay_token();
 
-        address vault = tokenList[_token].vaultToken;
-        int256 _vaultBalance = IVaultToken(vault).getVaultByChainId(_chainId);
-        if (_vaultBalance > 0) {
-            uint256 tem = _getTargetAmount(_token, selfChainId, _chainId, uint256(_vaultBalance));
-            require(tem <= uint256(type(int256).max));
-            return tem;
-        }
-        return 0;
-    }
+    //     address vault = tokenList[_token].vaultToken;
+    //     int256 _vaultBalance = IVaultToken(vault).getVaultByChainId(_chainId);
+    //     if (_vaultBalance > 0) {
+    //         uint256 tem = _getTargetAmount(_token, selfChainId, _chainId, uint256(_vaultBalance));
+    //         require(tem <= uint256(type(int256).max));
+    //         return tem;
+    //     }
+    //     return 0;
+    // }
 
-    function getVaultBalanceByToken(uint256 chain, bytes memory token)
-        external
-        view
-        override
-        returns (uint256 vaultBalance)
-    {
-        address relayToken = tokenMappingList[chain][token];
-        vaultBalance = getVaultBalance(relayToken, chain);
-    }
+    // function getVaultBalanceByToken(uint256 chain, bytes memory token)
+    //     external
+    //     view
+    //     override
+    //     returns (uint256 vaultBalance)
+    // {
+    //     address relayToken = tokenMappingList[chain][token];
+    //     vaultBalance = getVaultBalance(relayToken, chain);
+    // }
 
     function getChains() external view override returns (uint256[] memory) {
         return chainList.values();

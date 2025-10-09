@@ -102,7 +102,8 @@ contract Relay is BaseGateway, IRelay {
         address sender,
         bytes data
     );
-
+    
+    event BridgeError(bytes32 indexed orderId, string reason);
     event BridgeFeeCollected(bytes32 indexed orderId, address token, uint256 securityFee, uint256 vaultFee);
 
 
@@ -149,7 +150,7 @@ contract Relay is BaseGateway, IRelay {
         address vaultToken = _getRegistry().getVaultToken(token);
         if (_vaultToken != vaultToken) revert Errs.invalid_vault_token();
         uint256 amount = IVaultToken(vaultToken).getTokenAmount(_vaultAmount);
-        IVaultToken(vaultToken).withdraw(selfChainId, _vaultAmount, user);
+        IVaultToken(vaultToken).withdraw(_vaultAmount, user);
 
         _sendToken(token, amount, user, false);
         emit Withdraw(token, user, _vaultAmount, amount);
@@ -197,7 +198,7 @@ contract Relay is BaseGateway, IRelay {
         return false;
     }
 
-    function relaySigned(bytes32 orderId, bytes calldata vault, bytes calldata relayData, bytes calldata signature)
+    function relaySigned(bytes32 orderId, bytes calldata relayData, bytes calldata signature)
         external
     {
         OrderInfo storage order = orderInfos[orderId];
@@ -205,16 +206,16 @@ contract Relay is BaseGateway, IRelay {
 
         BridgeItem memory outItem = abi.decode(relayData, (BridgeItem));
 
-        bytes32 hash = _getSignHash(orderId, vault, outItem);
+        bytes32 hash = _getSignHash(orderId, outItem);
         if (hash != order.hash) revert Errs.invalid_signature();
 
         address signer = ECDSA.recover(hash, signature);
-        if (signer != Utils.getAddressFromPublicKey(vault)) revert Errs.invalid_signature();
+        if (signer != Utils.getAddressFromPublicKey(outItem.vault)) revert Errs.invalid_signature();
 
         order.signed = true;
         _updateLastScanBlock(selfChainId, order.height);
 
-        emit BridgeRelaySigned(orderId, outItem.chainAndGasLimit, vault, relayData, signature);
+        emit BridgeRelaySigned(orderId, outItem.chainAndGasLimit, outItem.vault, relayData, signature);
     }
 
     // todo: add block hash
@@ -254,12 +255,14 @@ contract Relay is BaseGateway, IRelay {
         if (txItem.chainType == ChainType.CONTRACT) {
             // send gas fee to sender
             _sendToken(order.gasToken, order.estimateGas, txOutItem.sender, false);
+        } else {
+            _reduceVaultBalance(order.gasToken, relayGasUsed);
         }
         if (bridgeItem.txType == TxType.MIGRATE) {
             if (txItem.chainType != ChainType.CONTRACT) {
                 (txItem.token, txItem.amount) = _getRelayTokenAndAmount(chain, bridgeItem.token, bridgeItem.amount);
                 // todo: mint token
-                // _checkAndMint(txItem.token, txItem.amount);
+                _checkAndMint(txItem.token, txItem.amount);
                 // send gas to vault
             }
             vaultManager.migrationOut(txItem, bridgeItem.vault, bridgeItem.payload, relayGasUsed, relayGasEstimated);
@@ -336,6 +339,7 @@ contract Relay is BaseGateway, IRelay {
             txItem.amount = _collectAffiliateAndBridgeFee(txItem, bridgeItem.from, toChain, affiliateData, targetData.length > 0);
             if (txItem.amount == 0) {
                 // emit complete event
+                emit BridgeError(txItem.orderId, "zero out amount");
                 return;
             }
 
@@ -518,6 +522,7 @@ contract Relay is BaseGateway, IRelay {
         }
 
         vaultFeeInfos[txItem.token] += vaultFee;
+        _increaseVaultBalance(txItem.token, vaultFee);
         if (securityFee > 0) {
             _sendToken(txItem.token, securityFee, securityFeeReceiver, true);
         }
@@ -580,7 +585,7 @@ contract Relay is BaseGateway, IRelay {
     ) internal {
         address vaultToken = _getRegistry().getVaultToken(token);
         if (vaultToken == address(0)) revert Errs.vault_token_not_registered();
-        IVaultToken(vaultToken).deposit(fromChain, amount, receiver);
+        IVaultToken(vaultToken).deposit(amount, receiver);
         emit Deposit(orderId, fromChain, token, amount, receiver, from);
     }
 
@@ -630,7 +635,7 @@ contract Relay is BaseGateway, IRelay {
         order.gasToken = txItem.token;
         order.estimateGas = gasInfo.estimateGas;
 
-        order.hash = _getSignHash(txItem.orderId, bridgeItem.vault, bridgeItem);
+        order.hash = _getSignHash(txItem.orderId, bridgeItem);
         order.height = uint64(block.number);
 
         emit BridgeRelay(
@@ -648,14 +653,14 @@ contract Relay is BaseGateway, IRelay {
         );
     }
 
-    function _increaseVaultBalance(uint256 chain, address token, uint256 amount) internal {
+    function _increaseVaultBalance(address token, uint256 amount) internal {
         address vaultToken = _getRegistry().getVaultToken(token);
-        IVaultToken(vaultToken).increaseVaultBalance(chain, amount);
+        IVaultToken(vaultToken).increaseVaultBalance(amount);
     }
 
-    function _reduceVaultBalance(uint256 chain, address token, uint256 amount) internal {
+    function _reduceVaultBalance(address token, uint256 amount) internal {
         address vaultToken = _getRegistry().getVaultToken(token);
-        IVaultToken(vaultToken).reduceVaultBalance(chain, amount);
+        IVaultToken(vaultToken).reduceVaultBalance(amount);
     }
 
     function _getRelayToken(uint256 chain, bytes memory token) internal view returns (address relayToken) {

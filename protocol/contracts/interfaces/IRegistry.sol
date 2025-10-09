@@ -90,5 +90,5 @@ interface IRegistry {
 
     function getTokenAddressByNickname(uint256 chain, string memory nickname) external view returns (bytes memory);
 
-    function getVaultBalanceByToken(uint256 chain, bytes memory token) external view returns (uint256 vaultBalance);
+    // function getVaultBalanceByToken(uint256 chain, bytes memory token) external view returns (uint256 vaultBalance);
 }

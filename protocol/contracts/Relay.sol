@@ -107,7 +107,7 @@ contract Relay is BaseGateway, IRelay {
         address sender,
         bytes data
     );
-    
+
     event BridgeError(bytes32 indexed orderId, string reason);
     event BridgeFeeCollected(bytes32 indexed orderId, address token, uint256 securityFee, uint256 vaultFee);
 
@@ -250,7 +250,6 @@ contract Relay is BaseGateway, IRelay {
         TxItem memory txItem;
         txItem.orderId = txOutItem.orderId;
         txItem.chain = chain;
-
         txItem.chainType = _getRegistry().getChainType(chain);
 
         uint256 relayGasUsed = _getRelayChainGasAmount(chain, txOutItem.gasUsed);
@@ -263,6 +262,7 @@ contract Relay is BaseGateway, IRelay {
         } else {
             _reduceVaultBalance(order.gasToken, relayGasUsed);
         }
+
         if (bridgeItem.txType == TxType.MIGRATE) {
             if (txItem.chainType != ChainType.CONTRACT) {
                 (txItem.token, txItem.amount) = _getRelayTokenAndAmount(chain, bridgeItem.token, bridgeItem.amount);
@@ -270,13 +270,12 @@ contract Relay is BaseGateway, IRelay {
                 _checkAndMint(txItem.token, txItem.amount);
                 // send gas to vault
             }
-            vaultManager.migrationOut(txItem, bridgeItem.vault, bridgeItem.payload, relayGasUsed, relayGasEstimated);
+            vaultManager.migrationComplete(txItem, bridgeItem.vault, bridgeItem.payload, relayGasUsed, relayGasEstimated);
         } else {
+            // todo: refund retied vault
             (txItem.token, txItem.amount) = _getRelayTokenAndAmount(chain, bridgeItem.token, bridgeItem.amount);
 
-            vaultManager.transferComplete(
-                txItem.chain, bridgeItem.vault, txItem.token, txItem.amount, relayGasUsed, relayGasEstimated
-            );
+            vaultManager.transferComplete(txItem, bridgeItem.vault, relayGasUsed, relayGasEstimated);
         }
 
         // todo: delete order info
@@ -326,7 +325,7 @@ contract Relay is BaseGateway, IRelay {
             bridgeItem.to = txInItem.refundAddr;
             bridgeItem.payload = bytes("");
 
-            return _refund(bridgeItem, txItem);
+            return _refund(bridgeItem, txItem, true);
         }
 
         if (bridgeItem.txType == TxType.DEPOSIT) {
@@ -360,7 +359,7 @@ contract Relay is BaseGateway, IRelay {
                 bridgeItem.to = txInItem.refundAddr;
                 bridgeItem.payload = bytes("");
 
-                _refund(bridgeItem, txItem);
+                _refund(bridgeItem, txItem, false);
 
                 return;
             }
@@ -575,12 +574,11 @@ contract Relay is BaseGateway, IRelay {
         _emitRelay(selfChainId, bridgeItem, txItem, gasInfo);
     }
 
-    // only support non-contract chain refund
-    function _refund(BridgeItem memory bridgeItem, TxItem memory txItem) internal {
+    function _refund(BridgeItem memory bridgeItem, TxItem memory txItem, bool fromRetiredVault) internal {
         GasInfo memory gasInfo;
 
-        // refund from the from vault
-        (txItem.amount, gasInfo) = vaultManager.refund(txItem, bridgeItem.vault);
+        // refund to the from vault
+        (txItem.amount, gasInfo) = vaultManager.refund(txItem, bridgeItem.vault, fromRetiredVault);
         if (txItem.amount == 0) {
             // todo: emit complete?
             return;

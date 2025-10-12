@@ -24,15 +24,11 @@ struct TxItem {
 }
 
 struct GasInfo {
+    address gasToken;
     uint256 estimateGas;
     uint256 transactionRate;
     uint256 transactionSize;
-}
-
-struct FeeInfo {
-    uint256 vaultFee;
-    uint256 balanceFee;
-    bool incentive;
+    bytes vault;
 }
 
 struct BridgeItem {
@@ -58,7 +54,7 @@ struct TxOutItem {
     bytes32 orderId;
     BridgeItem bridgeItem;
     uint64 height;
-    uint128 gasUsed;
+    uint128 gasUsed;        // native token used
     address sender;
 }
 

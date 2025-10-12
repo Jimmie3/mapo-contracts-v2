@@ -58,6 +58,13 @@ interface IPeriphery {
     view
     returns (uint256 gasFee, uint256 transactionRate, uint256 transactionSize);
 
+    // Get network fee with the chain base token
+    // for non-contract chain, it will be the gas token
+    function getNetworkFeeInfo(uint256 chain, bool withCall)
+    external
+    view
+    returns (address token, uint256 relayGasFee, uint256 transactionRate, uint256 transactionSize);
+
     /**
      * @dev Check if an address is the Relay contract
      * @param sender Address to verify

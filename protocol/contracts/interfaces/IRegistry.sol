@@ -88,6 +88,8 @@ interface IRegistry {
 
     function getChainGasToken(uint256 chain) external view returns (address);
 
+    function getChainBaseToken(uint256 chain) external view returns (address);
+
     function getTokenAddressByNickname(uint256 chain, string memory nickname) external view returns (bytes memory);
 
     // function getVaultBalanceByToken(uint256 chain, bytes memory token) external view returns (uint256 vaultBalance);

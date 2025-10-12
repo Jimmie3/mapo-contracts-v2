@@ -150,11 +150,17 @@ contract Registry is BaseImplementation, IRegistry {
         uint256 _lastScanBlock,
         bytes memory _router,
         address _gasToken,
+        address _baseToken,
         string memory _chainName
     ) external restricted {
         ChainInfo storage chainInfo = chainInfos[_chain];
         chainInfo.router = _router;
         chainInfo.gasToken = _gasToken;
+        chainInfo.baseFeeToken = _baseToken;
+
+        if (_chainType != ChainType.CONTRACT) {
+            require(_gasToken == _baseToken);
+        }
         chainInfo.name = _chainName;
         chainInfo.chainType = _chainType;
         string memory oldName = chainToNames[_chain];
@@ -255,7 +261,7 @@ contract Registry is BaseImplementation, IRegistry {
         f.highest = highest;
         f.lowest = lowest;
         f.rate = rate;
-        emit SetFeeRate(key, highest, lowest, rate); 
+        emit SetFeeRate(key, highest, lowest, rate);
     }
 
     function setFromChainFee(address _token, uint256 _fromChain, uint256 _lowest, uint256 _highest, uint256 _rate)
@@ -617,6 +623,10 @@ contract Registry is BaseImplementation, IRegistry {
 
     function getChainGasToken(uint256 chain) external view override returns (address) {
         return chainInfos[chain].gasToken;
+    }
+
+    function getChainBaseToken(uint256 chain) external view override returns (address) {
+        return chainInfos[chain].baseFeeToken;
     }
 
     function getTokenDecimals(uint256 chain, bytes calldata token) external view override returns (uint256) {

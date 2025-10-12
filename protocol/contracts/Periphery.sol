@@ -102,19 +102,18 @@ contract Periphery is BaseImplementation, IPeriphery {
     override
     returns (uint256 relayGasFee, uint256 transactionRate, uint256 transactionSize)
     {
-        uint256 networkFee;
-        (networkFee, transactionRate, transactionSize) = IGasService(gasService).getNetworkFeeInfo(chain, withCall);
+        return _getNetworkFeeInfo(token, chain, withCall);
+    }
 
-        IRegistry r = IRegistry(tokenRegistry);
-        address relayGasToken = r.getChainGasToken(chain);
-        bytes memory gasToken = r.getToChainToken(relayGasToken, chain);
-        uint256 relayNetworkFee = r.getRelayChainAmount(gasToken, chain, networkFee);
+    function getNetworkFeeInfo(uint256 chain, bool withCall)
+    external
+    view
+    override
+    returns (address token, uint256 relayGasFee, uint256 transactionRate, uint256 transactionSize)
+    {
+        token = IRegistry(tokenRegistry).getChainBaseToken(chain);
 
-        if (relayGasToken == token) {
-            relayGasFee = relayNetworkFee;
-        } else {
-            relayGasFee = ISwap(swap).getAmountOut(relayGasToken, token, relayNetworkFee);
-        }
+        (relayGasFee, transactionRate, transactionSize) = _getNetworkFeeInfo(token, chain, withCall);
     }
 
     function isRelay(address _sender) external view returns (bool) {
@@ -123,5 +122,25 @@ contract Periphery is BaseImplementation, IPeriphery {
 
     function isTssManager(address _sender) external view returns (bool) {
         return (_sender == tssManager);
+    }
+
+    function _getNetworkFeeInfo(address token, uint256 chain, bool withCall)
+    internal
+    view
+    returns (uint256 relayGasFee, uint256 transactionRate, uint256 transactionSize)
+    {
+        uint256 networkFee;
+        (networkFee, transactionRate, transactionSize) = IGasService(gasService).getNetworkFeeInfo(chain, withCall);
+
+        IRegistry r = IRegistry(tokenRegistry);
+        address relayGasToken = r.getChainGasToken(chain);
+        bytes memory gasToken = r.getToChainToken(token, chain);
+        uint256 relayNetworkFee = r.getRelayChainAmount(gasToken, chain, networkFee);
+
+        if (relayGasToken == token) {
+            relayGasFee = relayNetworkFee;
+        } else {
+            relayGasFee = ISwap(swap).getAmountOut(relayGasToken, token, relayNetworkFee);
+        }
     }
 }

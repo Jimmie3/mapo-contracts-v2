@@ -111,7 +111,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     struct ChainVault {
-        bool migrating;         // set true after start a migration, reset after migration txOut on relay chain.
         // used by non-contract chain
         // the native token will be the first one, and will be migrated at last
         // todo: only support native token now
@@ -122,6 +121,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
     struct Vault {
         EnumerableSet.UintSet chains;
         bytes pubkey;
+        // set true after start a migration, reset after migration txOut on relay chain.
+        mapping(uint256 chain => bool ) isMigrating;
         mapping(uint256 chain => ChainVault) chainVaults;
     }
 
@@ -138,7 +139,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     struct TotalTokenState {
         uint24 deltaSMax;
         uint64 totalWeight;
-        uint128 totalDeposit;
+        //uint128 totalDeposit;
         uint128 totalBalance;
         uint128 totalPendingOut;
     }
@@ -165,7 +166,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     // token => amount
     mapping(address => uint256) public balanceFees;
-    mapping(address => uint256) public vaultFees;
+
 
     address public securityFeeReceiver;
 
@@ -211,6 +212,10 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
         // todo: update max balance indicator
         _updateBalanceIndicator(token);
+    }
+
+    function registerToken(address token, address vaultToken) external restricted {
+        tokenList.set(token, vaultToken);
     }
 
 
@@ -273,7 +278,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         uint256[] memory chains = v.chains.values();
         for (uint256 i = 0; i < chains.length; i++) {
             uint256 chain = chains[i];
-            if (v.chainVaults[chain].migrating) {
+            if (v.isMigrating[chain]) {
                 // migrating, continue to other chain migration
                 continue;
             }
@@ -413,7 +418,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         uint256[] memory chains = v.chains.values();
         for (uint256 i = 0; i < chains.length; i++) {
             uint256 chain = chains[i];
-            if (v.chainVaults[chain].migrating) {
+            if (v.isMigrating[chain]) {
                 // migrating, continue to other chain migration
                 continue;
             }
@@ -424,7 +429,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
             periphery.getNetworkFeeInfo(chain,false);
 
             if (txItem.chainType == ChainType.CONTRACT) {
-                v.chainVaults[chain].migrating = true;
+                v.isMigrating[chain] = true;
 
                 // switch to active vault after migration start when choosing vault
                 vaultList[activeVaultKey].chains.add(chain);
@@ -488,8 +493,34 @@ contract VaultManager is BaseImplementation, IVaultManager {
         bytes32 vaultKey = keccak256(vault);
         _transferIn(vaultKey, txItem);
 
-        // todo: mint vault token
-        totalStates[txItem.token].totalDeposit += uint128(txItem.amount);
+        IVaultToken vaultToken = IVaultToken(tokenList.get(txItem.token));
+
+        vaultToken.deposit(txItem.amount, txItem.to);
+    }
+
+    function withdraw(address token, uint256 amount, address owner, address receiver) external onlyRelay {
+        TxItem memory txItem;
+        txItem.chain = block.chainid;
+        txItem.token = token;
+        txItem.amount = amount;
+
+        _transferOut(activeVaultKey, txItem, uint128(amount), 0);
+
+        IVaultToken vaultToken = IVaultToken(tokenList.get(token));
+        vaultToken.withdraw(amount, receiver, owner);
+    }
+
+    function redeem(address _vaultToken, uint256 _share, address _owner, address _receiver) external override onlyRelay  returns (uint256)  {
+        TxItem memory txItem;
+        IVaultToken vaultToken = IVaultToken(_vaultToken);
+        txItem.token = vaultToken.asset();
+        txItem.amount = vaultToken.redeem(_share, _receiver, _owner);
+
+        txItem.chain = block.chainid;
+
+        _transferOut(activeVaultKey, txItem, uint128(txItem.amount), 0);
+
+        return txItem.amount;
     }
 
     // tx out, remove liquidity or swap out
@@ -515,8 +546,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
             delete vaultList[vaultKey].chainVaults[txItem.chain];
             vaultList[vaultKey].chains.remove(txItem.chain);
         } else {
-            ChainVault storage v = vaultList[vaultKey].chainVaults[txItem.chain];
-            v.migrating = false;
+            vaultList[vaultKey].isMigrating[txItem.chain] = false;
 
             _transferComplete(vaultKey, txItem, uint128(usedGas), uint128(estimatedGas));
 
@@ -582,7 +612,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
                 continue;
             }
 
-            v.migrating = true;
+            vaultList[retiringVaultKey].isMigrating[_chain] = true;
 
             uint128 migrationAmount = available / (MAX_MIGRATION_AMOUNT - tokenBalance.migrationIndex);
             if (migrationAmount <= minAmount || (available - migrationAmount) <= minAmount) {
@@ -687,7 +717,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
         uint256 totalWeight = totalStates[token].totalWeight;
         uint256 deltaS;
-        uint256 balanceRate;
+        // uint256 balanceRate;
         // 2avₓ×wᵧ + a²(wₓ + wᵧ)
         uint256 s1 = 2 * amount * x.balance * y.weight + amount * amount * (x.weight + y.weight);
         // 2avᵧ×wₓ
@@ -719,7 +749,10 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     function _collectVaultAndBalanceFee(TxItem memory txItem, FeeInfo memory feeInfo, uint256 ammVaultFee) internal returns (uint256 outAmount) {
         uint256 balanceFee = feeInfo.balanceFee;
-        vaultFees[txItem.token] += feeInfo.vaultFee;
+        // vaultFees[txItem.token] += feeInfo.vaultFee;
+        IVaultToken vaultToken = IVaultToken(tokenList.get(txItem.token));
+        vaultToken.collectFee(feeInfo.vaultFee);
+
         if (feeInfo.incentive) {
             if (feeInfo.balanceFee >= balanceFees[txItem.token]) {
                 balanceFee = balanceFees[txItem.token];

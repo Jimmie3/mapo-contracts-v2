@@ -31,6 +31,8 @@ interface IVaultManager {
 
     function deposit(TxItem memory txItem, bytes memory vault) external;
 
+    function redeem(address _vaultToken, uint256 _share, address _owner, address _receiver) external returns (uint256 amount);
+
     function bridge(TxItem memory txItem, bytes memory fromVault, uint256 toChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
 
     function transferIn(TxItem memory txItem, bytes memory fromVault, uint256 toChain) external returns (uint256 outAmount);

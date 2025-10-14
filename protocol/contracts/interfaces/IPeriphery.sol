@@ -21,6 +21,11 @@ interface IPeriphery {
      */
     function getAddress(uint256 t) external view returns (address addr);
 
+
+    function getSwap() external view returns (address);
+
+    function getAffiliateManager() external view returns (address);
+
     /**
      * @dev Get the type of blockchain for a given chain ID
      * @param chain Chain ID to query

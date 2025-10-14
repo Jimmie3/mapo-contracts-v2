@@ -6,7 +6,10 @@ import {IPeriphery} from "./interfaces/IPeriphery.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 import {IRegistry} from "./interfaces/IRegistry.sol";
+
 import {ISwap} from "./interfaces/ISwap.sol";
+import {IAffiliateFeeManager} from "./interfaces/IAffiliateFeeManager.sol";
+
 import {IGasService} from "./interfaces/IGasService.sol";
 
 contract Periphery is BaseImplementation, IPeriphery {
@@ -25,8 +28,8 @@ contract Periphery is BaseImplementation, IPeriphery {
     address public vaultManager;
     address public tssManager;
 
-    address public affiliateFeeManager;
-    address public swap;
+    address public affiliateManager;
+    address public swapManager;
 
     mapping(bytes32 => address) public addresses;
 
@@ -35,6 +38,8 @@ contract Periphery is BaseImplementation, IPeriphery {
     event SetVaultManager(address vaultManager);
     event SetTSSManager(address _tssManager);
     event SetTokenRegister(address _tokenRegister);
+    event SetAffiliateManager(address _tokenRegister);
+    event SetSwapManager(address _tokenRegister);
 
     function initialize(address _defaultAdmin) public initializer {
         __BaseImplementation_init(_defaultAdmin);
@@ -70,6 +75,18 @@ contract Periphery is BaseImplementation, IPeriphery {
         emit SetTokenRegister(_tokenRegister);
     }
 
+    function setSwapManager(address _swapManager) external restricted {
+        require(_swapManager != address(0));
+        swapManager = _swapManager;
+        emit SetSwapManager(_swapManager);
+    }
+
+    function setAffiliateManager(address _affiliateManager) external restricted {
+        require(_affiliateManager != address(0));
+        affiliateManager = _affiliateManager;
+        emit SetAffiliateManager(_affiliateManager);
+    }
+
     function getAddress(uint256 t) external view returns (address addr) {
         if (t == 0) {
             addr = relay;
@@ -84,6 +101,14 @@ contract Periphery is BaseImplementation, IPeriphery {
         }
     }
 
+    function getSwap() external view override returns (address) {
+        return swapManager;
+    }
+
+    function getAffiliateManager() external view override returns (address) {
+        return affiliateManager;
+    }
+
     function getChainType(uint256 _chain) external view returns (ChainType) {
         return IRegistry(tokenRegistry).getChainType(_chain);
     }
@@ -93,7 +118,7 @@ contract Periphery is BaseImplementation, IPeriphery {
     }
 
     function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) external view returns (uint256) {
-        return ISwap(swap).getAmountOut(tokenIn, tokenOut, amountIn);
+        return ISwap(swapManager).getAmountOut(tokenIn, tokenOut, amountIn);
     }
 
     function getNetworkFeeInfoWithToken(address token, uint256 chain, bool withCall)
@@ -140,7 +165,7 @@ contract Periphery is BaseImplementation, IPeriphery {
         if (relayGasToken == token) {
             relayGasFee = relayNetworkFee;
         } else {
-            relayGasFee = ISwap(swap).getAmountOut(relayGasToken, token, relayNetworkFee);
+            relayGasFee = ISwap(swapManager).getAmountOut(relayGasToken, token, relayNetworkFee);
         }
     }
 }

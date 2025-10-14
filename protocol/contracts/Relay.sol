@@ -33,9 +33,6 @@ contract Relay is BaseGateway, IRelay {
     IPeriphery public periphery;
     IVaultManager public vaultManager;
 
-    IAffiliateFeeManager public affiliateFeeManager;
-    ISwap public swap;
-
     struct Rate {
         uint24 rate;
         address receiver;
@@ -122,18 +119,6 @@ contract Relay is BaseGateway, IRelay {
         require(_periphery != address(0));
         periphery = IPeriphery(_periphery);
         emit SetPeriphery(_periphery);
-    }
-
-    function setAffiliateFeeManager(address _affiliateFeeManager) external restricted {
-        require(_affiliateFeeManager != address(0));
-        affiliateFeeManager = IAffiliateFeeManager(_affiliateFeeManager);
-        emit SetAffiliateFeeManager(_affiliateFeeManager);
-    }
-
-    function setSwap(address _swap) external restricted {
-        require(_swap != address(0));
-        swap = ISwap(_swap);
-        emit SetSwap(_swap);
     }
 
     function addChain(uint256 chain, uint256 startBlock) external override {
@@ -361,6 +346,12 @@ contract Relay is BaseGateway, IRelay {
         }
     }
 
+    function _swap(address tokenIn, uint256 amountInt, bytes memory payload) internal returns (address , uint256) {
+        (address tokenOut, uint256 amountOutMin) = abi.decode(payload, (address, uint256));
+        ISwap swap = ISwap(periphery.getSwap());
+        uint amountOut = swap.swap(tokenIn, amountInt, tokenOut, amountOutMin);
+        return (tokenOut, amountOut);
+    }
 
     function execute(BridgeItem memory bridgeItem, TxItem memory txItem, uint256 toChain, bytes memory relayPayload, bytes memory targetPayload) public returns (uint256) {
         require(msg.sender == address(this));
@@ -375,12 +366,9 @@ contract Relay is BaseGateway, IRelay {
             txItem.amount = vaultManager.transferIn(txItem, bridgeItem.vault, toChain);
 
             // 2 swap
-            (address tokenOut, uint256 amountOutMin) = abi.decode(relayPayload, (address, uint256));
-            txItem.amount = swap.swap(txItem.token, txItem.amount, tokenOut, amountOutMin);
-            txItem.token = tokenOut;
+            (txItem.token, txItem.amount) = _swap(txItem.token, txItem.amount, relayPayload);
 
             // todo: update target payload
-
             txItem.chain = toChain;
             txItem.chainType = periphery.getChainType(toChain);
 
@@ -486,6 +474,7 @@ contract Relay is BaseGateway, IRelay {
     {
         uint256 affiliateFee;
         if (feeData.length > 0) {
+            IAffiliateFeeManager affiliateFeeManager = IAffiliateFeeManager(periphery.getAffiliateManager());
             try affiliateFeeManager.collectAffiliatesFee(txItem.orderId, txItem.token, txItem.amount, feeData) returns (uint256 totalFee) {
                 affiliateFee = totalFee;
                 _sendToken(txItem.token, affiliateFee, address(affiliateFeeManager), true);
@@ -633,7 +622,6 @@ contract Relay is BaseGateway, IRelay {
     {
         chainAndGasLimit = ((_fromChain << 192) | (_toChain << 128) | (_transactionRate << 64) | _transactionSize);
     }
-
 
     function _checkAccess(uint256 t) internal view {
         if (msg.sender != periphery.getAddress(t)) revert Errs.no_access();

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+uint256 constant MAX_RATE_UNIT = 1_000_000;         // unit is 0.01 bps
+
 enum ChainType {
     CONTRACT,
     NON_CONTRACT

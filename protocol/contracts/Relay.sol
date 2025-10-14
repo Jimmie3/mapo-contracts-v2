@@ -23,6 +23,8 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {BaseGateway} from "./base/BaseGateway.sol";
 
 contract Relay is BaseGateway, IRelay {
+    uint256 constant MAX_RATE_UNIT = 1_000_000;         // unit is 0.01 bps
+
     mapping(uint256 => uint256) private chainSequence;
     mapping(uint256 => uint256) private chainLastScanBlock;
 
@@ -49,13 +51,8 @@ contract Relay is BaseGateway, IRelay {
 
     mapping(bytes32 => OrderInfo) public orderInfos;
 
-    // token => amount
-    mapping(address => uint256) public balanceFeeInfos;
-
-    mapping(address => uint256) public vaultFeeInfos;
-
-    address public securityFeeReceiver;
-
+    Rate public protocolFeeRate;
+    mapping(address => uint256) public protocolFees;
 
     event SetSwap(address _swap);
     event SetPeriphery(address _periphery);
@@ -109,8 +106,7 @@ contract Relay is BaseGateway, IRelay {
     );
 
     event BridgeError(bytes32 indexed orderId, string reason);
-    event BridgeFeeCollected(bytes32 indexed orderId, address token, uint256 securityFee, uint256 vaultFee);
-
+    event BridgeFeeCollected(bytes32 indexed orderId, address token, uint256 securityFee);
 
     function initialize(address _defaultAdmin) public initializer {
         __BaseImplementation_init(_defaultAdmin);
@@ -140,6 +136,14 @@ contract Relay is BaseGateway, IRelay {
         emit SetSwap(_swap);
     }
 
+    function addChain(uint256 chain, uint256 startBlock) external override {
+        _checkAccess(3);
+        _updateLastScanBlock(chain, uint64(startBlock));
+        vaultManager.addChain(chain);
+        // todo: emit event
+    }
+
+
     function removeChain(uint256 chain) external override {
         _checkAccess(3);
         // todo: check vault migration
@@ -148,20 +152,6 @@ contract Relay is BaseGateway, IRelay {
         vaultManager.removeChain(chain);
         // todo: emit event
     }
-
-    function withdraw(address _vaultToken, uint256 _vaultAmount) external whenNotPaused {
-        address user = msg.sender;
-        address token = IVaultToken(_vaultToken).getTokenAddress();
-        address vaultToken = _getRegistry().getVaultToken(token);
-        if (_vaultToken != vaultToken) revert Errs.invalid_vault_token();
-        uint256 amount = IVaultToken(vaultToken).getTokenAmount(_vaultAmount);
-        IVaultToken(vaultToken).withdraw(_vaultAmount, user);
-
-        _sendToken(token, amount, user, false);
-        emit Withdraw(token, user, _vaultAmount, amount);
-    }
-
-
 
     function isOrderExecuted(bytes32 orderId, bool isTxIn) external view override returns (bool executed) {
         executed = isTxIn ? orderExecuted[orderId] : outOrderExecuted[orderId];
@@ -173,11 +163,12 @@ contract Relay is BaseGateway, IRelay {
     }
 
 
-    function addChain(uint256 chain, uint256 startBlock) external override {
-        _checkAccess(3);
-        _updateLastScanBlock(chain, uint64(startBlock));
-        vaultManager.addChain(chain);
-        // todo: emit event
+    function redeem(address _vaultToken, uint256 _vaultShare, address receiver) external whenNotPaused {
+        address user = msg.sender;
+
+        uint256 amount = vaultManager.redeem(_vaultToken, _vaultShare, user, receiver);
+
+        emit Withdraw(_vaultToken, user, _vaultShare, amount);
     }
 
 
@@ -198,7 +189,15 @@ contract Relay is BaseGateway, IRelay {
             // no need do more migration, waiting for all migration completed
             return false;
         }
-        _migrate(txItem, gasInfo, fromVault, toVault);
+
+        txItem.orderId = _getOrderId();
+
+        BridgeItem memory bridgeItem;
+        bridgeItem.vault = fromVault;
+        bridgeItem.payload = toVault;
+        bridgeItem.txType = TxType.MIGRATE;
+
+        _emitRelay(selfChainId, bridgeItem, txItem, gasInfo);
 
         return false;
     }
@@ -260,7 +259,7 @@ contract Relay is BaseGateway, IRelay {
             // send gas fee to sender
             _sendToken(order.gasToken, order.estimateGas, txOutItem.sender, false);
         } else {
-            _reduceVaultBalance(order.gasToken, relayGasUsed);
+            // todo: process vault gas
         }
 
         if (bridgeItem.txType == TxType.MIGRATE) {
@@ -279,7 +278,7 @@ contract Relay is BaseGateway, IRelay {
         }
 
         // todo: delete order info
-        // delete orderInfos[orderId];
+        delete orderInfos[txItem.orderId];
 
         emit BridgeCompleted(
             txOutItem.orderId,
@@ -290,11 +289,6 @@ contract Relay is BaseGateway, IRelay {
             txOutItem.sender,
             bridgeItem.payload
         );
-    }
-
-    function _getRelayChainGasAmount(uint256 chain, uint256 gasAmount) internal view returns (uint256 relayGasAmount) {
-        bytes memory token = _getToChainToken(chain, _getRegistry().getChainGasToken(chain));
-        relayGasAmount = _getRelayAmount(chain, token, gasAmount);
     }
 
     // payload |1byte affiliate count| n * 2 byte affiliateId + 2 byte fee rate| 2 byte relayOutToken|
@@ -330,17 +324,14 @@ contract Relay is BaseGateway, IRelay {
 
         if (bridgeItem.txType == TxType.DEPOSIT) {
             // todo: affiliate fee ?
-            // todo: mint vault token in vaultManager
-            vaultManager.deposit(txItem, bridgeItem.vault);
-            _depositIn(
-                txItem.orderId, fromChain, txItem.token, txItem.amount, bridgeItem.from, Utils.fromBytes(bridgeItem.to)
-            );
+            txItem.to = Utils.fromBytes(bridgeItem.to);
+            _depositIn(txItem, bridgeItem.from, bridgeItem.vault);
         } else {
             (bytes memory affiliateData, bytes memory relayData, bytes memory targetData) =
                 abi.decode(bridgeItem.payload, (bytes, bytes, bytes));
 
             // collect affiliate and bridge fee first
-            txItem.amount = _collectAffiliateAndBridgeFee(txItem, bridgeItem.from, toChain, affiliateData, targetData.length > 0);
+            txItem.amount = _collectAffiliateAndProtocolFee(txItem, affiliateData);
             if (txItem.amount == 0) {
                 // emit complete event
                 emit BridgeError(txItem.orderId, "zero out amount");
@@ -454,7 +445,10 @@ contract Relay is BaseGateway, IRelay {
         internal
         override
     {
-        _depositIn(orderId, selfChainId, outToken, amount, Utils.toBytes(from), to);
+        TxItem memory txItem = TxItem(orderId, selfChainId, ChainType.CONTRACT, outToken, amount, to);
+        bytes memory vault = vaultManager.getActiveVault();
+
+        _depositIn(txItem,  Utils.toBytes(from), vault);
     }
 
     function _bridgeOut(
@@ -479,29 +473,14 @@ contract Relay is BaseGateway, IRelay {
             abi.decode(payload, (bytes, bytes, bytes));
 
         // collect affiliate and bridge fee first
-        txItem.amount = _collectAffiliateAndBridgeFee(txItem, bridgeItem.from, toChain, affiliateData, targetPayload.length > 0);
+        txItem.amount = _collectAffiliateAndProtocolFee(txItem, affiliateData);
         if (txItem.amount == 0) revert Errs.zero_amount_out();
 
         execute(bridgeItem, txItem, selfChainId, relayPayload, targetPayload);
     }
 
-    function _collectToChainFee(bytes memory from, TxItem memory txItem, uint256 fromChain, bool withCall)
-        internal view
-        returns (uint256 outAmount)
-    {
-        (uint256 securityFee, uint256 vaultFee) =
-            _getRegistry().getTransferOutFee(from, txItem.token, txItem.amount, fromChain, txItem.chain, withCall);
 
-
-        if (txItem.amount > securityFee + vaultFee) {
-            outAmount = txItem.amount - securityFee - vaultFee;
-        } else {
-            securityFee = txItem.amount;
-            outAmount = 0;
-        }
-    }
-
-    function _collectAffiliateAndBridgeFee(TxItem memory txItem, bytes memory from, uint256 toChain, bytes memory feeData, bool withCall)
+    function _collectAffiliateAndProtocolFee(TxItem memory txItem, bytes memory feeData)
     internal
     returns (uint256)
     {
@@ -510,50 +489,19 @@ contract Relay is BaseGateway, IRelay {
             try affiliateFeeManager.collectAffiliatesFee(txItem.orderId, txItem.token, txItem.amount, feeData) returns (uint256 totalFee) {
                 affiliateFee = totalFee;
                 _sendToken(txItem.token, affiliateFee, address(affiliateFeeManager), true);
-
             } catch (bytes memory) {
                 // do nothing
             }
         }
 
-        uint256 amount = txItem.amount;
-        (uint256 securityFee, uint256 vaultFee) =
-                                _getRegistry().getTransferOutFee(from, txItem.token, txItem.amount,  txItem.chain, toChain, withCall);
+        uint256 protocolFee = txItem.amount * protocolFeeRate.rate / MAX_RATE_UNIT;
+        protocolFees[txItem.token] += protocolFee;
 
-        if (txItem.amount > affiliateFee + securityFee + vaultFee) {
-            amount -= (affiliateFee + securityFee + vaultFee);
-        } else if (txItem.amount > affiliateFee + securityFee) {
-            vaultFee = txItem.amount - (affiliateFee + securityFee);
-            amount = 0;
-        } else if (txItem.amount > affiliateFee) {
-            securityFee = txItem.amount - affiliateFee;
-            vaultFee = 0;
-            amount = 0;
-        } else {
-            securityFee = 0;
-            vaultFee = 0;
-            amount = 0;
-        }
+        uint256 amount = txItem.amount - affiliateFee - protocolFee;
 
-        vaultFeeInfos[txItem.token] += vaultFee;
-        _increaseVaultBalance(txItem.token, vaultFee);
-        if (securityFee > 0) {
-            _sendToken(txItem.token, securityFee, securityFeeReceiver, true);
-        }
-
-        emit BridgeFeeCollected(txItem.orderId, txItem.token, securityFee, vaultFee);
+        emit BridgeFeeCollected(txItem.orderId, txItem.token, protocolFee);
 
         return amount;
-    }
-
-    function _collectFromFee(TxItem memory txItem) internal view returns (uint256 outAmount) {
-        uint256 proportionFee = _getRegistry().getTransferInFee(bytes(""), txItem.token, txItem.amount, txItem.chain);
-        if (txItem.amount > proportionFee) {
-            outAmount = txItem.amount - proportionFee;
-        } else {
-            proportionFee = txItem.amount;
-            outAmount = 0;
-        }
     }
 
 
@@ -561,17 +509,6 @@ contract Relay is BaseGateway, IRelay {
         if (height > chainLastScanBlock[chain]) {
             chainLastScanBlock[chain] = height;
         }
-    }
-
-    function _migrate(TxItem memory txItem, GasInfo memory gasInfo, bytes memory fromVault, bytes memory toVault) internal {
-        txItem.orderId = _getOrderId();
-
-        BridgeItem memory bridgeItem;
-        bridgeItem.vault = fromVault;
-        bridgeItem.payload = toVault;
-        bridgeItem.txType = TxType.MIGRATE;
-
-        _emitRelay(selfChainId, bridgeItem, txItem, gasInfo);
     }
 
     function _refund(BridgeItem memory bridgeItem, TxItem memory txItem, bool fromRetiredVault) internal {
@@ -588,18 +525,10 @@ contract Relay is BaseGateway, IRelay {
         _emitRelay(txItem.chain, bridgeItem, txItem, gasInfo);
     }
 
-    function _depositIn(
-        bytes32 orderId,
-        uint256 fromChain,
-        address token,
-        uint256 amount,
-        bytes memory from,
-        address receiver
-    ) internal {
-        address vaultToken = _getRegistry().getVaultToken(token);
-        if (vaultToken == address(0)) revert Errs.vault_token_not_registered();
-        IVaultToken(vaultToken).deposit(amount, receiver);
-        emit Deposit(orderId, fromChain, token, amount, receiver, from);
+    function _depositIn(TxItem memory txItem, bytes memory from, bytes memory vault) internal {
+        vaultManager.deposit(txItem, vault);
+
+        emit Deposit(txItem.orderId, txItem.chain, txItem.token, txItem.amount, txItem.to, from);
     }
 
     function _sendToken(address token, uint256 amount, address to, bool handle) internal returns (bool result) {
@@ -666,26 +595,12 @@ contract Relay is BaseGateway, IRelay {
         );
     }
 
-    function _increaseVaultBalance(address token, uint256 amount) internal {
-        address vaultToken = _getRegistry().getVaultToken(token);
-        IVaultToken(vaultToken).increaseVaultBalance(amount);
-    }
 
-    function _reduceVaultBalance(address token, uint256 amount) internal {
-        address vaultToken = _getRegistry().getVaultToken(token);
-        IVaultToken(vaultToken).reduceVaultBalance(amount);
-    }
+    function _getRelayChainGasAmount(uint256 chain, uint256 gasAmount) internal view returns (uint256 relayGasAmount) {
+        address gasToken = _getRegistry().getChainGasToken(chain);
+        bytes memory toToken = _getRegistry().getToChainToken(gasToken, chain);
 
-    function _getRelayToken(uint256 chain, bytes memory token) internal view returns (address relayToken) {
-        relayToken = _getRegistry().getRelayChainToken(chain, token);
-    }
-
-    function _getRelayAmount(uint256 chain, bytes memory token, uint256 fromAmount)
-        internal
-        view
-        returns (uint256 relayAmount)
-    {
-        relayAmount = _getRegistry().getRelayChainAmount(token, chain, fromAmount);
+        relayGasAmount = _getRegistry().getRelayChainAmount(toToken, chain, gasAmount);
     }
 
     function _getRelayTokenAndAmount(uint256 chain, bytes memory fromToken, uint256 fromAmount) internal view returns (address token, uint256 amount){
@@ -702,17 +617,6 @@ contract Relay is BaseGateway, IRelay {
         amount = registry.getToChainAmount(relayToken, relayAmount, chain);
     }
 
-    function _getToChainToken(uint256 chain, address relayToken) internal view returns (bytes memory token) {
-        token = _getRegistry().getToChainToken(relayToken, chain);
-    }
-
-    function _getToChainAmount(uint256 chain, address token, uint256 relayAmount)
-        internal
-        view
-        returns (uint256 amount)
-    {
-        amount = _getRegistry().getToChainAmount(token, relayAmount, chain);
-    }
 
     function _getOrderId() internal returns (bytes32 orderId) {
         return keccak256(abi.encodePacked(selfChainId, address(this), ++nonce));

@@ -48,7 +48,7 @@ interface IRegistry {
         uint256 _fromChain,
         uint256 _toChain,
         bool _withSwap
-    ) external view returns (uint256 securityFee, uint256 vaultFee);
+    ) external view returns (uint256 totalFee, uint256 baseFee, uint256 bridgeFee);
 
     // get token transfer fee, the larger one of transfer in or transfer out fee
     function getTransferFee(

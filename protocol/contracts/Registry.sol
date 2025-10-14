@@ -18,7 +18,6 @@ contract Registry is BaseImplementation, IRegistry {
     uint256 constant MAX_RATE_UNIT = 1_000_000;         // unit is 0.01 bps
 
     bytes32 public constant SECURITY_FEE_KEY = keccak256("fee.security");
-    bytes32 public constant VAULT_FEE_KEY = keccak256("fee.vault");
 
     struct FeeRate {
         uint256 lowest;
@@ -188,7 +187,7 @@ contract Registry is BaseImplementation, IRegistry {
         checkAddress(_vaultToken)
     {
         Token storage token = tokenList[_token];
-        address tokenAddress = IVaultToken(_vaultToken).getTokenAddress();
+        address tokenAddress = IVaultToken(_vaultToken).asset();
         if (_token != tokenAddress) revert invalid_relay_token();
         uint256 chainId = selfChainId;
         token.id = _id;
@@ -454,8 +453,8 @@ contract Registry is BaseImplementation, IRegistry {
         uint256 _fromChain,
         uint256 _toChain,
         bool _withSwap
-    ) external view override returns (uint256 securityFee, uint256 vaultFee) {
-        return _getToChainFeeV1(_caller, _token, _amount, _fromChain, _toChain, _withSwap);
+    ) external view override returns (uint256 totalFee, uint256 baseFee, uint256 bridgeFee) {
+        return _getToChainFeeV0(_caller, _token, _amount, _fromChain, _toChain, _withSwap);
     }
 
     // get bridge fee info based on the relay chain token and amount
@@ -721,25 +720,6 @@ contract Registry is BaseImplementation, IRegistry {
             uint256 fromChainFee = _getFee(fromChainFeeRate, _relayAmount);
             bridgeFee = fromChainFee;
         }
-    }
-
-
-    function _getToChainFeeV1(
-        bytes memory,
-        address _relayToken,
-        uint256 _relayAmount,
-        uint256,
-        uint256,
-        bool
-    ) internal view returns (uint256 securityFee, uint256 vaultFee) {
-        Token storage token = tokenList[_relayToken];
-        if (token.tokenAddress == address(0)) revert invalid_relay_token();
-
-        FeeRate memory rate = feeRates[SECURITY_FEE_KEY];
-        securityFee = _getFee(rate, _relayAmount);
-
-        rate = feeRates[VAULT_FEE_KEY];
-        vaultFee = _getFee(rate, _relayAmount);
     }
 
     function _getToChainFeeV0(

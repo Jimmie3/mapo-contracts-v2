@@ -27,10 +27,9 @@ struct TxItem {
 
 struct GasInfo {
     address gasToken;
-    uint256 estimateGas;
+    uint128 estimateGas;
     uint256 transactionRate;
     uint256 transactionSize;
-    bytes vault;
 }
 
 struct BridgeItem {

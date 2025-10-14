@@ -42,7 +42,7 @@ contract Relay is BaseGateway, IRelay {
         bool signed;
         uint64 height;
         address gasToken;
-        uint256 estimateGas;
+        uint128 estimateGas;
         bytes32 hash;
     }
 
@@ -146,7 +146,6 @@ contract Relay is BaseGateway, IRelay {
     function getChainLastScanBlock(uint256 chain) external view override returns(uint256) {
         return chainLastScanBlock[chain];
     }
-
 
     function redeem(address _vaultToken, uint256 _vaultShare, address receiver) external whenNotPaused {
         address user = msg.sender;
@@ -308,7 +307,6 @@ contract Relay is BaseGateway, IRelay {
         }
 
         if (bridgeItem.txType == TxType.DEPOSIT) {
-            // todo: affiliate fee ?
             txItem.to = Utils.fromBytes(bridgeItem.to);
             _depositIn(txItem, bridgeItem.from, bridgeItem.vault);
         } else {
@@ -542,7 +540,7 @@ contract Relay is BaseGateway, IRelay {
      * - Vault must be already selected and updated before calling this function
      * - VaultManager.doTransfer() or similar vault update must be called first
      * - txItem must contain valid orderId, token, amount, and chain information
-     * - bridgeItem must contain valid vault, from, to, and txType
+     * - bridgeItem must contain valid vault, from, to, payload and txType
      *
      * @param fromChain Source chain ID where the transaction originates
      * @param bridgeItem Bridge item containing vault and transaction details

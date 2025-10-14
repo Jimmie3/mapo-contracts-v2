@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ChainType} from "../libs/Types.sol";
+import {ChainType, GasInfo} from "../libs/Types.sol";
 
 /**
  * @title IPeriphery
@@ -54,21 +54,13 @@ interface IPeriphery {
      * @param token Token address to denominate the fee in
      * @param chain Target chain ID
      * @param withCall Whether the transaction includes a contract call
-     * @return gasFee Total gas fee in the specified token
-     * @return transactionRate Gas price or fee rate for the chain
-     * @return transactionSize Estimated transaction size in bytes
+     * @return Total gas fee in the specified token, include txRate(gasPrice) and txSize(gasLimit)
      */
-    function getNetworkFeeInfoWithToken(address token, uint256 chain, bool withCall)
-    external
-    view
-    returns (uint256 gasFee, uint256 transactionRate, uint256 transactionSize);
+    function getNetworkFeeInfoWithToken(address token, uint256 chain, bool withCall) external view returns (GasInfo memory);
 
     // Get network fee with the chain base token
     // for non-contract chain, it will be the gas token
-    function getNetworkFeeInfo(uint256 chain, bool withCall)
-    external
-    view
-    returns (address token, uint256 relayGasFee, uint256 transactionRate, uint256 transactionSize);
+    function getNetworkFeeInfo(uint256 chain, bool withCall) external view returns (GasInfo memory);
 
     /**
      * @dev Check if an address is the Relay contract

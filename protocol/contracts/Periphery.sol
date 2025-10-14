@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {ChainType} from "./libs/Types.sol";
+import {ChainType, GasInfo} from "./libs/Types.sol";
 import {IPeriphery} from "./interfaces/IPeriphery.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
@@ -125,7 +125,7 @@ contract Periphery is BaseImplementation, IPeriphery {
     external
     view
     override
-    returns (uint256 relayGasFee, uint256 transactionRate, uint256 transactionSize)
+    returns (GasInfo memory)
     {
         return _getNetworkFeeInfo(token, chain, withCall);
     }
@@ -134,11 +134,11 @@ contract Periphery is BaseImplementation, IPeriphery {
     external
     view
     override
-    returns (address token, uint256 relayGasFee, uint256 transactionRate, uint256 transactionSize)
+    returns (GasInfo memory)
     {
-        token = IRegistry(tokenRegistry).getChainBaseToken(chain);
+        address token = IRegistry(tokenRegistry).getChainBaseToken(chain);
 
-        (relayGasFee, transactionRate, transactionSize) = _getNetworkFeeInfo(token, chain, withCall);
+        return _getNetworkFeeInfo(token, chain, withCall);
     }
 
     function isRelay(address _sender) external view returns (bool) {
@@ -152,20 +152,20 @@ contract Periphery is BaseImplementation, IPeriphery {
     function _getNetworkFeeInfo(address token, uint256 chain, bool withCall)
     internal
     view
-    returns (uint256 relayGasFee, uint256 transactionRate, uint256 transactionSize)
+    returns (GasInfo memory)
     {
-        uint256 networkFee;
-        (networkFee, transactionRate, transactionSize) = IGasService(gasService).getNetworkFeeInfo(chain, withCall);
+        (uint256 networkFee, uint256 transactionRate, uint256 transactionSize) = IGasService(gasService).getNetworkFeeInfo(chain, withCall);
 
         IRegistry r = IRegistry(tokenRegistry);
         address relayGasToken = r.getChainGasToken(chain);
         bytes memory gasToken = r.getToChainToken(token, chain);
+
         uint256 relayNetworkFee = r.getRelayChainAmount(gasToken, chain, networkFee);
 
-        if (relayGasToken == token) {
-            relayGasFee = relayNetworkFee;
-        } else {
-            relayGasFee = ISwap(swapManager).getAmountOut(relayGasToken, token, relayNetworkFee);
+        if (relayGasToken != token) {
+            relayNetworkFee = ISwap(swapManager).getAmountOut(relayGasToken, token, relayNetworkFee);
         }
+
+        return GasInfo(token, uint128(relayNetworkFee), transactionRate, transactionSize);
     }
 }

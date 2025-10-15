@@ -327,8 +327,8 @@ contract Relay is BaseGateway, IRelay {
                 txItem.chain = toChain;
                 txItem.chainType = periphery.getChainType(txItem.chain);
             } catch (bytes memory) {
-                txItem.chain = fromChain;
-                txItem.chainType = periphery.getChainType(fromChain);
+                // txItem.chain = fromChain;
+                // txItem.chainType = periphery.getChainType(fromChain);
 
                 bridgeItem.to = txInItem.refundAddr;
                 bridgeItem.payload = bytes("");
@@ -347,6 +347,7 @@ contract Relay is BaseGateway, IRelay {
     function _swap(address tokenIn, uint256 amountInt, bytes memory payload) internal returns (address , uint256) {
         (address tokenOut, uint256 amountOutMin) = abi.decode(payload, (address, uint256));
         ISwap swap = ISwap(periphery.getSwap());
+        // todo: approve or send token to swap
         uint amountOut = swap.swap(tokenIn, amountInt, tokenOut, amountOutMin);
         return (tokenOut, amountOut);
     }
@@ -393,6 +394,8 @@ contract Relay is BaseGateway, IRelay {
             }
         }
 
+        // todo: check relay min amount
+
         bridgeItem.payload = targetPayload;
         bridgeItem.txType = TxType.TRANSFER;
 
@@ -400,8 +403,6 @@ contract Relay is BaseGateway, IRelay {
         if (txItem.chain != selfChainId) {
             _emitRelay(fromChain, bridgeItem, txItem, gasInfo);
         }
-
-        // todo: check relay min amount
 
         return txItem.amount;
     }
@@ -466,14 +467,14 @@ contract Relay is BaseGateway, IRelay {
     }
 
 
-    function _collectAffiliateAndProtocolFee(TxItem memory txItem, bytes memory feeData)
+    function _collectAffiliateAndProtocolFee(TxItem memory txItem, bytes memory affiliateData)
     internal
     returns (uint256)
     {
         uint256 affiliateFee;
-        if (feeData.length > 0) {
+        if (affiliateData.length > 0) {
             IAffiliateFeeManager affiliateFeeManager = IAffiliateFeeManager(periphery.getAffiliateManager());
-            try affiliateFeeManager.collectAffiliatesFee(txItem.orderId, txItem.token, txItem.amount, feeData) returns (uint256 totalFee) {
+            try affiliateFeeManager.collectAffiliatesFee(txItem.orderId, txItem.token, txItem.amount, affiliateData) returns (uint256 totalFee) {
                 affiliateFee = totalFee;
                 _sendToken(txItem.token, affiliateFee, address(affiliateFeeManager), true);
             } catch (bytes memory) {
@@ -504,7 +505,7 @@ contract Relay is BaseGateway, IRelay {
         // refund to the from vault
         (txItem.amount, gasInfo) = vaultManager.refund(txItem, bridgeItem.vault, fromRetiredVault);
         if (txItem.amount == 0) {
-            // todo: emit complete?
+            emit BridgeError(txItem.orderId, "zero out amount");
             return;
         }
 
@@ -549,9 +550,8 @@ contract Relay is BaseGateway, IRelay {
      */
     function _emitRelay(uint256 fromChain, BridgeItem memory bridgeItem, TxItem memory txItem, GasInfo memory gasInfo) internal {
 
+        // non contract migration or token transfer
         if (!(bridgeItem.txType == TxType.MIGRATE && txItem.chainType == ChainType.CONTRACT)) {
-            // todo: amount + gas?
-            // todo: burn when migration ?
             _checkAndBurn(txItem.token, txItem.amount);
             (bridgeItem.token, bridgeItem.amount) = _getToChainTokenAndAmount(txItem.chain, txItem.token, txItem.amount);
         }

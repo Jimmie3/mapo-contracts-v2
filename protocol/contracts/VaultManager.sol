@@ -174,7 +174,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     mapping(address => uint256) public balanceFees;
 
     // reserved for migration gas
-    mapping(address => uint256) public vaultFees;
+    mapping(address => uint256) public reservedFees;
 
     event SetRelay(address _relay);
     event SetPeriphery(address _periphery);
@@ -276,13 +276,37 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     function removeChain(uint256 chain) external override onlyRelay {
+        if (retiringVaultKey != NON_VAULT_KEY) revert Errs.migration_not_completed();
+
         // check all balance
-        address[] memory tokens = tokenList.keys();
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (tokenStates[tokens[i]].balance > 0) revert Errs.token_allowance_not_zero();
+        uint256 length = tokenList.length();
+        for (uint256 i = 0; i < length; i++) {
+            (address token, ) = tokenList.at(i);
+            TokenState storage s = tokenStates[token];
+            if (s.balance > 0) revert Errs.token_allowance_not_zero();
+            if (s.chainStates[chain].weight > 0) {
+                s.totalWeight -= s.chainStates[chain].weight;
+
+                _updateBalanceIndicator(token);
+            }
+            delete s.chainStates[chain];
         }
+
+        ChainVault storage v = vaultList[activeVaultKey].chainVaults[chain];
+        length = v.tokens.length;
+        for (uint256 i = 0; i < length; i++) {
+            address token = v.tokens[i];
+            if (v.tokenVaults[token].balance > 0) revert Errs.token_allowance_not_zero();
+            delete v.tokenVaults[token];
+        }
+        delete v.tokens;
+
+        delete vaultList[activeVaultKey].chainVaults[chain];
+        delete vaultList[activeVaultKey].isMigrating[chain];
+        vaultList[activeVaultKey].chains.remove(chain);
+
         chainList.remove(chain);
-        // vaultList[activeVaultKey].chains.remove(chain);
+
         // todo: emit event
     }
 
@@ -492,8 +516,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
         _transferIn(vaultKey, txItem);
         if (txItem.amount <= gasInfo.estimateGas) {
-            // out of gas, update vault and return
-            vaultFees[txItem.token] += txItem.amount;
+            // out of gas, save as reserved fee and return
+            reservedFees[txItem.token] += txItem.amount;
             return (0, gasInfo);
         }
 
@@ -534,19 +558,27 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     // tx out, remove liquidity or swap out
-    function transferComplete(TxItem memory txItem, bytes memory vault, uint256 relayGasUsed, uint256 relayGasEstimated) external override onlyRelay {
+    function transferComplete(TxItem memory txItem, bytes memory vault, uint256 relayGasUsed, uint256 relayGasEstimated) external override onlyRelay returns (uint256 gas, uint256 amount) {
         bytes32 vaultKey = keccak256(vault);
 
         if (vaultKey != retiringVaultKey || vaultKey != activeVaultKey) revert Errs.invalid_vault();
 
         _transferComplete(vaultKey, txItem, uint128(relayGasUsed), uint128(relayGasEstimated));
+        if (txItem.chainType == ChainType.CONTRACT) {
+            return (relayGasEstimated, txItem.amount);
+        }
+        // save not used gas
+        // todo: check usedGas > estimatedGas
+        reservedFees[txItem.token] += (relayGasEstimated - relayGasUsed);
+
+        return (0, (txItem.amount + relayGasUsed));
     }
 
 
     function migrationComplete(TxItem memory txItem, bytes memory fromVault, bytes memory toVault, uint256 estimatedGas, uint256 usedGas)
     external
     override
-    onlyRelay
+    onlyRelay returns (uint256 gas, uint256 amount)
     {
         bytes32 vaultKey = keccak256(fromVault);
         bytes32 targetVaultKey = keccak256(toVault);
@@ -554,13 +586,27 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
         if (txItem.chainType == ChainType.CONTRACT) {
             delete vaultList[vaultKey].chainVaults[txItem.chain];
+            delete vaultList[vaultKey].isMigrating[txItem.chain];
             vaultList[vaultKey].chains.remove(txItem.chain);
+            gas = estimatedGas;
         } else {
             vaultList[vaultKey].isMigrating[txItem.chain] = false;
-
             _transferComplete(vaultKey, txItem, uint128(usedGas), uint128(estimatedGas));
-
             _transferIn(targetVaultKey, txItem);
+            amount = usedGas;
+        }
+
+        // use reserved fee to cover migration gas
+        if (reservedFees[txItem.token] >= gas) {
+            reservedFees[txItem.token] -= gas;
+        } else {
+            uint256 decreased = gas - reservedFees[txItem.token];
+            reservedFees[txItem.token] = 0;
+
+            // use vault token to cover migration gas
+            // will incentive from relay chain later
+            IVaultToken vaultToken = IVaultToken(tokenList.get(txItem.token));
+            vaultToken.decreaseVault(decreased);
         }
     }
 
@@ -643,6 +689,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         // token length == 0
         vaultList[retiringVaultKey].chains.remove(_chain);
         delete vaultList[retiringVaultKey].chainVaults[_chain];
+        delete vaultList[retiringVaultKey].isMigrating[_chain];
 
         // todo: emit event
         return (true, token, 0);
@@ -775,7 +822,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         uint256 balanceFee = feeInfo.balanceFee;
         IVaultToken vaultToken = IVaultToken(tokenList.get(txItem.token));
         // todo: check vault token exist
-        vaultToken.collectFee(feeInfo.vaultFee);
+        vaultToken.increaseVault(feeInfo.vaultFee);
 
         if (feeInfo.incentive) {
             if (feeInfo.balanceFee >= balanceFees[txItem.token]) {
@@ -824,7 +871,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     // update balance, remove pending
-    function _transferComplete(bytes32 vaultKey, TxItem memory txItem, uint128 usedGas, uint128 estimateGas) internal {
+    function _transferComplete(bytes32 vaultKey, TxItem memory txItem, uint128 usedGas, uint128 estimateGas) internal{
         TokenState storage totalState = tokenStates[txItem.token];
         TokenChainState storage chainState = tokenStates[txItem.token].chainStates[txItem.chain];
 

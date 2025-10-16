@@ -414,13 +414,6 @@ contract Registry is BaseImplementation, IRegistry {
         toAmount = _getTargetAmount(tokenAddr, _fromChain, _toChain, _amount);
     }
 
-    function getVaultToken(address _token) external view override returns (address) {
-        Token storage token = tokenList[_token];
-        if (token.tokenAddress == address(0)) revert invalid_relay_token();
-
-        return tokenList[_token].vaultToken;
-    }
-
     function getBaseFeeReceiver() external view returns (address) {
         return baseFeeReceiver;
     }

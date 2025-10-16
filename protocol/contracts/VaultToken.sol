@@ -13,7 +13,8 @@ contract VaultToken is ERC4626Upgradeable, BaseImplementation {
 
     error only_manager_role();
 
-    event FeeCollected(uint256 indexed feeType, uint256 feeAmount, uint256 totalValue);
+    event VaultIncreased(address indexed token, uint256 feeAmount, uint256 totalValue);
+    event VaultDecreased(address indexed token, uint256 feeAmount, uint256 totalValue);
 
     function initialize(address _defaultAdmin, address _token, string memory name_, string memory symbol_) public initializer {
         __BaseImplementation_init(_defaultAdmin);
@@ -26,10 +27,15 @@ contract VaultToken is ERC4626Upgradeable, BaseImplementation {
     }
 
 
-    function collectFee(uint256 assets) external {
+    function increaseVault(uint256 assets) external {
         balance += assets;
+        emit VaultIncreased(asset(), assets, balance);
+    }
+
+    function decreaseVault(uint256 assets) external {
+        balance -= assets;
         // todo: emit
-        emit FeeCollected(0, assets, balance);
+        emit VaultDecreased(asset(), assets, balance);
     }
 
     function totalAssets() public view override returns (uint256) {

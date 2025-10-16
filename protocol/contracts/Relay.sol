@@ -235,33 +235,35 @@ contract Relay is BaseGateway, IRelay {
         txItem.chain = chain;
         txItem.chainType = _getRegistry().getChainType(chain);
 
-        uint256 relayGasUsed = _getRelayChainGasAmount(chain, txOutItem.gasUsed);
-
         OrderInfo memory order = orderInfos[txOutItem.orderId];
-        uint256 relayGasEstimated = order.estimateGas;
-        if (txItem.chainType == ChainType.CONTRACT) {
-            // send gas fee to sender
-            _sendToken(order.gasToken, order.estimateGas, txOutItem.sender, false);
-        } else {
-            // todo: process vault gas
+
+        uint256 usedGas = order.estimateGas;
+        if (txItem.chainType != ChainType.CONTRACT) {
+            usedGas = _getRelayChainGasAmount(chain, txOutItem.gasUsed);
         }
 
-        if (bridgeItem.txType == TxType.MIGRATE) {
-            if (txItem.chainType != ChainType.CONTRACT) {
-                (txItem.token, txItem.amount) = _getRelayTokenAndAmount(chain, bridgeItem.token, bridgeItem.amount);
-                // todo: mint token
-                _checkAndMint(txItem.token, txItem.amount);
-                // send gas to vault
-            }
-            vaultManager.migrationComplete(txItem, bridgeItem.vault, bridgeItem.payload, relayGasUsed, relayGasEstimated);
-        } else {
-            // todo: refund retied vault
+        if (vaultManager.checkVault(txItem.chainType, txItem.chain, bridgeItem.vault)) {
+            uint256 gasAmount = 0;
+            uint256 transferAmount = 0;
+
             (txItem.token, txItem.amount) = _getRelayTokenAndAmount(chain, bridgeItem.token, bridgeItem.amount);
 
-            vaultManager.transferComplete(txItem, bridgeItem.vault, relayGasUsed, relayGasEstimated);
+            if (bridgeItem.txType == TxType.MIGRATE) {
+                (gasAmount, transferAmount) = vaultManager.migrationComplete(txItem, bridgeItem.vault, bridgeItem.payload, order.estimateGas, usedGas);
+            } else {
+                (gasAmount, transferAmount) = vaultManager.transferComplete(txItem, bridgeItem.vault, usedGas, order.estimateGas);
+            }
+            if (gasAmount > 0) {
+                _sendToken(txItem.token, gasAmount, txOutItem.sender, false);
+            }
+            if (transferAmount > 0) {
+                _checkAndBurn(txItem.token, transferAmount);
+            }
+
+        } else {
+            // refund from retired vault on non-contract vault
         }
 
-        // todo: delete order info
         delete orderInfos[txItem.orderId];
 
         emit BridgeCompleted(

@@ -30,8 +30,6 @@ interface IRegistry {
         view
         returns (uint256 toAmount);
 
-    function getVaultToken(address _token) external view returns (address);
-
     function getBaseFeeReceiver() external view returns (address);
 
     // get from chain fee

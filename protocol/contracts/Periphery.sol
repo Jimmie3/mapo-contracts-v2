@@ -2,15 +2,16 @@
 pragma solidity 0.8.24;
 
 import {ChainType, GasInfo} from "./libs/Types.sol";
+
 import {IPeriphery} from "./interfaces/IPeriphery.sol";
-import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
-
+import {IProtocolFee} from "./interfaces/IProtocolFee.sol";
 import {IRegistry} from "./interfaces/IRegistry.sol";
-
 import {ISwap} from "./interfaces/ISwap.sol";
 import {IAffiliateFeeManager} from "./interfaces/IAffiliateFeeManager.sol";
-
 import {IGasService} from "./interfaces/IGasService.sol";
+
+import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
+
 
 contract Periphery is BaseImplementation, IPeriphery {
     bytes32 private constant RELAY_ADDRESS_KEY = keccak256("address.relay");
@@ -21,6 +22,7 @@ contract Periphery is BaseImplementation, IPeriphery {
 
     bytes32 private constant AFFILIATE_ADDRESS_KEY = keccak256("address.affiliate");
     bytes32 private constant SWAP_ADDRESS_KEY = keccak256("address.swap");
+    bytes32 private constant PROTOCOLFEE_ADDRESS_KEY = keccak256("address.protocolfee.manager");
 
     address public relay;
     address public gasService;
@@ -30,16 +32,18 @@ contract Periphery is BaseImplementation, IPeriphery {
 
     address public affiliateManager;
     address public swapManager;
+    address public protocolFeeManager;
 
     mapping(bytes32 => address) public addresses;
 
-    event SetRelay(address _relay);
+    event SetRelay(address relay);
     event SetGasService(address _gasService);
     event SetVaultManager(address vaultManager);
-    event SetTSSManager(address _tssManager);
-    event SetTokenRegister(address _tokenRegister);
-    event SetAffiliateManager(address _tokenRegister);
-    event SetSwapManager(address _tokenRegister);
+    event SetTSSManager(address tssManager);
+    event SetTokenRegister(address registry);
+    event SetAffiliateManager(address affiliateManager);
+    event SetSwapManager(address swapManager);
+    event SetProtocolFeeManager(address feeManager);
 
     function initialize(address _defaultAdmin) public initializer {
         __BaseImplementation_init(_defaultAdmin);
@@ -87,6 +91,12 @@ contract Periphery is BaseImplementation, IPeriphery {
         emit SetAffiliateManager(_affiliateManager);
     }
 
+    function setProtocolFeeManager(address _feeManager) external restricted {
+        require(_feeManager != address(0));
+        protocolFeeManager = _feeManager;
+        emit SetProtocolFeeManager(_feeManager);
+    }
+
     function getAddress(uint256 t) external view returns (address addr) {
         if (t == 0) {
             addr = relay;
@@ -107,6 +117,14 @@ contract Periphery is BaseImplementation, IPeriphery {
 
     function getAffiliateManager() external view override returns (address) {
         return affiliateManager;
+    }
+
+    function getProtocolFee(address token, uint256 amount) external view override returns (address, uint256) {
+        IProtocolFee feeManager = IProtocolFee(protocolFeeManager);
+
+        uint256 fee = feeManager.getProtocolFee(token, amount);
+
+        return (protocolFeeManager, fee);
     }
 
     function getChainType(uint256 _chain) external view returns (ChainType) {

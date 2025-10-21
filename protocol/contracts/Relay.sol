@@ -33,11 +33,6 @@ contract Relay is BaseGateway, IRelay {
     IPeriphery public periphery;
     IVaultManager public vaultManager;
 
-    struct Rate {
-        uint24 rate;
-        address receiver;
-    }
-
     struct OrderInfo {
         bool signed;
         uint64 height;
@@ -47,9 +42,6 @@ contract Relay is BaseGateway, IRelay {
     }
 
     mapping(bytes32 => OrderInfo) public orderInfos;
-
-    Rate public protocolFeeRate;
-    mapping(address => uint256) public protocolFees;
 
     event SetSwap(address _swap);
     event SetPeriphery(address _periphery);
@@ -103,7 +95,7 @@ contract Relay is BaseGateway, IRelay {
     );
 
     event BridgeError(bytes32 indexed orderId, string reason);
-    event BridgeFeeCollected(bytes32 indexed orderId, address token, uint256 securityFee);
+    event BridgeFeeCollected(bytes32 indexed orderId, address token, uint256 protocolFee);
 
     function initialize(address _defaultAdmin) public initializer {
         __BaseImplementation_init(_defaultAdmin);
@@ -254,7 +246,7 @@ contract Relay is BaseGateway, IRelay {
                 (gasAmount, transferAmount) = vaultManager.transferComplete(txItem, bridgeItem.vault, usedGas, order.estimateGas);
             }
             if (gasAmount > 0) {
-                _sendToken(txItem.token, gasAmount, txOutItem.sender, false);
+                _sendToken(txItem.token, gasAmount, txOutItem.sender, true);
             }
             if (transferAmount > 0) {
                 _checkAndBurn(txItem.token, transferAmount);
@@ -315,7 +307,7 @@ contract Relay is BaseGateway, IRelay {
             (bytes memory affiliateData, bytes memory relayData, bytes memory targetData) =
                 abi.decode(bridgeItem.payload, (bytes, bytes, bytes));
 
-            // collect affiliate and bridge fee first
+            // collect affiliate and protocol fee first
             txItem.amount = _collectAffiliateAndProtocolFee(txItem, affiliateData);
             if (txItem.amount == 0) {
                 // emit complete event
@@ -484,8 +476,8 @@ contract Relay is BaseGateway, IRelay {
             }
         }
 
-        uint256 protocolFee = txItem.amount * protocolFeeRate.rate / MAX_RATE_UNIT;
-        protocolFees[txItem.token] += protocolFee;
+        (address receiver, uint256 protocolFee) = periphery.getProtocolFee(txItem.token, txItem.amount);
+        _sendToken(txItem.token, protocolFee, receiver, true);
 
         uint256 amount = txItem.amount - affiliateFee - protocolFee;
 
@@ -554,7 +546,7 @@ contract Relay is BaseGateway, IRelay {
 
         // non contract migration or token transfer
         if (!(bridgeItem.txType == TxType.MIGRATE && txItem.chainType == ChainType.CONTRACT)) {
-            _checkAndBurn(txItem.token, txItem.amount);
+            // _checkAndBurn(txItem.token, txItem.amount);
             (bridgeItem.token, bridgeItem.amount) = _getToChainTokenAndAmount(txItem.chain, txItem.token, txItem.amount);
         }
 

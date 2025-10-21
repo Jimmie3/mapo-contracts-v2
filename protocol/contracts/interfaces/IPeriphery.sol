@@ -26,6 +26,8 @@ interface IPeriphery {
 
     function getAffiliateManager() external view returns (address);
 
+    function getProtocolFee(address token, uint256 amount) external view returns (address, uint256);
+
     /**
      * @dev Get the type of blockchain for a given chain ID
      * @param chain Chain ID to query

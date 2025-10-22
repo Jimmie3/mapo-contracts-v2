@@ -184,6 +184,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
     event UpdateTokenWeight(address indexed token, uint256 chain, uint24 weight);
     event UpdateBalanceIndicator(address indexed token, uint24 totalWeight, uint24 deltaMax);
 
+    event UpdateVaultFeeRate(VaultFeeRate _vaultFeeRate);
+
     modifier onlyRelay() {
         if (msg.sender != address(relay)) revert Errs.no_access();
         _;
@@ -203,6 +205,14 @@ contract VaultManager is BaseImplementation, IVaultManager {
         require(_periphery != address(0));
         periphery = IPeriphery(_periphery);
         emit SetPeriphery(_periphery);
+    }
+
+    function updateVaultFeeRate(VaultFeeRate calldata _vaultFeeRate) external restricted {
+        require(_vaultFeeRate.ammVault < MAX_RATE_UNIT);
+        require(_vaultFeeRate.fromVault < MAX_RATE_UNIT);
+        require(_vaultFeeRate.toVault < MAX_RATE_UNIT);
+        vaultFeeRate = _vaultFeeRate;
+        emit UpdateVaultFeeRate(_vaultFeeRate);
     }
 
     function updateTokenWeights(address token, uint256[] memory chains, uint256[] memory weights) external restricted {
@@ -355,11 +365,19 @@ contract VaultManager is BaseImplementation, IVaultManager {
         else return bytes("");
     }
 
-//    function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view returns(uint256 balance, uint256 pendingOut) {
-//        ChainTokenState storage state =  chainStates[token][chain];
-//        balance = state.balance;
-//        pendingOut = state.pendingOut;
-//    }
+   function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view returns(uint256 balance, uint256 pendingOut) {
+       ChainType chainType = periphery.getChainType(chain);
+       if(chainType == ChainType.CONTRACT) {
+            TokenChainState storage state =  tokenStates[token].chainStates[chain];
+            balance = state.balance;
+            pendingOut = state.pendingOut;
+       } else {
+            ChainTokenVault storage chainTokenVault = vaultList[keccak256(vault)].chainVaults[chain].tokenVaults[token];
+            balance = chainTokenVault.balance;
+            pendingOut = chainTokenVault.pendingOut;
+       }
+
+   }
 
 
     function getBalanceFee(uint256 fromChain, uint256 toChain, address token, uint256 amount)

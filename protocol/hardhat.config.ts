@@ -1,6 +1,8 @@
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-foundry";
 import { HardhatUserConfig } from "hardhat/config";
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const config: HardhatUserConfig = {
   paths: {
@@ -23,13 +25,77 @@ const config: HardhatUserConfig = {
     localhost: {
       url: "http://127.0.0.1:8545",
     },
-  },
-  gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
-    currency: "USD",
+
+    Makalu: {
+      chainId: 212,
+      url: "https://testnet-rpc.maplabs.io",
+      accounts: process.env.TESTNET_PRIVATE_KEY !== undefined ? [process.env.TESTNET_PRIVATE_KEY] : [],
+    },
+
+    Mapo: {
+      chainId: 22776,
+      url: "https://rpc.maplabs.io",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+
+    Eth: {
+      url: "https://eth-mainnet.public.blastapi.io",
+      chainId: 1,
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+
+    Bsc: {
+      url: `https://binance-smart-chain-public.nodies.app`,
+      chainId: 56,
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+
+    eth_test: {
+      url: `https://eth-sepolia.api.onfinality.io/public`,
+      chainId: 11155111,
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+
+    bsc_test: {
+      url: `https://api.zan.top/bsc-testnet`,
+      chainId: 97,
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: {
+      Mapo: " ",
+      Eth: " ",
+      Bsc: " "
+    },
+    customChains: [
+      {
+        network: "Mapo",
+        chainId: 22776,
+        urls: {
+          apiURL: "https://explorer-api.chainservice.io/api",
+          browserURL: "https://explorer.mapprotocol.io"
+        },
+      },
+      {
+        network: "Eth",
+        chainId: 1,
+        urls: {
+          apiURL: "https://api.etherscan.io/api",
+          browserURL: "https://etherscan.com/",
+        },
+      },
+      {
+        network: "Bsc",
+        chainId: 56,
+        urls: {
+          apiURL: "https://api.bscscan.com/api",
+          browserURL: "https://bscscan.com/",
+        },
+      },
+    ]
   },
 };
 

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {ChainType, TxItem, GasInfo} from "../libs/Types.sol";
 
 interface IVaultManager {
-    // function getVaultToken(address _token) external view returns (address);
+    function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view returns(uint256 balance, uint256 pendingOut);
     function getBalanceFee(uint256 fromChain, uint256 toChain, address token, uint256 amount)
     external
     view

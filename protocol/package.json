@@ -36,7 +36,8 @@
     "solidity-coverage": "^0.8.1",
     "ts-node": "^10.0.0",
     "typechain": "^8.3.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "dotenv": "^16.0.3"
   },
   "keywords": [
     "solidity",

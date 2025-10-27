@@ -776,14 +776,14 @@ contract VaultManager is BaseImplementation, IVaultManager {
         // 2avᵧ×wₓ
         uint256 s2 = 2 * amount * y.balance * x.weight;
         if (s1 > s2) {
-            uint256 delta = (s1 - s2) * totalWeight / (x.weight * y.weight * total * total);
+            uint256 delta = _divUint256(((s1 - s2) * totalWeight), (x.weight * y.weight * total * total));
             deltaS = int24(int256(delta));
         } else {
-            uint256 delta = (s2 - s1) * totalWeight / (x.weight * y.weight * total * total);
+            uint256 delta = _divUint256(((s2 - s1) * totalWeight), (x.weight * y.weight * total * total));
             deltaS = 0 - int24(int256(delta));
         }
         int24 deltaSMax = int24(tokenStates[token].deltaSMax);
-        return deltaS * int24(MAX_RATE_UNIT) / deltaSMax;
+        return _divInt24(deltaS * int24(MAX_RATE_UNIT), deltaSMax);
     }
 
     function _getBalanceFeeInfo(uint256 fromChain, uint256 toChain, address token, uint256 amount, bool isSwapIn, bool isSwapOut)
@@ -816,7 +816,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         } else if (deltaPercent <= MIN_BALANCE_CHANGE) {
             rate = feeRate.minBalance;
         } else {
-            rate = deltaPercent * (MAX_BALANCE_CHANGE - MIN_BALANCE_CHANGE) / (feeRate.maxBalance - feeRate.minBalance) + feeRate.minBalance;
+            rate = _divInt24(deltaPercent * (MAX_BALANCE_CHANGE - MIN_BALANCE_CHANGE), ((feeRate.maxBalance - feeRate.minBalance) + feeRate.minBalance));
         }
 
         return _getBalanceFee(amount, rate);
@@ -918,5 +918,13 @@ contract VaultManager is BaseImplementation, IVaultManager {
         tokenVault.pendingOut -= (amount + estimateGas);
     }
 
-
+    function _divUint256(uint256 a, uint256 b) internal pure returns(uint256) {
+        if(b == 0) return 0;
+        return a / b;
+    }
+    
+    function _divInt24(int24 a, int24 b) internal pure returns(int24) {
+        if(b == 0) return 0;
+        return a / b;
+    }
 }

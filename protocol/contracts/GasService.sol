@@ -46,7 +46,7 @@ contract GasService is BaseImplementation, IGasService {
         uint256 transactionSizeWithCall,
         uint256 transactionRate
     ) external override {
-        _checkAccess(4);
+        _checkAccess(0);
 
         NetworkFee storage fee = chainNetworkFee[chain];
         fee.height = uint64(height);

@@ -43,7 +43,7 @@ contract Gateway is BaseGateway {
         internal
         override
     {
-        bytes memory receiver = abi.encode(to);
+        bytes memory receiver = abi.encodePacked(to);
 
         emit BridgeOut(
             orderId, selfChainId << 192, TxType.DEPOSIT, activeTss, outToken, amount, from, refundAddr, receiver, bytes("")

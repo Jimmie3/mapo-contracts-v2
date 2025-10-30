@@ -348,7 +348,11 @@ contract Relay is BaseGateway, IRelay {
 
     function execute(BridgeItem memory bridgeItem, TxItem memory txItem, uint256 toChain, bytes memory relayPayload, bytes memory targetPayload) public returns (uint256) {
         require(msg.sender == address(this));
+        _executeInternal(bridgeItem, txItem, toChain, relayPayload, targetPayload);
+    }
 
+
+    function _executeInternal(BridgeItem memory bridgeItem, TxItem memory txItem, uint256 toChain, bytes memory relayPayload, bytes memory targetPayload) internal returns (uint256) {
         bool choose;
         GasInfo memory gasInfo;
         uint256 fromChain = txItem.chain;
@@ -394,7 +398,7 @@ contract Relay is BaseGateway, IRelay {
         bridgeItem.txType = TxType.TRANSFER;
 
         // 4 emit BridgeRelay event
-        if (txItem.chain != selfChainId) {
+        if (toChain != selfChainId) {
             _emitRelay(fromChain, bridgeItem, txItem, gasInfo);
         }
 
@@ -444,7 +448,7 @@ contract Relay is BaseGateway, IRelay {
         txItem.orderId = orderId;
         txItem.token = token;
         txItem.amount = amount;
-        txItem.chain = toChain;
+        txItem.chain = selfChainId;
 
         BridgeItem memory bridgeItem;
         bridgeItem.from = Utils.toBytes(msg.sender);
@@ -457,7 +461,7 @@ contract Relay is BaseGateway, IRelay {
         txItem.amount = _collectAffiliateAndProtocolFee(txItem, affiliateData);
         if (txItem.amount == 0) revert Errs.zero_amount_out();
 
-        execute(bridgeItem, txItem, selfChainId, relayPayload, targetPayload);
+        _executeInternal(bridgeItem, txItem, toChain, relayPayload, targetPayload);
     }
 
 

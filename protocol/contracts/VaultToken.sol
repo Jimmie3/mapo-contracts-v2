@@ -28,13 +28,18 @@ contract VaultToken is ERC4626Upgradeable, BaseImplementation {
 
 
     function increaseVault(uint256 assets) external {
+        if (_msgSender() != vaultManager) {
+            revert only_manager_role();
+        }
         balance += assets;
         emit VaultIncreased(asset(), assets, balance);
     }
 
     function decreaseVault(uint256 assets) external {
+        if (_msgSender() != vaultManager) {
+            revert only_manager_role();
+        }
         balance -= assets;
-        // todo: emit
         emit VaultDecreased(asset(), assets, balance);
     }
 

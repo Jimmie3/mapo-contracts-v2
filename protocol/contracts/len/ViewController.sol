@@ -109,7 +109,7 @@ contract ViewController is BaseImplementation {
 
     struct Token {
         bytes token;
-        uint256 balance;
+        int256 balance;
         uint256 pendingOut;
         uint256 decimals;
     }
@@ -149,8 +149,8 @@ contract ViewController is BaseImplementation {
                 vaultView.routerTokens[i].coins[j].token = tokens[i];
                 vaultView.routerTokens[i].coins[j].decimals = r.getTokenDecimals(chain, tokens[i]);
                 address relayToken = r.getRelayChainToken(chain, tokens[i]);
-                (uint256 balance, uint256 pendingOut) = vm.getVaultTokenBalance(pubkey, chain, relayToken);
-                vaultView.routerTokens[i].coins[j].balance = _adjustDecimals(balance, vaultView.routerTokens[i].coins[j].decimals);
+                (int256 balance, uint256 pendingOut) = vm.getVaultTokenBalance(pubkey, chain, relayToken);
+                vaultView.routerTokens[i].coins[j].balance = _adjustDecimalsInt256(balance, vaultView.routerTokens[i].coins[j].decimals);
                 vaultView.routerTokens[i].coins[j].pendingOut = _adjustDecimals(pendingOut, vaultView.routerTokens[i].coins[j].decimals);
             }
         }
@@ -162,6 +162,10 @@ contract ViewController is BaseImplementation {
 
     function _adjustDecimals(uint256 amount, uint256 decimals) internal pure returns(uint256) {
         return amount * 10 ** decimals / (10 ** 18);
+    }
+
+    function _adjustDecimalsInt256(int256 amount, uint256 decimals) internal pure returns(int256) {
+        return amount * int256(10 ** decimals) / (10 ** 18);
     }
 
     function _getRelay() internal view returns (IRelay relay) {

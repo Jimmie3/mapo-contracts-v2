@@ -220,6 +220,7 @@ contract Relay is BaseGateway, IRelay {
         BridgeItem memory bridgeItem = txOutItem.bridgeItem;
 
         uint256 chain = (bridgeItem.chainAndGasLimit >> 128) & 0xFFFFFFFFFFFFFFFF;
+        if(chain == selfChainId) return;
         _updateLastScanBlock(chain, txOutItem.height);
 
         TxItem memory txItem;
@@ -316,10 +317,23 @@ contract Relay is BaseGateway, IRelay {
             }
 
             try this.execute(bridgeItem, txItem, toChain, relayData, targetData) returns (uint256 amount) {
-                txItem.amount = amount;
+                if(toChain == selfChainId) {
+                    txItem.amount = amount;
+                    txItem.chain = toChain;
+                    txItem.chainType = periphery.getChainType(txItem.chain);
+                    vaultManager.transferComplete(txItem, bridgeItem.vault, 0, 0);
+                    emit BridgeCompleted(
+                        txInItem.orderId,
+                        bridgeItem.chainAndGasLimit,
+                        bridgeItem.txType,
+                        bridgeItem.vault,
+                        bridgeItem.sequence,
+                        msg.sender,
+                        targetData
+                    );
+                    _bridgeIn(txItem, bridgeItem);
+                }
 
-                txItem.chain = toChain;
-                txItem.chainType = periphery.getChainType(txItem.chain);
             } catch (bytes memory) {
                 // txItem.chain = fromChain;
                 // txItem.chainType = periphery.getChainType(fromChain);
@@ -330,10 +344,6 @@ contract Relay is BaseGateway, IRelay {
                 _refund(bridgeItem, txItem, false);
 
                 return;
-            }
-
-            if (txItem.chain == selfChainId) {
-                return _bridgeIn(txItem, bridgeItem);
             }
         }
     }

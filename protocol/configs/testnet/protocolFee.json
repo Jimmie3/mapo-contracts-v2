@@ -1,0 +1,45 @@
+{   
+
+    "totalRate": 100,
+    "tokens":[
+        {
+            "addr": "0xE85C9Bc2Aef9374EAe55E844f1B6d8cB2cFA5A89",
+            "add": true
+        },
+        {
+            "addr": "0x71239b11Ad68e27609e42cA6723645172FDB02c7",
+            "add": true
+        },
+        {
+            "addr": "0x4f2E7AE1B0b36da92F44903b3b5631f97F2CD52d",
+            "add": true
+        }
+    ],
+
+    "feeShares": [
+        {
+            "feeType": 0,
+            "share": 10,
+            "receiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d"
+        },
+
+        {
+            "feeType": 1,
+            "share": 10,
+            "receiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d"
+        },
+
+        {
+            "feeType": 2,
+            "share": 10,
+            "receiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d"
+        },
+
+        {
+            "feeType": 3,
+            "share": 10,
+            "receiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d"
+        }
+    ]
+
+}

@@ -2,7 +2,10 @@ import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-foundry";
 import { HardhatUserConfig } from "hardhat/config";
 import * as dotenv from "dotenv";
+import "./tasks";
 dotenv.config();
+
+
 
 const config: HardhatUserConfig = {
   paths: {

@@ -1,0 +1,81 @@
+{
+
+    "VaultFeeRate": {
+        "ammVault": 0,
+        "fromVault": 0,
+        "toVault": 0,
+        "balanceThreshold": 0,
+        "fixedFromBalance": 0,
+        "fixedToBalance": 0,
+        "minBalance": 0,
+        "maxBalance": 0,
+        "reserved": 0
+    },
+
+    "tokens": [
+        {
+            "id": 1,
+            "name": "BTC",
+            "addr": "0xE85C9Bc2Aef9374EAe55E844f1B6d8cB2cFA5A89",
+            "vaultToken": "0x336DF8E16936F47e49aCe4ec413F4FF14C0CB9C3",
+            "chainWeights": [
+                {
+                    "chainId": 97,
+                    "weight": 100
+                },
+                {
+                    "chainId": 212,
+                    "weight": 100
+                },
+                {
+                    "chainId": 11155111,
+                    "weight": 100
+                },
+                {
+                    "chainId": 1360095883558914,
+                    "weight": 100
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "name": "ETH",
+            "addr": "0x71239b11Ad68e27609e42cA6723645172FDB02c7",
+            "vaultToken": "0x43ccc52D8fC65bE16877a92933d92fe73f324110",
+            "chainWeights": [
+                {
+                    "chainId": 97,
+                    "weight": 100
+                },
+                {
+                    "chainId": 212,
+                    "weight": 100
+                },
+                {
+                    "chainId": 11155111,
+                    "weight": 100
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "name": "BNB",
+            "addr": "0x4f2E7AE1B0b36da92F44903b3b5631f97F2CD52d",
+            "vaultToken": "0xfC06f1687e7973e399112Bb9902E795CF39876ee",
+            "chainWeights": [
+                {
+                    "chainId": 97,
+                    "weight": 100
+                },
+                {
+                    "chainId": 212,
+                    "weight": 100
+                },
+                {
+                    "chainId": 11155111,
+                    "weight": 100
+                }
+            ]
+        }
+    ]
+}

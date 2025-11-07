@@ -13,10 +13,11 @@ import {ViewController} from "../../contracts/len/ViewController.sol";
 
 contract DeployAndSetUp is BaseScript {
     function run() public virtual broadcast {
-          deployAndSet();
+          deploy();
+          set();
     }
 
-    function deployAndSet() internal {
+    function deploy() internal {
         string memory networkName = getNetworkName();
         address authority = readConfigAddr(networkName, "Authority");
         console.log("Authority address:", authority);
@@ -28,10 +29,21 @@ contract DeployAndSetUp is BaseScript {
                deployProtocolFee(networkName, authority);
                deployRegistry(networkName, authority);
                deployVaultManager(networkName, authority);
-               setUp(networkName);
         } else {
                deployGateway(networkName, authority);
         }
+    }
+
+    function set() internal {
+          uint256 chainId = block.chainid;
+          if(chainId == 212 || chainId == 22776) {
+               string memory networkName = getNetworkName();
+               address authority = readConfigAddr(networkName, "Authority");
+               console.log("Authority address:", authority);
+               setUp(networkName);
+          } else {
+               console.log("nothing to set");
+          }
     }
 
    function deployRelay(string memory networkName, address authority) internal returns(Relay relay) {

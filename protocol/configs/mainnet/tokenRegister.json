@@ -1,0 +1,81 @@
+{
+
+    "VaultFeeRate": {
+        "ammVault": 0,
+        "fromVault": 0,
+        "toVault": 0,
+        "balanceThreshold": 0,
+        "fixedFromBalance": 0,
+        "fixedToBalance": 0,
+        "minBalance": 0,
+        "maxBalance": 0,
+        "reserved": 0
+    },
+
+    "tokens": [
+        {
+            "id": 1,
+            "name": "BTC",
+            "addr": "",
+            "vaultToken": "",
+            "chainWeights": [
+                {
+                    "chainId": 56,
+                    "weight": 100
+                },
+                {
+                    "chainId": 22776,
+                    "weight": 100
+                },
+                {
+                    "chainId": 1,
+                    "weight": 100
+                },
+                {
+                    "chainId": 1360095883558913,
+                    "weight": 100
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "name": "ETH",
+            "addr": "",
+            "vaultToken": "",
+            "chainWeights": [
+                {
+                    "chainId": 56,
+                    "weight": 100
+                },
+                {
+                    "chainId": 22776,
+                    "weight": 100
+                },
+                {
+                    "chainId": 1,
+                    "weight": 100
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "name": "BNB",
+            "addr": "",
+            "vaultToken": "",
+            "chainWeights": [
+                {
+                    "chainId": 56,
+                    "weight": 100
+                },
+                {
+                    "chainId": 22776,
+                    "weight": 100
+                },
+                {
+                    "chainId": 1,
+                    "weight": 100
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,112 @@
+
+    {
+        "Mapo": {
+            "chainId": 22776, 
+            "lastScanBlock": 0,
+            "chainType": "contract",
+            "gasToken": "", 
+            "baseFeeToken": "",
+            "tokens": [
+                {
+                    "name": "BTC",
+                    "addr": "",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": true
+                },
+                {
+                    "name": "ETH",
+                    "addr": "",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": true
+                },
+                {
+                    "name": "BNB",
+                    "addr": "",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": true
+                }
+            ]
+        },
+
+        "Eth": {
+            "chainId": 1, 
+            "lastScanBlock": 0,
+            "chainType": "contract",
+            "gasToken": "", 
+            "baseFeeToken": "",
+            "tokens": [
+                {
+                    "name": "BTC",
+                    "addr": "",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false
+                },
+                {
+                    "name": "ETH",
+                    "addr": "",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false
+                },
+                {
+                    "name": "BNB",
+                    "addr": "",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false
+                }
+            ]
+        },
+
+        "Bsc": {
+            "chainId": 56, 
+            "lastScanBlock": 0,
+            "chainType": "contract",
+            "gasToken": "", 
+            "baseFeeToken": "",
+            "tokens": [
+                {
+                    "name": "BTC",
+                    "addr": "",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false
+                },
+                {
+                    "name": "ETH",
+                    "addr": "",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false
+                },
+                {
+                    "name": "BNB",
+                    "addr": "",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false
+                }
+            ]
+        },
+
+        "Btc": {
+            "chainId": 1360095883558913, 
+            "lastScanBlock": 0,
+            "chainType": "no-contract",
+            "gasToken": "0x425443", 
+            "baseFeeToken": "0x425443",
+            "tokens": [
+                {
+                    "name": "BTC",
+                    "addr": "0x425443",
+                    "decimals": 8,
+                    "bridgeAble": true,
+                    "mintAble": false
+                }
+            ]
+        }
+    }

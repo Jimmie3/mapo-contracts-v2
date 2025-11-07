@@ -358,7 +358,7 @@ contract Relay is BaseGateway, IRelay {
 
     function execute(BridgeItem memory bridgeItem, TxItem memory txItem, uint256 toChain, bytes memory relayPayload, bytes memory targetPayload) public returns (uint256) {
         require(msg.sender == address(this));
-        _executeInternal(bridgeItem, txItem, toChain, relayPayload, targetPayload);
+        return _executeInternal(bridgeItem, txItem, toChain, relayPayload, targetPayload);
     }
 
 
@@ -400,6 +400,9 @@ contract Relay is BaseGateway, IRelay {
                 // no vault
                 revert Errs.invalid_vault();
             }
+
+            txItem.chain = toChain;
+            txItem.chainType = periphery.getChainType(toChain);
         }
 
         // todo: check relay min amount

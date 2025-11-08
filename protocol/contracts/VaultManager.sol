@@ -580,7 +580,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     function transferComplete(TxItem memory txItem, bytes memory vault, uint256 relayGasUsed, uint256 relayGasEstimated) external override onlyRelay returns (uint256 gas, uint256 amount) {
         bytes32 vaultKey = keccak256(vault);
 
-        if (vaultKey != retiringVaultKey || vaultKey != activeVaultKey) revert Errs.invalid_vault();
+        if (vaultKey != retiringVaultKey && vaultKey != activeVaultKey) revert Errs.invalid_vault();
 
         _transferComplete(vaultKey, txItem, uint128(relayGasUsed), uint128(relayGasEstimated));
         if (txItem.chainType == ChainType.CONTRACT) {
@@ -601,7 +601,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     {
         bytes32 vaultKey = keccak256(fromVault);
         bytes32 targetVaultKey = keccak256(toVault);
-        if (vaultKey != retiringVaultKey || targetVaultKey != activeVaultKey) revert Errs.invalid_vault();
+        if (vaultKey != retiringVaultKey && targetVaultKey != activeVaultKey) revert Errs.invalid_vault();
 
         if (txItem.chainType == ChainType.CONTRACT) {
             delete vaultList[vaultKey].chainVaults[txItem.chain];

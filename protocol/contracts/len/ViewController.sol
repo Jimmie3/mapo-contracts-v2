@@ -146,12 +146,18 @@ contract ViewController is BaseImplementation {
             uint256 tokenLen = tokens.length;
             vaultView.routerTokens[i].coins = new Token[](tokenLen);
             for (uint j = 0; j < tokenLen; j++) {
-                vaultView.routerTokens[i].coins[j].token = tokens[i];
-                vaultView.routerTokens[i].coins[j].decimals = r.getTokenDecimals(chain, tokens[i]);
-                address relayToken = r.getRelayChainToken(chain, tokens[i]);
-                (int256 balance, uint256 pendingOut) = vm.getVaultTokenBalance(pubkey, chain, relayToken);
-                vaultView.routerTokens[i].coins[j].balance = _adjustDecimalsInt256(balance, vaultView.routerTokens[i].coins[j].decimals);
-                vaultView.routerTokens[i].coins[j].pendingOut = _adjustDecimals(pendingOut, vaultView.routerTokens[i].coins[j].decimals);
+                vaultView.routerTokens[i].coins[j].token = tokens[j];
+                if(chain == selfChainId) {
+                    vaultView.routerTokens[i].coins[j].decimals = 18;
+                    address relayToken = r.getRelayChainToken(chain, tokens[j]);
+                    (vaultView.routerTokens[i].coins[j].balance, vaultView.routerTokens[i].coins[j].pendingOut) = vm.getVaultTokenBalance(pubkey, chain, relayToken);
+                } else {
+                    vaultView.routerTokens[i].coins[j].decimals = r.getTokenDecimals(chain, tokens[j]);
+                    address relayToken = r.getRelayChainToken(chain, tokens[j]);
+                    (int256 balance, uint256 pendingOut) = vm.getVaultTokenBalance(pubkey, chain, relayToken);
+                    vaultView.routerTokens[i].coins[j].balance = _adjustDecimalsInt256(balance, vaultView.routerTokens[i].coins[j].decimals);
+                    vaultView.routerTokens[i].coins[j].pendingOut = _adjustDecimals(pendingOut, vaultView.routerTokens[i].coins[j].decimals);
+                }
             }
         }
     }

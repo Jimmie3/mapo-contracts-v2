@@ -1,0 +1,44 @@
+{
+    "totalRate": 100,
+    "tokens":[
+        {
+            "addr": "",
+            "add": true
+        },
+        {
+            "addr": "",
+            "add": true
+        },
+        {
+            "addr": "",
+            "add": true
+        }
+    ],
+
+    "feeShares": [
+        {
+            "feeType": 0,
+            "share": 10,
+            "receiver": ""
+        },
+
+        {
+            "feeType": 1,
+            "share": 10,
+            "receiver": ""
+        },
+
+        {
+            "feeType": 2,
+            "share": 10,
+            "receiver": ""
+        },
+
+        {
+            "feeType": 3,
+            "share": 10,
+            "receiver": ""
+        }
+    ]
+
+}

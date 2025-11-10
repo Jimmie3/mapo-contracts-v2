@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "./libs/Utils.sol";
-import "./interfaces/IVaultToken.sol";
-import "./interfaces/IRegistry.sol";
+import {Utils} from "./libs/Utils.sol";
+import {IVaultToken} from "./interfaces/IVaultToken.sol";
+import {IRegistry} from "./interfaces/IRegistry.sol";
 
 import {IVaultManager} from "./interfaces/IVaultManager.sol";
 
 import {ChainType, TxItem, GasInfo} from "./libs/Types.sol";
 import {Errs} from "./libs/Errors.sol";
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
@@ -96,9 +96,9 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     struct VaultFeeRate {
-        uint24  ammVault;           // the fee to vault when bridging
-        uint24  fromVault;          // the fee to swap in token vault
-        uint24  toVault;            // the fee to bridge/swap out token vault
+        uint24  ammVault;           // the vault fee to amm
+        uint24  fromVault;          // the vault fee to swap in token
+        uint24  toVault;            // the vault fee to bridge/swap out token
 
         uint24 balanceThreshold;    // balance fee calculation threshold
 
@@ -140,8 +140,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
         uint128 minAmount;          // minimum migration amount
         uint128 reserved;           // reserved for transfer out
         uint128 maxCredit;          // reserved
-        int128 balance;             // token balance
-        uint128 pendingOut;          // token pendingOut balance
+        int128 balance;             // token balance, might be negative value when token is minted
+        uint128 pendingOut;         // token pendingOut balance
     }
 
     struct TokenState {
@@ -163,7 +163,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     bytes32 public activeVaultKey;
     bytes32 public retiringVaultKey;
 
-    mapping(bytes32 => Vault) private vaultList;
+    mapping(bytes32 vaultKey => Vault) private vaultList;
 
     EnumerableSet.UintSet private chainList;        // all support chains
 
@@ -180,6 +180,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     event SetRelay(address _relay);
     event SetPeriphery(address _periphery);
+
+    event RegisterToken(address indexed _token, address _vaultToken);
 
     event FeeCollected(bytes32 indexed orderId, address token, uint256 vaultFee, uint256 ammVaultFee, uint256 balanceFee, bool incentive);
 
@@ -209,6 +211,18 @@ contract VaultManager is BaseImplementation, IVaultManager {
         emit SetPeriphery(_periphery);
     }
 
+
+    function registerToken(address _token, address _vaultToken) external restricted {
+        IVaultToken vault = IVaultToken(_vaultToken);
+        if (_token != vault.asset()) revert Errs.invalid_vault_token();
+
+        if (vault.vaultManager() != address(this)) revert Errs.invalid_vault_token();
+
+        tokenList.set(_token, _vaultToken);
+
+        emit RegisterToken(_token, _vaultToken);
+    }
+
     function updateVaultFeeRate(VaultFeeRate calldata _vaultFeeRate) external restricted {
         require(_vaultFeeRate.ammVault < MAX_RATE_UNIT);
         require(_vaultFeeRate.fromVault < MAX_RATE_UNIT);
@@ -236,11 +250,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
 
         _updateBalanceIndicator(token);
-    }
-
-    function registerToken(address token, address vaultToken) external restricted {
-        // todo: check vault token
-        tokenList.set(token, vaultToken);
     }
 
 
@@ -369,7 +378,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
    function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view returns(int256 balance, uint256 pendingOut) {
        ChainType chainType = periphery.getChainType(chain);
-       if(chainType == ChainType.CONTRACT) {
+       if (chainType == ChainType.CONTRACT) {
             TokenChainState storage state =  tokenStates[token].chainStates[chain];
             balance = state.balance;
             pendingOut = state.pendingOut;
@@ -378,7 +387,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
             balance = int128(chainTokenVault.balance);
             pendingOut = chainTokenVault.pendingOut;
        }
-
    }
 
 
@@ -396,13 +404,13 @@ contract VaultManager is BaseImplementation, IVaultManager {
         uint256 amount = txItem.amount;
 
         FeeInfo memory feeInfo;
-        uint256 ammFee = _getFee(txItem.amount, feeRate.ammVault);
+        uint256 ammVaultFee = _getFee(txItem.amount, feeRate.ammVault);
 
         feeInfo.vaultFee = _getFee(txItem.amount, feeRate.toVault);
 
         (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFeeInfo(txItem.chain, toChain, txItem.token, txItem.amount, false, false);
 
-        txItem.amount = _collectVaultAndBalanceFee(txItem,feeInfo, ammFee);
+        txItem.amount = _collectVaultAndBalanceFee(txItem,feeInfo, ammVaultFee);
 
         bytes32 vaultKey = keccak256(fromVault);
         _transferIn(vaultKey, txItem);
@@ -719,7 +727,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     internal
     view
     returns (bytes32 vaultKey, uint256 outAmount, GasInfo memory gasInfo)
-    {    
+    {
         if(txItem.chain == selfChainId) {
             return (activeVaultKey, txItem.amount, gasInfo);
         }
@@ -786,6 +794,32 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
         int24 deltaSMax = int24(tokenStates[token].deltaSMax);
         return _divInt24(deltaS * int24(MAX_RATE_UNIT), deltaSMax);
+    }
+
+    function _getBalanceChange(uint256 fromChain, uint256 toChain, address token, uint256 amount) internal view returns (int24 deltaS) {
+        uint256 total = tokenStates[token].balance;
+        // ΔS = [2a(vₓ×wᵧ - vᵧ×wₓ) + a²(wₓ + wᵧ)] / (wₓ×wᵧ×Tᵥ²)
+        //    = [2avₓ×wᵧ + a²(wₓ + wᵧ) - 2avᵧ×wₓ ] / (wₓ×wᵧ×Tᵥ²)
+        TokenChainState memory x = tokenStates[token].chainStates[fromChain];
+        TokenChainState memory y = tokenStates[token].chainStates[toChain];
+
+        // int24 deltaS;
+        uint256 totalWeight = tokenStates[token].totalWeight;
+
+        // 2avₓ×wᵧ + a²(wₓ + wᵧ)
+        uint256 s1 = 2 * amount * uint128(x.balance) * y.weight + amount * amount * (x.weight + y.weight);
+        // 2avᵧ×wₓ
+        uint256 s2 = 2 * amount * uint128(y.balance) * x.weight;
+
+        if (s1 > s2) {
+            uint256 delta = _divUint256(((s1 - s2) * totalWeight), (x.weight * y.weight * total * total));
+            deltaS = int24(int256(delta));
+        } else {
+            uint256 delta = _divUint256(((s2 - s1) * totalWeight), (x.weight * y.weight * total * total));
+            deltaS = 0 - int24(int256(delta));
+        }
+        // int24 deltaSMax = int24(tokenStates[token].deltaSMax);
+        // return _divInt24(deltaS * int24(MAX_RATE_UNIT), deltaSMax);
     }
 
     function _getBalanceFeeInfo(uint256 fromChain, uint256 toChain, address token, uint256 amount, bool isSwapIn, bool isSwapOut)
@@ -865,9 +899,12 @@ contract VaultManager is BaseImplementation, IVaultManager {
     // add token balance
     // add chain and token vault
     function _transferIn(bytes32 vaultKey, TxItem memory txItem) internal {
+        // todo: check mintable
         if(txItem.chain != selfChainId) vaultList[vaultKey].chains.add(txItem.chain);
+
         uint128 amount = uint128(txItem.amount);
 
+        // todo: process mint token
         tokenStates[txItem.token].balance += amount;
         tokenStates[txItem.token].chainStates[txItem.chain].balance += int128(amount);
 
@@ -880,6 +917,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
     // update target vault pending amount, include gas info
     function _transferOut(bytes32 vaultKey, TxItem memory txItem, uint128 outAmount, uint128 estimateGas) internal {
         // todo: support alt chain on non-contract chain
+
+        // todo: check mintable
         uint128 total = (txItem.chainType == ChainType.CONTRACT) ? outAmount : (outAmount + estimateGas);
 
         tokenStates[txItem.token].pendingOut += total;
@@ -894,6 +933,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
     function _transferComplete(bytes32 vaultKey, TxItem memory txItem, uint128 usedGas, uint128 estimateGas) internal{
         TokenState storage totalState = tokenStates[txItem.token];
         TokenChainState storage chainState = tokenStates[txItem.token].chainStates[txItem.chain];
+
+        // todo: check mintable
 
         uint128 amount = uint128(txItem.amount);
         if (txItem.chainType == ChainType.CONTRACT) {
@@ -921,12 +962,12 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     function _divUint256(uint256 a, uint256 b) internal pure returns(uint256) {
-        if(b == 0) return 0;
+        if (b == 0) return 0;
         return a / b;
     }
-    
+
     function _divInt24(int24 a, int24 b) internal pure returns(int24) {
-        if(b == 0) return 0;
+        if (b == 0) return 0;
         return a / b;
     }
 

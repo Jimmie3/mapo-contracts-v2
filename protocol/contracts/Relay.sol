@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 
 import {Utils} from "./libs/Utils.sol";
-import {IReceiver} from "./interfaces/IReceiver.sol";
 import {IRelay} from "./interfaces/IRelay.sol";
 import {ITSSManager} from "./interfaces/ITSSManager.sol";
 import {IVaultToken} from "./interfaces/IVaultToken.sol";
@@ -47,6 +46,9 @@ contract Relay is BaseGateway, IRelay {
     event SetPeriphery(address _periphery);
     event SetVaultManager(address _vaultManager);
     event SetAffiliateFeeManager(address _affiliateFeeManager);
+
+    event AddChain(uint256 chain);
+    event RemoveChain(uint256 chain);
 
     event Withdraw(address token, address reicerver, uint256 vaultAmount, uint256 tokenAmount);
 
@@ -113,22 +115,25 @@ contract Relay is BaseGateway, IRelay {
         emit SetPeriphery(_periphery);
     }
 
-    function addChain(uint256 chain, uint256 startBlock) external override {
-        _checkAccess(3);
-        _updateLastScanBlock(chain, uint64(startBlock));
-        vaultManager.addChain(chain);
-        // todo: emit event
+    function addChain(
+        uint256 _chain,
+        uint256 _lastScanBlock
+    ) external restricted {
+        _updateLastScanBlock(_chain, uint64(_lastScanBlock));
+        vaultManager.addChain(_chain);
+
+        emit AddChain(_chain);
     }
 
-
-    function removeChain(uint256 chain) external override {
-        _checkAccess(3);
-        // todo: check vault migration
+    function removeChain(uint256 _chain) external restricted {
+        // check vault migration
         (bool completed,) = vaultManager.checkMigration();
         if (!completed) revert Errs.migration_not_completed();
-        vaultManager.removeChain(chain);
-        // todo: emit event
+        vaultManager.removeChain(_chain);
+
+        emit AddChain(_chain);
     }
+
 
     function isOrderExecuted(bytes32 orderId, bool isTxIn) external view override returns (bool executed) {
         executed = isTxIn ? orderExecuted[orderId] : outOrderExecuted[orderId];
@@ -294,6 +299,7 @@ contract Relay is BaseGateway, IRelay {
 
         txItem.chain = fromChain;
         txItem.chainType = periphery.getChainType(fromChain);
+
         if (!vaultManager.checkVault(txItem.chainType, txItem.chain, bridgeItem.vault)) {
             // refund if vault is retired
             bridgeItem.to = txInItem.refundAddr;
@@ -305,7 +311,7 @@ contract Relay is BaseGateway, IRelay {
         if (bridgeItem.txType == TxType.DEPOSIT) {
             txItem.to = Utils.fromBytes(bridgeItem.to);
             _depositIn(txItem, bridgeItem.from, bridgeItem.vault);
-        } else {
+        } else if (bridgeItem.txType == TxType.TRANSFER) {
             (bytes memory affiliateData, bytes memory relayData, bytes memory targetData) =
                 abi.decode(bridgeItem.payload, (bytes, bytes, bytes));
 
@@ -318,7 +324,7 @@ contract Relay is BaseGateway, IRelay {
             }
 
             try this.execute(bridgeItem, txItem, toChain, relayData, targetData) returns (uint256 amount) {
-                if(toChain == selfChainId) {
+                if (toChain == selfChainId) {
                     txItem.amount = amount;
                     txItem.chain = toChain;
                     txItem.chainType = periphery.getChainType(txItem.chain);
@@ -334,7 +340,6 @@ contract Relay is BaseGateway, IRelay {
                     );
                     _bridgeIn(txItem, bridgeItem);
                 }
-
             } catch (bytes memory) {
                 // txItem.chain = fromChain;
                 // txItem.chainType = periphery.getChainType(fromChain);
@@ -399,7 +404,7 @@ contract Relay is BaseGateway, IRelay {
             // 3 update from chain and to chain vault
             (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.bridge(txItem,bridgeItem.vault,  toChain,targetPayload.length > 0);
             if (!choose) {
-                // no vault
+                // no target vault
                 revert Errs.invalid_vault();
             }
 
@@ -441,14 +446,20 @@ contract Relay is BaseGateway, IRelay {
         return vaultManager.getActiveVault();
     }
 
-    function _deposit(bytes32 orderId, address outToken, uint256 amount, address from, address to, address)
+    function _deposit(bytes32 _orderId, address _outToken, uint256 _amount, address _from, address _to, address)
         internal
         override
     {
-        TxItem memory txItem = TxItem(orderId, selfChainId, ChainType.CONTRACT, outToken, amount, to);
+        TxItem memory txItem = TxItem({
+        orderId: _orderId,
+        chain: selfChainId,
+        chainType: ChainType.CONTRACT,
+        token: _outToken,
+        amount: _amount,
+        to: _to});
         bytes memory vault = vaultManager.getActiveVault();
 
-        _depositIn(txItem,  Utils.toBytes(from), vault);
+        _depositIn(txItem,  Utils.toBytes(_from), vault);
     }
 
     function _bridgeOut(

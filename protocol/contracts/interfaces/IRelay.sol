@@ -5,12 +5,12 @@ import {TxOutItem, TxInItem} from "../libs/Types.sol";
 
 interface IRelay {
 
-    function rotate(bytes memory retiringVault, bytes memory activeVault) external;
+    function rotate(bytes calldata retiringVault, bytes calldata activeVault) external;
 
     function migrate() external returns (bool completed);
 
-    function executeTxOut(TxOutItem memory txOutItem) external;
-    function executeTxIn(TxInItem memory txInItem) external;
+    function executeTxOut(TxOutItem calldata txOutItem) external;
+    function executeTxIn(TxInItem calldata txInItem) external;
 
     function postNetworkFee(
         uint256 chain,

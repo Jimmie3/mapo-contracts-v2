@@ -57,25 +57,19 @@ contract Gateway is BaseGateway {
 
         orderExecuted[orderId] = true;
 
-        TxItem memory txItem;
-
         BridgeItem memory bridgeItem = abi.decode(params, (BridgeItem));
 
-        address vaultAddr = Utils.getAddressFromPublicKey(bridgeItem.vault);
+        bytes32 hash = _checkVaultSignature(orderId, signature, bridgeItem);
 
-        if (!_checkSignature(orderId, vaultAddr, signature, bridgeItem)) revert invalid_signature();
-
-        address tssAddr = (bridgeItem.sequence > retireSequence) ? activeTssAddress : retireTssAddress;
-        if (tssAddr != vaultAddr) revert invalid_vault();
-
-        _checkTargetChain(bridgeItem.chainAndGasLimit);
-
+        TxItem memory txItem;
+        txItem.orderId = orderId;
         txItem.token = Utils.fromBytes(bridgeItem.token);
-        txItem.to = Utils.fromBytes(bridgeItem.to);
         txItem.amount = bridgeItem.amount;
 
+        address to = Utils.fromBytes(bridgeItem.to);
+
         emit BridgeIn(
-            orderId,
+            txItem.orderId,
             bridgeItem.chainAndGasLimit,
             bridgeItem.txType,
             bridgeItem.vault,
@@ -83,21 +77,21 @@ contract Gateway is BaseGateway {
             sender,
             txItem.token,
             txItem.amount,
-            txItem.to,
+            to,
             bridgeItem.payload
         );
 
         if (bridgeItem.txType == TxType.MIGRATE) {
-            _updateTSS(orderId, bridgeItem.sequence, bridgeItem.payload);
+            _updateTSS(txItem.orderId, bridgeItem.sequence, bridgeItem.payload);
         } else if (bridgeItem.txType == TxType.TRANSFER || bridgeItem.txType == TxType.REFUND) {
             _checkAndMint(txItem.token, txItem.amount);
-            _bridgeTokenIn(orderId, bridgeItem, txItem);
+            _bridgeTokenIn(hash,bridgeItem, txItem);
         } else {
             revert invalid_in_tx_type();
         }
     }
 
-    function _updateTSS(bytes32 orderId, uint256 sequence, bytes memory newVault) internal whenNotPaused nonReentrant {
+    function _updateTSS(bytes32 orderId, uint256 sequence, bytes memory newVault) internal {
         retireTss = activeTss;
         retireTssAddress = activeTssAddress;
         activeTss = newVault;
@@ -107,20 +101,25 @@ contract Gateway is BaseGateway {
         emit UpdateTSS(orderId, retireTss, newVault);
     }
 
-    function _checkSignature(
+    function _checkVaultSignature(
         bytes32 orderId,
-        address vaultAddress,
         bytes calldata signature,
-        BridgeItem memory params
-    ) internal pure returns (bool) {
-        bytes32 hash = _getSignHash(orderId, params);
-        address signer = ECDSA.recover(hash, signature);
-        return signer == vaultAddress;
-    }
+        BridgeItem memory bridgeItem
+    ) internal view returns (bytes32) {
+        address vaultAddr = Utils.getAddressFromPublicKey(bridgeItem.vault);
 
-    function _checkTargetChain(uint256 chainAndGasLimit) internal view {
-        uint256 toChain = (chainAndGasLimit >> 128) & 0xFFFFFFFFFFFFFFFF;
+        bytes32 hash = _getSignHash(orderId, bridgeItem);
+        address signer = ECDSA.recover(hash, signature);
+        if (signer != vaultAddr) revert invalid_signature();
+
+        address tssAddr = (bridgeItem.sequence > retireSequence) ? activeTssAddress : retireTssAddress;
+        if (tssAddr != vaultAddr) revert invalid_vault();
+
+        ( ,uint256 toChain) = _getFromAndToChain(bridgeItem.chainAndGasLimit);
+
         if (toChain != selfChainId) revert invalid_target_chain();
+
+        return (hash);
     }
 
     function _getActiveVault() internal view override returns (bytes memory vault) {

@@ -4,9 +4,7 @@ pragma solidity 0.8.24;
 import {Utils} from "./libs/Utils.sol";
 import {IRelay} from "./interfaces/IRelay.sol";
 import {ITSSManager} from "./interfaces/ITSSManager.sol";
-import {IVaultToken} from "./interfaces/IVaultToken.sol";
 import {IRegistry} from "./interfaces/IRegistry.sol";
-import {IMintableToken} from "./interfaces/IMintableToken.sol";
 import {IGasService} from "./interfaces/IGasService.sol";
 import {IPeriphery} from "./interfaces/IPeriphery.sol";
 import {IVaultManager} from "./interfaces/IVaultManager.sol";
@@ -226,7 +224,7 @@ contract Relay is BaseGateway, IRelay {
 
         BridgeItem memory bridgeItem = txOutItem.bridgeItem;
 
-        uint256 chain = (bridgeItem.chainAndGasLimit >> 128) & 0xFFFFFFFFFFFFFFFF;
+        (, uint256 chain) = _getFromAndToChain(bridgeItem.chainAndGasLimit);
         if(chain == selfChainId) return;
         _updateLastScanBlock(chain, txOutItem.height);
 
@@ -242,7 +240,7 @@ contract Relay is BaseGateway, IRelay {
             usedGas = _getRelayChainGasAmount(chain, txOutItem.gasUsed);
         }
 
-        if (vaultManager.checkVault(txItem.chainType, txItem.chain, bridgeItem.vault)) {
+        if (vaultManager.checkVault(txItem, bridgeItem.vault)) {
             uint256 gasAmount = 0;
             uint256 transferAmount = 0;
 
@@ -279,16 +277,15 @@ contract Relay is BaseGateway, IRelay {
 
 
     // swap: affiliate data | relay data | target data
-    function executeTxIn(TxInItem memory txInItem) external override {
+    function executeTxIn(TxInItem calldata txInItem) external override {
         _checkAccess(4);
-        
+
         if (orderExecuted[txInItem.orderId]) revert Errs.order_executed();
         orderExecuted[txInItem.orderId] = true;
 
         BridgeItem memory bridgeItem = txInItem.bridgeItem;
 
-        uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
-        uint256 toChain = bridgeItem.chainAndGasLimit >> 128 & 0xFFFFFFFFFFFFFFFF;
+        (uint256 fromChain, uint256 toChain) = _getFromAndToChain(bridgeItem.chainAndGasLimit);
 
         _updateLastScanBlock(fromChain, txInItem.height);
 
@@ -300,17 +297,16 @@ contract Relay is BaseGateway, IRelay {
         txItem.chain = fromChain;
         txItem.chainType = periphery.getChainType(fromChain);
 
-        if (!vaultManager.checkVault(txItem.chainType, txItem.chain, bridgeItem.vault)) {
+        if (!vaultManager.checkVault(txItem, bridgeItem.vault)) {
             // refund if vault is retired
             bridgeItem.to = txInItem.refundAddr;
             bridgeItem.payload = bytes("");
-
             return _refund(bridgeItem, txItem, true);
         }
 
         if (bridgeItem.txType == TxType.DEPOSIT) {
-            txItem.to = Utils.fromBytes(bridgeItem.to);
-            _depositIn(txItem, bridgeItem.from, bridgeItem.vault);
+            address to = Utils.fromBytes(bridgeItem.to);
+            _depositIn(txItem, bridgeItem.from, bridgeItem.vault, to);
         } else if (bridgeItem.txType == TxType.TRANSFER) {
             (bytes memory affiliateData, bytes memory relayData, bytes memory targetData) =
                 abi.decode(bridgeItem.payload, (bytes, bytes, bytes));
@@ -426,7 +422,7 @@ contract Relay is BaseGateway, IRelay {
     }
 
     function _bridgeIn(TxItem memory txItem, BridgeItem memory bridgeItem) internal {
-        txItem.to = Utils.fromBytes(bridgeItem.to);
+        address to = Utils.fromBytes(bridgeItem.to);
         emit BridgeIn(
             txItem.orderId,
             bridgeItem.chainAndGasLimit,
@@ -436,10 +432,10 @@ contract Relay is BaseGateway, IRelay {
             msg.sender,
             txItem.token,
             txItem.amount,
-            txItem.to,
+            to,
             bridgeItem.payload
         );
-        _bridgeTokenIn(txItem.orderId, bridgeItem, txItem);
+        _bridgeTokenIn(bytes32(0x00), bridgeItem, txItem);
     }
 
     function _getActiveVault() internal view override returns (bytes memory vault) {
@@ -455,11 +451,10 @@ contract Relay is BaseGateway, IRelay {
         chain: selfChainId,
         chainType: ChainType.CONTRACT,
         token: _outToken,
-        amount: _amount,
-        to: _to});
+        amount: _amount});
         bytes memory vault = vaultManager.getActiveVault();
 
-        _depositIn(txItem,  Utils.toBytes(_from), vault);
+        _depositIn(txItem,  Utils.toBytes(_from), vault, _to);
     }
 
     function _bridgeOut(
@@ -537,10 +532,10 @@ contract Relay is BaseGateway, IRelay {
         _emitRelay(txItem.chain, bridgeItem, txItem, gasInfo);
     }
 
-    function _depositIn(TxItem memory txItem, bytes memory from, bytes memory vault) internal {
-        vaultManager.deposit(txItem, vault);
+    function _depositIn(TxItem memory txItem, bytes memory from, bytes memory vault, address to) internal {
+        vaultManager.deposit(txItem, vault, to);
 
-        emit Deposit(txItem.orderId, txItem.chain, txItem.token, txItem.amount, txItem.to, from);
+        emit Deposit(txItem.orderId, txItem.chain, txItem.token, txItem.amount, to, from);
     }
 
     function _sendToken(address token, uint256 amount, address to, bool handle) internal returns (bool result) {

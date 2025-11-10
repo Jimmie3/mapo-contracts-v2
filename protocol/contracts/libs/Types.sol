@@ -22,7 +22,7 @@ struct TxItem {
     ChainType chainType;
     address token;
     uint256 amount;
-    address to;
+    // address to;
 }
 
 struct GasInfo {

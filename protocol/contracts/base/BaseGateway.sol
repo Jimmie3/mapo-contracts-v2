@@ -14,14 +14,16 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 import {TxType, BridgeItem, TxItem} from "../libs/Types.sol";
-// import {Utils} from "../libs/Utils.sol";
+import {Utils} from "../libs/Utils.sol";
 
 abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUpgradeable {
     address internal constant ZERO_ADDRESS = address(0);
     uint256 internal constant MIN_GAS_FOR_LOG = 20_000;
 
-    uint256 constant MINTABLE_TOKEN = 0x02;
-    uint256 constant BRIDGEABLE_TOKEN = 0x01;
+    uint256 constant TOKEN_BRIDGEABLE = 0x01;
+    uint256 constant TOKEN_MINTABLE = 0x02;
+    uint256 constant TOKEN_BURNFROM = 0x04;
+
 
     uint256 public immutable selfChainId = block.chainid;
 
@@ -68,9 +70,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         bytes data      // migration: new vault
     );
 
-    event BridgeFailed(
-        bytes32 indexed orderId, address token, uint256 amount, bytes from, address to, bytes data, bytes reason
-    );
+    event BridgeFailed(bytes32 indexed orderId, address token, uint256 amount, bytes data, bytes reason);
 
     error transfer_in_failed();
     error transfer_out_failed();
@@ -98,14 +98,27 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         }
     }
 
+    function isOrderExecuted(bytes32 orderId, bool) external view virtual returns (bool) {
+        return orderExecuted[orderId];
+    }
+
+    function isMintable(address _token) external view returns (bool) {
+        return _isMintable(_token);
+    }
+
+    function isBridgeable(address _token) external view returns (bool) {
+        return _isBridgeable(_token);
+    }
+
+
     function deposit(address token, uint256 amount, address to, address refundAddr, uint256 deadline)
-        external
-        payable
-        override
-        whenNotPaused
-        nonReentrant
-        ensure(deadline)
-        returns (bytes32 orderId)
+    external
+    payable
+    override
+    whenNotPaused
+    nonReentrant
+    ensure(deadline)
+    returns (bytes32 orderId)
     {
         require(amount != 0);
         address user = msg.sender;
@@ -120,21 +133,6 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         return orderId;
     }
 
-    function isOrderExecuted(bytes32 orderId, bool) external view virtual returns (bool) {
-        return orderExecuted[orderId];
-    }
-
-    function isMintable(address _token) external view returns (bool) {
-        return _isMintable(_token);
-    }
-
-    function isBridgeable(address _token) external view returns (bool) {
-        return _isBridgeable(_token);
-    }
-
-    function _deposit(bytes32 orderId, address token, uint256 amount, address from, address to, address refundAddr)
-        internal
-        virtual;
 
     function bridgeOut(
         address token,
@@ -174,7 +172,10 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         return orderId;
     }
 
-    function _getActiveVault() internal view virtual returns (bytes memory vault);
+
+    function _deposit(bytes32 orderId, address token, uint256 amount, address from, address to, address refundAddr)
+    internal
+    virtual;
 
     function _bridgeOut(
         bytes32 orderId,
@@ -185,31 +186,33 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         bytes memory payload
     ) internal virtual {}
 
-    function _bridgeTokenIn(bytes32 orderId, BridgeItem memory bridgeItem, TxItem memory txItem) internal {
+    function _bridgeTokenIn(bytes32 hash, BridgeItem memory bridgeItem, TxItem memory txItem) internal {
+        address to = Utils.fromBytes(bridgeItem.to);
 
-        if (txItem.amount > 0 && txItem.to != address(0)) {
-            bool needCall = _needCall(txItem.to, bridgeItem.payload.length);
-            bool result = _safeTransferOut(txItem.token, txItem.to, txItem.amount, needCall);
-            if(result) {
-                if(needCall) {
-                    uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
-                    uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
-                    try IReceiver(txItem.to).onReceived{gas: gasForCall}(
-                        orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
-                    ) {} catch {}
-                }
+        if (txItem.amount > 0 && to != address(0)) {
+            bool needCall = _needCall(to, bridgeItem.payload.length);
+            bool result = _safeTransferOut(txItem.token, to, txItem.amount, needCall);
+            if (result && needCall) {
+                uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
+                uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
+                try IReceiver(to).onReceived{gas: gasForCall}(
+                    txItem.orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
+                ) {} catch {}
+
                 return;
             }
         }
 
-        _bridgeFailed(orderId, bridgeItem,  txItem, bytes("transferFailed"));
+        _bridgeFailed(hash, bridgeItem,  txItem, bytes("transferFailed"));
     }
 
-    function _bridgeFailed(bytes32 orderId, BridgeItem memory param, TxItem memory baseItem, bytes memory reason) internal {
-        bytes32 hash =
-            keccak256(abi.encodePacked(orderId, baseItem.token, baseItem.amount, param.from, baseItem.to, param.payload));
+    function _bridgeFailed(bytes32 hash, BridgeItem memory bridgeItem, TxItem memory txItem, bytes memory reason) internal {
+        if (hash == bytes32(0x00)) {
+            hash = _getSignHash(txItem.orderId, bridgeItem);
+        }
         failedHash[hash] = true;
-        emit BridgeFailed(orderId, baseItem.token, baseItem.amount, param.from, baseItem.to, param.payload, reason);
+        bytes memory bridgeData = abi.encode(bridgeItem);
+        emit BridgeFailed(txItem.orderId, txItem.token, txItem.amount, bridgeData, reason);
     }
 
     function _safeTransferOut(address token, address to, uint256 value, bool needCall) internal returns (bool result) {
@@ -261,6 +264,8 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         if (balanceAfter != (balanceBefore + amount)) revert transfer_in_failed();
     }
 
+    function _getActiveVault() internal view virtual returns (bytes memory vault);
+
     function _getOrderId(address user) internal returns (bytes32 orderId) {
         return keccak256(abi.encodePacked(address(this), selfChainId, user, ++nonce));
     }
@@ -276,6 +281,13 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         if (_isMintable(_token)) {
             IMintableToken(_token).mint(address(this), _amount);
         }
+    }
+
+    function _getFromAndToChain(uint256 chainAndGasLimit) internal pure returns (uint256, uint256) {
+        uint256 fromChain = chainAndGasLimit >> 192;
+        uint256 toChain = chainAndGasLimit >> 128 & 0xFFFFFFFFFFFFFFFF;
+
+        return (fromChain, toChain);
     }
 
     function _getSignHash(bytes32 orderId, BridgeItem memory bridgeItem)
@@ -305,11 +317,15 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     }
 
     function _isMintable(address _token) internal view returns (bool) {
-        return (tokenFeatureList[_token] & MINTABLE_TOKEN) == MINTABLE_TOKEN;
+        return (tokenFeatureList[_token] & TOKEN_MINTABLE) == TOKEN_MINTABLE;
     }
 
     function _isBridgeable(address _token) internal view returns (bool) {
-        return ((tokenFeatureList[_token] & BRIDGEABLE_TOKEN) == BRIDGEABLE_TOKEN);
+        return ((tokenFeatureList[_token] & TOKEN_BRIDGEABLE) == TOKEN_BRIDGEABLE);
+    }
+
+    function _isSupportBurnFrom(address _token) internal view returns (bool) {
+        return ((tokenFeatureList[_token] & TOKEN_BURNFROM) == TOKEN_BURNFROM);
     }
 
     function _needCall(address target, uint256 len) internal view returns (bool) {

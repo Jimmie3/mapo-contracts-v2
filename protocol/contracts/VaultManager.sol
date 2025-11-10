@@ -282,7 +282,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
 
-    function rotate(bytes memory retiringVault, bytes memory activeVault) external override onlyRelay {
+    function rotate(bytes calldata retiringVault, bytes calldata activeVault) external override onlyRelay {
         // todo: check retiring vault
         activeVaultKey = keccak256(activeVault);
         retiringVaultKey = keccak256(retiringVault);
@@ -358,8 +358,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
 
-    function checkVault(ChainType chainType, uint256, bytes calldata vault) external view returns (bool) {
-        if (chainType == ChainType.CONTRACT) {
+    function checkVault(TxItem calldata txItem, bytes calldata vault) external view returns (bool) {
+        if (txItem.chainType == ChainType.CONTRACT) {
             // checked by source gateway contract for a contract chain
             return true;
         }
@@ -399,39 +399,30 @@ contract VaultManager is BaseImplementation, IVaultManager {
         return _getBalanceFeeInfo(fromChain, toChain, token, amount, false, false);
     }
 
-    function bridge(TxItem memory txItem, bytes memory fromVault, uint256 toChain, bool withCall) external override returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo) {
-        VaultFeeRate memory feeRate = vaultFeeRate;
-        uint256 amount = txItem.amount;
-
-        FeeInfo memory feeInfo;
-        uint256 ammVaultFee = _getFee(txItem.amount, feeRate.ammVault);
-
-        feeInfo.vaultFee = _getFee(txItem.amount, feeRate.toVault);
-
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFeeInfo(txItem.chain, toChain, txItem.token, txItem.amount, false, false);
-
-        txItem.amount = _collectVaultAndBalanceFee(txItem,feeInfo, ammVaultFee);
-
+    function bridge(TxItem calldata txItem, bytes calldata fromVault, uint256 toChain, bool withCall) external override returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo) {
         bytes32 vaultKey = keccak256(fromVault);
-        _transferIn(vaultKey, txItem);
+        _updateFromVault(vaultKey, txItem);
 
-        txItem.chain = toChain;
-        txItem.chainType = periphery.getChainType(toChain);
+        TxItem memory txOutItem;
+        txOutItem.token = txItem.token;
+        txOutItem.amount = _collectBridgeFee(txItem,toChain);
+        txOutItem.chain = toChain;
+        txOutItem.chainType = periphery.getChainType(toChain);
 
-        (vaultKey, outAmount, gasInfo) = _chooseVault(txItem, withCall);
+        (vaultKey, outAmount, gasInfo) = _chooseVault(txOutItem, withCall);
         if (vaultKey == NON_VAULT_KEY) {
             // no vault
-            return (false, amount, bytes(""), gasInfo);
+            return (false, txItem.amount, bytes(""), gasInfo);
         }
 
-        _transferOut(vaultKey, txItem,  uint128(outAmount), gasInfo.estimateGas);
+        _updateToVaultPending(vaultKey, txOutItem,  uint128(outAmount), gasInfo.estimateGas);
 
         return (true, outAmount, vaultList[vaultKey].pubkey, gasInfo);
     }
 
     // collect transfer in fee
     // update vault balance
-    function transferIn(TxItem memory txItem, bytes memory fromVault, uint256) external override returns (uint256 outAmount) {
+    function transferIn(TxItem calldata txItem, bytes calldata fromVault, uint256) external override returns (uint256 outAmount) {
         VaultFeeRate memory feeRate = vaultFeeRate;
 
         FeeInfo memory feeInfo;
@@ -442,7 +433,9 @@ contract VaultManager is BaseImplementation, IVaultManager {
         outAmount = _collectVaultAndBalanceFee(txItem, feeInfo, 0);
 
         bytes32 vaultKey = keccak256(fromVault);
-        _transferIn(vaultKey, txItem);
+        _updateFromVault(vaultKey, txItem);
+
+        // todo: update relay chain balance
 
         return txItem.amount;
     }
@@ -466,7 +459,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
             return (false, amount, bytes(""), gasInfo);
         }
 
-        _transferOut(vaultKey, txItem, uint128(outAmount), gasInfo.estimateGas);
+        _updateToVaultPending(vaultKey, txItem, uint128(outAmount), gasInfo.estimateGas);
 
         return (true, outAmount, vaultList[vaultKey].pubkey, gasInfo);
     }
@@ -527,7 +520,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
 
-    function refund(TxItem memory txItem, bytes memory vault, bool fromRetiredVault)
+    function refund(TxItem calldata txItem, bytes calldata vault, bool fromRetiredVault)
     external
     onlyRelay
     returns (uint256, GasInfo memory)
@@ -542,7 +535,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
         bytes32 vaultKey = keccak256(vault);
 
-        _transferIn(vaultKey, txItem);
+        _updateFromVault(vaultKey, txItem);
         if (txItem.amount <= gasInfo.estimateGas) {
             // out of gas, save as reserved fee and return
             reservedFees[txItem.token] += txItem.amount;
@@ -550,24 +543,24 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
 
         uint128 refundAmount = uint128(txItem.amount) - gasInfo.estimateGas;
-        _transferOut(vaultKey, txItem, refundAmount, gasInfo.estimateGas);
+        _updateToVaultPending(vaultKey, txItem, refundAmount, gasInfo.estimateGas);
 
         return (refundAmount, gasInfo);
     }
 
 
-    function deposit(TxItem memory txItem, bytes memory vault)
+    function deposit(TxItem calldata txItem, bytes calldata vault, address to)
     external
     onlyRelay
     {
         bytes32 vaultKey = keccak256(vault);
-        _transferIn(vaultKey, txItem);
+        _updateFromVault(vaultKey, txItem);
 
         IVaultToken vaultToken = IVaultToken(tokenList.get(txItem.token));
 
         // todo: check maximum deposit amount
 
-        vaultToken.deposit(txItem.amount, txItem.to);
+        vaultToken.deposit(txItem.amount, to);
     }
 
     function redeem(address _vaultToken, uint256 _share, address _owner, address _receiver) external override onlyRelay  returns (uint256)  {
@@ -585,12 +578,12 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     // tx out, remove liquidity or swap out
-    function transferComplete(TxItem memory txItem, bytes memory vault, uint256 relayGasUsed, uint256 relayGasEstimated) external override onlyRelay returns (uint256 gas, uint256 amount) {
+    function transferComplete(TxItem calldata txItem, bytes calldata vault, uint256 relayGasUsed, uint256 relayGasEstimated) external override onlyRelay returns (uint256 gas, uint256 amount) {
         bytes32 vaultKey = keccak256(vault);
 
         if (vaultKey != retiringVaultKey && vaultKey != activeVaultKey) revert Errs.invalid_vault();
 
-        _transferComplete(vaultKey, txItem, uint128(relayGasUsed), uint128(relayGasEstimated));
+        _updateToVaultComplete(vaultKey, txItem, uint128(relayGasUsed), uint128(relayGasEstimated));
         if (txItem.chainType == ChainType.CONTRACT) {
             return (relayGasEstimated, txItem.amount);
         }
@@ -603,7 +596,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
 
-    function migrationComplete(TxItem memory txItem, bytes memory fromVault, bytes memory toVault, uint256 estimatedGas, uint256 usedGas)
+    function migrationComplete(TxItem calldata txItem, bytes calldata fromVault, bytes calldata toVault, uint256 estimatedGas, uint256 usedGas)
     external
     override
     onlyRelay returns (uint256 gas, uint256 amount)
@@ -619,8 +612,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
             gas = estimatedGas;
         } else {
             vaultList[vaultKey].isMigrating[txItem.chain] = false;
-            _transferComplete(vaultKey, txItem, uint128(usedGas), uint128(estimatedGas));
-            _transferIn(targetVaultKey, txItem);
+            _updateToVaultComplete(vaultKey, txItem, uint128(usedGas), uint128(estimatedGas));
+            _updateFromVault(targetVaultKey, txItem);
             amount = usedGas;
         }
 
@@ -709,7 +702,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
             txItem.chainType = ChainType.NON_CONTRACT;
             txItem.chain = _chain;
             txItem.token = token;
-            _transferOut(retiringVaultKey, txItem, migrationAmount, estimateGas);
+            _updateToVaultPending(retiringVaultKey, txItem, migrationAmount, estimateGas);
 
             return (false, token, migrationAmount);
         }
@@ -895,10 +888,19 @@ contract VaultManager is BaseImplementation, IVaultManager {
         emit FeeCollected(txItem.orderId, txItem.token, feeInfo.vaultFee, ammVaultFee, balanceFee, feeInfo.incentive);
     }
 
+    function _collectBridgeFee(TxItem calldata txItem, uint256 toChain) internal returns (uint256) {
+        VaultFeeRate memory feeRate = vaultFeeRate;
+        FeeInfo memory feeInfo;
+        uint256 ammVaultFee = _getFee(txItem.amount, feeRate.ammVault);
+        feeInfo.vaultFee = _getFee(txItem.amount, feeRate.toVault);
+        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFeeInfo(txItem.chain, toChain, txItem.token, txItem.amount, false, false);
+
+        return _collectVaultAndBalanceFee(txItem,feeInfo, ammVaultFee);
+    }
 
     // add token balance
-    // add chain and token vault
-    function _transferIn(bytes32 vaultKey, TxItem memory txItem) internal {
+    // add from chain and token vault
+    function _updateFromVault(bytes32 vaultKey, TxItem calldata txItem) internal {
         // todo: check mintable
         if(txItem.chain != selfChainId) vaultList[vaultKey].chains.add(txItem.chain);
 
@@ -915,7 +917,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     // update target vault pending amount, include gas info
-    function _transferOut(bytes32 vaultKey, TxItem memory txItem, uint128 outAmount, uint128 estimateGas) internal {
+    function _updateToVaultPending(bytes32 vaultKey, TxItem memory txItem, uint128 outAmount, uint128 estimateGas) internal {
         // todo: support alt chain on non-contract chain
 
         // todo: check mintable
@@ -929,8 +931,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
     }
 
-    // update balance, remove pending
-    function _transferComplete(bytes32 vaultKey, TxItem memory txItem, uint128 usedGas, uint128 estimateGas) internal{
+    // update target vault balance, remove pending
+    function _updateToVaultComplete(bytes32 vaultKey, TxItem calldata txItem, uint128 usedGas, uint128 estimateGas) internal{
         TokenState storage totalState = tokenStates[txItem.token];
         TokenChainState storage chainState = tokenStates[txItem.token].chainStates[txItem.chain];
 

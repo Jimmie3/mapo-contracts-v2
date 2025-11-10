@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ChainType, TxItem, GasInfo} from "../libs/Types.sol";
+import {TxItem, GasInfo} from "../libs/Types.sol";
 
 interface IVaultManager {
 
@@ -14,15 +14,14 @@ interface IVaultManager {
 
     function checkMigration() external view returns (bool completed, uint256 toMigrateChain);
 
-    function checkVault(ChainType chainType, uint256 fromChain, bytes calldata vault) external view returns (bool);
+    function checkVault(TxItem calldata txItem, bytes calldata vault) external view returns (bool);
 
     function getActiveVault() external view returns (bytes memory);
 
     function getRetiringVault() external view returns (bytes memory);
 
 
-
-    function rotate(bytes memory retiringVault, bytes memory activeVault) external;
+    function rotate(bytes calldata retiringVault, bytes calldata activeVault) external;
 
     function addChain(uint256 chain) external;
 
@@ -31,19 +30,19 @@ interface IVaultManager {
 
     function migrate() external returns (bool completed, TxItem memory txItem, GasInfo memory gasInfo, bytes memory fromVault, bytes memory toVault);
 
-    function refund(TxItem memory txItem, bytes memory vault, bool fromRetiredVault) external returns  (uint256 refundAmount, GasInfo memory gasInfo);
+    function refund(TxItem calldata txItem, bytes calldata vault, bool fromRetiredVault) external returns  (uint256 refundAmount, GasInfo memory gasInfo);
 
-    function deposit(TxItem memory txItem, bytes memory vault) external;
+    function deposit(TxItem calldata txItem, bytes calldata vault, address to) external;
 
     function redeem(address _vaultToken, uint256 _share, address _owner, address _receiver) external returns (uint256 amount);
 
-    function bridge(TxItem memory txItem, bytes memory fromVault, uint256 toChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
+    function bridge(TxItem calldata txItem, bytes calldata fromVault, uint256 toChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
 
-    function transferIn(TxItem memory txItem, bytes memory fromVault, uint256 toChain) external returns (uint256 outAmount);
+    function transferIn(TxItem calldata txItem, bytes calldata fromVault, uint256 toChain) external returns (uint256 outAmount);
 
     function transferOut(TxItem memory txItem, uint256 fromChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
 
-    function transferComplete(TxItem memory txItem, bytes memory vault, uint256 relayGasUsed, uint256 relayGasEstimated) external returns (uint256 gas, uint256 amount);
+    function transferComplete(TxItem calldata txItem, bytes calldata vault, uint256 relayGasUsed, uint256 relayGasEstimated) external returns (uint256 gas, uint256 amount);
 
-    function migrationComplete(TxItem memory txItem, bytes memory fromVault, bytes memory toVault, uint256 estimatedGas, uint256 usedGas) external returns (uint256 gas, uint256 amount);
+    function migrationComplete(TxItem calldata txItem, bytes calldata fromVault, bytes calldata toVault, uint256 estimatedGas, uint256 usedGas) external returns (uint256 gas, uint256 amount);
 }

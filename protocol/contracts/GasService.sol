@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 import {ISwap} from "./interfaces/ISwap.sol";
 import {IGasService} from "./interfaces/IGasService.sol";
 import {IPeriphery} from "./interfaces/IPeriphery.sol";
-import {IRegistry} from "./interfaces/IRegistry.sol";
 import {IHiveSwapV3Quoter} from "./interfaces/IHiveSwapV3Quoter.sol";
 
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";

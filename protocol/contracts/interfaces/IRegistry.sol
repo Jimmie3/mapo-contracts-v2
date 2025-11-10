@@ -8,6 +8,11 @@ interface IRegistry {
     // Get token address on target chain
     function getToChainToken(address _token, uint256 _toChain) external view returns (bytes memory _toChainToken);
 
+    function getTokenInfo(address _relayToken, uint256 _fromChain)
+    external
+    view
+    returns (bytes memory token, uint8 decimals, bool mintable);
+
     // Get token amount on target chain
     function getToChainAmount(address _token, uint256 _amount, uint256 _toChain) external view returns (uint256);
 
@@ -31,42 +36,6 @@ interface IRegistry {
         returns (uint256 toAmount);
 
     function getBaseFeeReceiver() external view returns (address);
-
-    // get from chain fee
-    function getTransferInFee(bytes memory _caller, address _token, uint256 _amount, uint256 _fromChain)
-        external
-        view
-        returns (uint256 bridgeFee);
-
-    // get to chain fee
-    function getTransferOutFee(
-        bytes memory _caller,
-        address _token,
-        uint256 _amount,
-        uint256 _fromChain,
-        uint256 _toChain,
-        bool _withSwap
-    ) external view returns (uint256 totalFee, uint256 baseFee, uint256 bridgeFee);
-
-    // get token transfer fee, the larger one of transfer in or transfer out fee
-    function getTransferFee(
-        bytes memory _caller,
-        address _token,
-        uint256 _amount,
-        uint256 _fromChain,
-        uint256 _toChain,
-        bool _withSwap
-    ) external view returns (uint256 totalFee, uint256 baseFee, uint256 bridgeFee);
-
-    function getBridgeFeeInfo(
-        bytes memory _caller,
-        bytes memory _fromToken,
-        address _bridgeToken,
-        uint256 _fromChain,
-        uint256 _fromAmount,
-        uint256 _toChain,
-        bool _withSwap
-    ) external view returns (uint256 fromChainFee, uint256 toChainVault);
 
     function getChains() external view returns (uint256[] memory);
 

@@ -7,7 +7,7 @@ import {IPeriphery} from "./interfaces/IPeriphery.sol";
 import {IProtocolFee} from "./interfaces/IProtocolFee.sol";
 import {IRegistry} from "./interfaces/IRegistry.sol";
 import {ISwap} from "./interfaces/ISwap.sol";
-import {IAffiliateFeeManager} from "./interfaces/IAffiliateFeeManager.sol";
+// import {IAffiliateFeeManager} from "./interfaces/IAffiliateFeeManager.sol";
 import {IGasService} from "./interfaces/IGasService.sol";
 
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
@@ -22,7 +22,7 @@ contract Periphery is BaseImplementation, IPeriphery {
 
     bytes32 private constant AFFILIATE_ADDRESS_KEY = keccak256("address.affiliate");
     bytes32 private constant SWAP_ADDRESS_KEY = keccak256("address.swap");
-    bytes32 private constant PROTOCOLFEE_ADDRESS_KEY = keccak256("address.protocolfee.manager");
+    bytes32 private constant PROTOCOL_FEE_ADDRESS_KEY = keccak256("address.protocolfee.manager");
 
     address public relay;
     address public gasService;
@@ -132,6 +132,10 @@ contract Periphery is BaseImplementation, IPeriphery {
     }
 
     function getChainGasToken(uint256 _chain) external view returns (address) {
+        return IRegistry(tokenRegistry).getChainGasToken(_chain);
+    }
+
+    function isTokenMintable(uint256 _chain, address relayToken) external view returns (address) {
         return IRegistry(tokenRegistry).getChainGasToken(_chain);
     }
 

@@ -57,6 +57,8 @@ contract Gateway is BaseGateway {
     {
         if (orderExecuted[orderId]) revert order_executed();
 
+        orderExecuted[orderId] = true;
+
         TxItem memory txItem;
 
         BridgeItem memory bridgeItem = abi.decode(params, (BridgeItem));

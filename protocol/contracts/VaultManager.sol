@@ -588,8 +588,9 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
         // save not used gas
         // todo: check usedGas > estimatedGas
-        reservedFees[txItem.token] += (relayGasEstimated - relayGasUsed);
-
+        if(relayGasEstimated > relayGasUsed){
+            reservedFees[txItem.token] += (relayGasEstimated - relayGasUsed);
+        }
         return (0, (txItem.amount + relayGasUsed));
     }
 
@@ -759,11 +760,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     function _checkVaultAllowance(bytes32 vaultKey, TxItem memory txItem) internal view returns (bool) {
         ChainTokenVault storage p = vaultList[vaultKey].chainVaults[txItem.chain].tokenVaults[txItem.token];
         uint128 allowance = p.balance - p.pendingOut;
-        if (allowance >= txItem.amount) {
-            return true;
-        } else {
-            return false;
-        }
+        return (allowance >= txItem.amount);
     }
 
     function _getBalanceChangePercent(uint256 fromChain, uint256 toChain, address token, uint256 amount) internal view returns (int24 deltaPercent) {

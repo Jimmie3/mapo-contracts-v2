@@ -15,4 +15,5 @@ library Errs {
     error migration_not_completed();
     error not_bridge_able();
     error zero_amount_out();
+    error approve_token_failed();
 }

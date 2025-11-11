@@ -47,6 +47,8 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     EnumerableMap.AddressToUintMap internal jailList;
 
+    mapping(address => address) public maintainerToValidator;
+
     error no_access();
     error empty_pubkey();
     error invalid_pubkey();
@@ -62,8 +64,8 @@ contract Maintainers is BaseImplementation, IMaintainers {
     event AddToJail(address m, uint256 jailBlock);
     event DistributeReward(uint256 epoch, address m, uint256 value);
     event Elect(uint256 epochId, address[] maintainers, bool maintainersUpdate);
-    event Update(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
-    event Register(address user, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
+    event Update(address validator, address maintainerAddr, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
+    event Register(address validator, address maintaierAddr, bytes secp256Pubkey, bytes ed25519PubKey, string p2pAddress);
 
     modifier onlyVm() {
         if (msg.sender != address(0)) revert no_access();
@@ -89,35 +91,42 @@ contract Maintainers is BaseImplementation, IMaintainers {
         emit UpdateMaintainerLimit(_limit);
     }
 
-    function register(bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress)
+    function register(address maintainerAddr, bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress)
         external
-    {
-        address user = msg.sender;
-        MaintainerInfo storage info = maintainerInfos[user];
+    {   
+        require(maintainerAddr != address(0));
+        require(maintainerToValidator[maintainerAddr] == address(0));
+        address validator = msg.sender;
+        MaintainerInfo storage info = maintainerInfos[validator];
         require(info.status == MaintainerStatus.UNKNOWN);
-        _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress, user);
-        if (!_isValidator(user)) revert only_validator_can_register();
+        _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress, maintainerAddr);
+        if (!_isValidator(validator)) revert only_validator_can_register();
         info.status = MaintainerStatus.STANDBY;
         info.p2pAddress = p2pAddress;
         info.secp256Pubkey = secp256Pubkey;
         info.ed25519Pubkey = ed25519PubKey;
-        info.account = user;
-        emit Register(user, secp256Pubkey, ed25519PubKey, p2pAddress);
+        info.account = maintainerAddr;
+        maintainerToValidator[maintainerAddr] = validator;
+        emit Register(validator, maintainerAddr, secp256Pubkey, ed25519PubKey, p2pAddress);
     }
 
-    function update(bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress) external {
-        address user = msg.sender;
-        MaintainerInfo storage info = maintainerInfos[user];
+    function update(address maintainerAddr, bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress) external {
+        require(maintainerAddr != address(0));
+        address validator = msg.sender;
+        MaintainerInfo storage info = maintainerInfos[validator];
         require(info.status == MaintainerStatus.STANDBY);
-        _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress, user);
+        _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress, maintainerAddr);
         info.p2pAddress = p2pAddress;
         info.secp256Pubkey = secp256Pubkey;
         info.ed25519Pubkey = ed25519PubKey;
-        emit Update(user, secp256Pubkey, ed25519PubKey, p2pAddress);
+        delete maintainerToValidator[info.account];
+        info.account = maintainerAddr;
+        maintainerToValidator[maintainerAddr] = validator;
+        emit Update(validator, maintainerAddr, secp256Pubkey, ed25519PubKey, p2pAddress);
     }
 
     function heartbeat() external {
-        MaintainerInfo storage info = maintainerInfos[msg.sender];
+        MaintainerInfo storage info = maintainerInfos[maintainerToValidator[msg.sender]];
         require(info.status != MaintainerStatus.UNKNOWN);
         info.lastHeartbeatTime = block.timestamp;
         emit Heartbeat(msg.sender);
@@ -129,20 +138,21 @@ contract Maintainers is BaseImplementation, IMaintainers {
     }
 
     function deregister() external {
-        address user = msg.sender;
-        MaintainerInfo storage info = maintainerInfos[user];
+        address validator = msg.sender;
+        MaintainerInfo storage info = maintainerInfos[validator];
         require(info.status == MaintainerStatus.STANDBY);
         require(info.lastActiveEpoch == 0 || (info.lastActiveEpoch + 1) < currentEpoch);
-        delete maintainerInfos[user];
+        delete maintainerToValidator[info.account];
+        delete maintainerInfos[validator];
 
-        emit Deregister(user);
+        emit Deregister(validator);
     }
 
     function getMaintainerInfos(address[] calldata ms) external view returns(MaintainerInfo[] memory infos) {
         uint256 len = ms.length;
         infos  = new MaintainerInfo[](len);
         for (uint i = 0; i < len; i++) {
-            infos[i] = maintainerInfos[ms[i]];
+            infos[i] = maintainerInfos[maintainerToValidator[ms[i]]];
         }
     }
 
@@ -157,7 +167,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         uint256 jailBlock = block.number + _getParameter(JAIL_BLOCK);
         for (uint i = 0; i < len;) {
             address _maintainer = _maintainers[i];
-            maintainerInfos[_maintainer].status = MaintainerStatus.JAILED;
+            maintainerInfos[maintainerToValidator[_maintainer]].status = MaintainerStatus.JAILED;
             jailList.set(_maintainer, jailBlock);
             emit AddToJail(_maintainer, jailBlock);
             unchecked {
@@ -175,7 +185,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
                 continue;
             }
             jailList.remove(m);
-            maintainerInfos[m].status = MaintainerStatus.STANDBY;
+            maintainerInfos[maintainerToValidator[m]].status = MaintainerStatus.STANDBY;
             emit ReleaseFromJail(m);
         }
     }
@@ -326,7 +336,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
     {
         uint256 len = maintainers.length;
         for (uint256 i = 0; i < len; i++) {
-            MaintainerInfo storage info = maintainerInfos[maintainers[i]];
+            MaintainerInfo storage info = maintainerInfos[maintainerToValidator[maintainers[i]]];
             if(info.status == keep || info.status == MaintainerStatus.REVOKED || info.status == MaintainerStatus.JAILED) continue;
             info.status = target;
         }
@@ -335,7 +345,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
     function _updateMaintainerLastActiveEpoch(uint256 _epoch, address[] memory ms) internal {
         uint256 len = ms.length;
         for (uint256 i = 0; i < len;) {
-            MaintainerInfo storage info = maintainerInfos[ms[i]];
+            MaintainerInfo storage info = maintainerInfos[maintainerToValidator[ms[i]]];
             info.lastActiveEpoch = _epoch;
             unchecked {
                 ++i;
@@ -345,17 +355,17 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     function _chooseMaintainers() internal view returns (address[] memory, uint256) {
         uint256 e = currentEpoch;
-        address[] memory validators = _getCurrentValidatorSigners();
+        address[] memory validators = _getCurrentValidators();
         uint256 length = validators.length;
         uint256 limit = maintainerLimit;
         address[] memory maintainers = new address[](limit);
         uint256 selectedCount;
         ITSSManager m = tssManager;
         for (uint256 i = 0; i < length;) {
-            address validator = validators[i];
+            MaintainerInfo storage info = maintainerInfos[validators[i]];
             // todo: check and sort by stake amount
-            if (_checkCandidacy(m, e, validator)) {
-                maintainers[selectedCount] = validator;
+            if (_checkCandidacy(m, e, info.account, info.status)) {
+                maintainers[selectedCount] = info.account;
                 selectedCount++;
 
                 if (selectedCount == limit) break;
@@ -385,14 +395,14 @@ contract Maintainers is BaseImplementation, IMaintainers {
             );
     }
 
-    function _checkCandidacy(ITSSManager m, uint256 epochId, address v) internal view returns (bool) {
-        MaintainerStatus status = maintainerInfos[v].status;
+    function _checkCandidacy(ITSSManager m, uint256 epochId, address maintainerAddr, MaintainerStatus status) internal view returns (bool) {
+    
         if (status != MaintainerStatus.STANDBY && status != MaintainerStatus.ACTIVE && status != MaintainerStatus.READY) {
             return false;
         }
         // check election epoch point when reelecting
         uint256 checkEpoch = (electionEpoch == 0) ? epochId : electionEpoch;
-        uint256 slashPoint = m.getSlashPoint(checkEpoch, v);
+        uint256 slashPoint = m.getSlashPoint(checkEpoch, maintainerAddr);
         if (slashPoint > _getParameter(MAX_SLASH_POINT_FOR_ELECT)) return false;
 
         return true;
@@ -402,21 +412,30 @@ contract Maintainers is BaseImplementation, IMaintainers {
         bytes calldata secp256Pubkey,
         bytes calldata ed25519PubKey,
         string calldata p2pAddress,
-        address user
+        address maintainerAddr
     ) internal pure {
         if (secp256Pubkey.length == 0 || ed25519PubKey.length == 0) {
             revert empty_pubkey();
         }
         if (bytes(p2pAddress).length == 0) revert empty_p2pAddress();
-        if(_getAddressFromPublicKey(secp256Pubkey) != user) revert invalid_pubkey();
+        if(_getAddressFromPublicKey(secp256Pubkey) != maintainerAddr) revert invalid_pubkey();
     }
 
     function _getAddressFromPublicKey(bytes memory publicKey) internal pure returns (address) {
         return address(uint160(uint256(keccak256(publicKey))));
     }
 
-    function _getCurrentValidatorSigners() internal view returns (address[] memory signers) {
-        signers = IElection(ELECTIONS_ADDRESS).getCurrentValidatorSigners();
+    function _getCurrentValidators() internal view returns (address[] memory validators) {
+        IAccounts account = IAccounts(ACCOUNTS_ADDRESS);
+        address[] memory signers = IElection(ELECTIONS_ADDRESS).getCurrentValidatorSigners();
+        uint256 len = signers.length;
+        validators = new address[](len);
+        for (uint i = 0; i < len;) {
+            validators[i] = account.signerToAccount(signers[i]);
+            unchecked {
+               ++i;
+            }
+        }
     }
 
     function _isValidator(address _user) internal view returns (bool) {

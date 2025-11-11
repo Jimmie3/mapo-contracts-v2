@@ -103,6 +103,12 @@ contract TSSManager is BaseImplementation, ITSSManager {
         return e.status;
     }
 
+    function getMembers(bytes calldata pubkey) external view returns (address[] memory members) {
+        TSSInfo storage e = tssInfos[keccak256(pubkey)];
+        return e.maintainers.values();
+    }
+
+
     function getKeyShare(address m) external view returns(KeyShare memory keyShare) {
         keyShare = keyShares[m];
     }
@@ -219,7 +225,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         TSSInfo storage e = tssInfos[ELECTING_PUBKEY_HASH];
         if(!_checkTssPoolStatus(e)) return;
         _updateKeyShare(user, param.pubkey, param.keyShare);
-        Proposal storage p = proposals[_getUpdateTSSPoolHash(param)];
+        Proposal storage p = proposals[_getUpdateTSSPoolHash(param, e.electBlock)];
         bool keyGen = (param.blames.length == 0);
         uint256 delaySlashPoint;
         if (keyGen) {
@@ -230,7 +236,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
             // keyGen failed
             delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
         }
-        _beforePropose(delaySlashPoint, user, p, e);
+        bool hasErr = _beforePropose(delaySlashPoint, user, p, e);
+        if(hasErr) return;
         if (keyGen) {
             if (!Utils.addressListEq(param.members, e.maintainers.values())) revert invalid_members();
 
@@ -297,7 +304,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
         TSSInfo storage e = tssInfos[activePubkey];
         Proposal storage p = proposals[hash];
         uint256 delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
-        _beforePropose(delaySlashPoint, user, p, e);
+        bool hasErr = _beforePropose(delaySlashPoint, user, p, e);
+        if(hasErr) return;
         if (_consensus(p, e.maintainers.length())) {
             _getRelay().postNetworkFee(chain, height, transactionSize, transactionSizeWithCall, transactionRate);
             _handleConsensus(e.epochId, delaySlashPoint, p, e.maintainers);
@@ -312,14 +320,22 @@ contract TSSManager is BaseImplementation, ITSSManager {
      * while non-participants apply DELAY_SLASH_POINT.
      * If non-participants submit within the specified block range, the DELAY_SLASH_POINT applied after consensus is reverted.
      */
-    function voteTxIn(TxInItem calldata txInItem) external {
+    function voteTxIn(TxInItem[] calldata txInItems) external {
+        uint256 len = txInItems.length;
+        for (uint i = 0; i < len; i++) {
+            _voteTxIn(txInItems[i]);
+        }
+    }
+
+    function _voteTxIn(TxInItem calldata txInItem) internal {
         bytes32 hash = _getTxInItemHash(txInItem);
         address user = msg.sender;
         bytes32 tssKey = keccak256(txInItem.bridgeItem.vault);
         TSSInfo storage e = tssInfos[tssKey];
         Proposal storage p = proposals[hash];
         uint256 delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
-        _beforePropose(delaySlashPoint, user, p, e);
+        bool hasErr = _beforePropose(delaySlashPoint, user, p, e);
+        if(hasErr) return;
         if (_consensus(p, e.maintainers.length())) {
             _getRelay().executeTxIn(txInItem);
             _handleConsensus(e.epochId, delaySlashPoint, p, e.maintainers);
@@ -335,7 +351,14 @@ contract TSSManager is BaseImplementation, ITSSManager {
      * If non-participants submit within the specified block range, the DELAY_SLASH_POINT applied after consensus is reverted.
      * if TxOutType is MIGRATE add jail block to users who non-participants submit within the specified block range.
      */
-    function voteTxOut(TxOutItem calldata txOutItem) external {
+    function voteTxOut(TxOutItem[] calldata txOutItems) external {
+        uint256 len = txOutItems.length;
+        for (uint i = 0; i < len; i++) {
+            _voteTxOut(txOutItems[i]);
+        }
+    }
+
+    function _voteTxOut(TxOutItem calldata txOutItem) internal {
         bytes32 hash = _getTxOutItemHash(txOutItem);
         address user = msg.sender;
         bytes32 tssKey = keccak256(txOutItem.bridgeItem.vault);
@@ -347,7 +370,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
         } else {
             delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
         }
-        _beforePropose(delaySlashPoint, user, p, e);
+        bool hasErr = _beforePropose(delaySlashPoint, user, p, e);
+        if(hasErr) return;
         if (_consensus(p, e.maintainers.length())) {
             p.consensusBlock = _getBlock();
             _getRelay().executeTxOut(txOutItem);
@@ -398,10 +422,10 @@ contract TSSManager is BaseImplementation, ITSSManager {
         address maintainer,
         Proposal storage p,
         TSSInfo storage e
-    ) internal {
+    ) internal returns(bool){
         if (!e.maintainers.contains(maintainer)) revert no_access();
 
-        if (p.proposed[maintainer]) revert already_propose();
+        if (p.proposed[maintainer]) return true;
         p.proposed[maintainer] = true;
         p.count += 1;
         if (p.consensusBlock == 0) {
@@ -414,6 +438,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
                 _subSlashPoint(e.epochId, maintainer, delayRecoverPoint);
             }
         }
+        return false;
     }
 
     function _handleConsensus(
@@ -465,8 +490,8 @@ contract TSSManager is BaseImplementation, ITSSManager {
         return p.consensusBlock == 0 && (p.count > ((maintainerCount * 2) / 3));
     }
 
-    function _getUpdateTSSPoolHash(TssPoolParam calldata param) internal pure returns (bytes32 hash) {
-        hash = keccak256(abi.encodePacked(param.epoch, param.pubkey, param.members, param.epoch, param.blames));
+    function _getUpdateTSSPoolHash(TssPoolParam calldata param, uint256 electBlock) internal pure returns (bytes32 hash) {
+        hash = keccak256(abi.encodePacked(param.epoch, param.pubkey, param.members, electBlock, param.blames));
     }
 
     function _getTxInItemHash(TxInItem calldata txInItem) internal pure returns (bytes32) {

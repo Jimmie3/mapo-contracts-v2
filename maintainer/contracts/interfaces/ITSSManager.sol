@@ -72,6 +72,8 @@ interface ITSSManager {
 
     function getTSSStatus(uint256 epochId) external view returns (TSSStatus status);
 
+    function getMembers(bytes calldata pubkey) external view returns (address[] memory members);
+
     function getSlashPoint(uint256 epoch, address m) external view returns (uint256 point);
 
     function batchGetSlashPoint(uint256 epoch, address[] calldata ms) external view returns (uint256[] memory points);

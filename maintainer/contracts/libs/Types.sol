@@ -31,14 +31,14 @@ struct BridgeItem {
 struct TxInItem {
     bytes32 orderId;
     BridgeItem bridgeItem;
-    uint128 height;
+    uint64 height;
     bytes refundAddr;
 }
 
 struct TxOutItem {
     bytes32 orderId;
     BridgeItem bridgeItem;
-    uint128 height;
+    uint64 height;
     uint128 gasUsed;
     address sender;
 }

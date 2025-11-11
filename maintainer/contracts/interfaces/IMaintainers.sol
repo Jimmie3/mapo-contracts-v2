@@ -33,8 +33,8 @@ interface IMaintainers {
 
     function orchestrate() external;
 
-    function register(bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress) external;
-    function update(bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress) external;
+    function register(address maintainerAddr, bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress) external;
+    function update(address maintainerAddr, bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress) external;
     function revoke() external;
     function deregister() external;
 

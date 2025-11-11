@@ -8,13 +8,23 @@ import {TSSManager} from "../../contracts/TSSManager.sol";
 
 
 contract DeployAndSetUp is BaseScript {
-    function run() public virtual broadcast returns (Parameters parameters, Maintainers maintainers, TSSManager manager) {
+     
+    function run() public virtual broadcast {
+          deploy();
+          set();
+    } 
+
+    function deploy() internal returns (Parameters parameters, Maintainers maintainers, TSSManager manager) {
         string memory networkName = getNetworkName();
         address authority = readConfigAddr(networkName, "Authority");
         console.log("Authority address:", authority);
         parameters = deployParameters(networkName, authority);
         maintainers = deployMaintainer(networkName, authority);
         manager = deployTSSManager(networkName, authority);
+    }
+
+    function set() internal {
+        string memory networkName = getNetworkName();
         setUp(networkName);
         setUpParameters(networkName);
     }
@@ -72,41 +82,41 @@ contract DeployAndSetUp is BaseScript {
     }
 
    function setUpParameters(string memory networkName) internal {
-     address parameters_addr = readConfigAddr(networkName, "Parameters");
-     Parameters p = Parameters(parameters_addr);
-     string memory json = vm.readFile("config/parameters.json");
-     bytes memory data = vm.parseJson(json);
-     Config[] memory configs = abi.decode(data, (Config[]));
-     for (uint i = 0; i < configs.length; i++) {
-          console.log("Key: %s, Value: %s", configs[i].key, configs[i].value);
-          p.set(configs[i].key, configs[i].value);
-     }
+          address parameters_addr = readConfigAddr(networkName, "Parameters");
+          Parameters p = Parameters(parameters_addr);
+          string memory json = vm.readFile("config/parameters.json");
+          bytes memory data = vm.parseJson(json);
+          Config[] memory configs = abi.decode(data, (Config[]));
+          for (uint i = 0; i < configs.length; i++) {
+               console.log("Key: %s, Value: %s", configs[i].key, configs[i].value);
+               p.set(configs[i].key, configs[i].value);
+          }
    }
 
    function upgrade(string memory c) internal {
-     string memory networkName = getNetworkName();
-     if(keccak256(bytes(c)) == keccak256(bytes("Parameters"))){
-          address parameters_addr = readConfigAddr(networkName, "Parameters");
-          Parameters p = Parameters(parameters_addr);
-          Parameters impl = new Parameters();
-          p.upgradeToAndCall(address(impl), bytes(""));
-     } else if(keccak256(bytes(c)) == keccak256(bytes("Maintainers"))) {
-          address Maintainers_addr = readConfigAddr(networkName, "Maintainers");
-          Maintainers maintainer = Maintainers(payable(Maintainers_addr));
-          Maintainers impl = new Maintainers();
-          maintainer.upgradeToAndCall(address(impl), bytes(""));
-     } else {
-          address manager_addr = readConfigAddr(networkName, "TSSManager");
-          TSSManager manager = TSSManager(manager_addr);
-          TSSManager impl = new TSSManager();
-          manager.upgradeToAndCall(address(impl), bytes(""));
-     }
+          string memory networkName = getNetworkName();
+          if(keccak256(bytes(c)) == keccak256(bytes("Parameters"))){
+               address parameters_addr = readConfigAddr(networkName, "Parameters");
+               Parameters p = Parameters(parameters_addr);
+               Parameters impl = new Parameters();
+               p.upgradeToAndCall(address(impl), bytes(""));
+          } else if(keccak256(bytes(c)) == keccak256(bytes("Maintainers"))) {
+               address Maintainers_addr = readConfigAddr(networkName, "Maintainers");
+               Maintainers maintainer = Maintainers(payable(Maintainers_addr));
+               Maintainers impl = new Maintainers();
+               maintainer.upgradeToAndCall(address(impl), bytes(""));
+          } else {
+               address manager_addr = readConfigAddr(networkName, "TSSManager");
+               TSSManager manager = TSSManager(manager_addr);
+               TSSManager impl = new TSSManager();
+               manager.upgradeToAndCall(address(impl), bytes(""));
+          }
    } 
 
    function updateMaintainerLimit(uint256 limit) internal {
-     string memory networkName = getNetworkName();
-     address Maintainers_addr = readConfigAddr(networkName, "Maintainers");
-     Maintainers maintainer = Maintainers(payable(Maintainers_addr));
-     maintainer.updateMaintainerLimit(limit);
+          string memory networkName = getNetworkName();
+          address Maintainers_addr = readConfigAddr(networkName, "Maintainers");
+          Maintainers maintainer = Maintainers(payable(Maintainers_addr));
+          maintainer.updateMaintainerLimit(limit);
    }
 }

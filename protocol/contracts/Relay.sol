@@ -217,6 +217,8 @@ contract Relay is BaseGateway, IRelay {
 
         if (outOrderExecuted[txOutItem.orderId]) revert Errs.order_executed();
 
+        outOrderExecuted[txOutItem.orderId] = true;
+
         BridgeItem memory bridgeItem = txOutItem.bridgeItem;
 
         uint256 chain = (bridgeItem.chainAndGasLimit >> 128) & 0xFFFFFFFFFFFFFFFF;
@@ -270,14 +272,13 @@ contract Relay is BaseGateway, IRelay {
         );
     }
 
-    // payload |1byte affiliate count| n * 2 byte affiliateId + 2 byte fee rate| 2 byte relayOutToken|
-    // 30 byte relayMinAmountOut| target call data|
 
     // swap: affiliate data | relay data | target data
     function executeTxIn(TxInItem memory txInItem) external override {
-        if (orderExecuted[txInItem.orderId]) revert Errs.order_executed();
-
         _checkAccess(4);
+        
+        if (orderExecuted[txInItem.orderId]) revert Errs.order_executed();
+        orderExecuted[txInItem.orderId] = true;
 
         BridgeItem memory bridgeItem = txInItem.bridgeItem;
 
@@ -351,8 +352,9 @@ contract Relay is BaseGateway, IRelay {
     function _swap(address tokenIn, uint256 amountInt, bytes memory payload) internal returns (address , uint256) {
         (address tokenOut, uint256 amountOutMin) = abi.decode(payload, (address, uint256));
         ISwap swap = ISwap(periphery.getSwap());
-        // todo: approve or send token to swap
+        _approveToken(tokenIn, amountInt, address(swap));
         uint amountOut = swap.swap(tokenIn, amountInt, tokenOut, amountOutMin);
+        _transferFromToken(address(swap), tokenOut, amountOut, address(this));
         return (tokenOut, amountOut);
     }
 
@@ -535,6 +537,13 @@ contract Relay is BaseGateway, IRelay {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, amount));
         result = (success && (data.length == 0 || abi.decode(data, (bool))));
         if (!handle && !result) revert Errs.transfer_token_out_failed();
+    }
+
+    function _approveToken(address token, uint256 amount, address spender) internal {
+        // bytes4(keccak256(bytes('approve(address,uint256)')));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x095ea7b3, spender, amount));
+        bool result = (success && (data.length == 0 || abi.decode(data, (bool))));
+        if (!result) revert Errs.approve_token_failed();
     }
 
 

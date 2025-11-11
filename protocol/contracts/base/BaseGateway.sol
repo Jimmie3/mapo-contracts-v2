@@ -190,13 +190,14 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         if (txItem.amount > 0 && txItem.to != address(0)) {
             bool needCall = _needCall(txItem.to, bridgeItem.payload.length);
             bool result = _safeTransferOut(txItem.token, txItem.to, txItem.amount, needCall);
-            if (result && needCall) {
-                uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
-                uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
-                try IReceiver(txItem.to).onReceived{gas: gasForCall}(
-                    orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
-                ) {} catch {}
-
+            if(result) {
+                if(needCall) {
+                    uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
+                    uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
+                    try IReceiver(txItem.to).onReceived{gas: gasForCall}(
+                        orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
+                    ) {} catch {}
+                }
                 return;
             }
         }
@@ -228,9 +229,10 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
             }
             result = (success && (data.length == 0 || abi.decode(data, (bool))));
         } else {
-            // bytes4(keccak256(bytes('transfer(address,uint256)')));  transfer
-            (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, value));
-            result = (success && (data.length == 0 || abi.decode(data, (bool))));
+            uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+            token.call(abi.encodeWithSelector(0xa9059cbb, to, value));
+            uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+            result = (balanceBefore == (balanceAfter + value));
         }
     }
 
@@ -246,17 +248,17 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
             }
         } else {
             outToken = token;
-            uint256 balanceBefore = IERC20(token).balanceOf(to);
-            // bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));  transferFrom
-            (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, to, value));
-            if (!success || (data.length != 0 && !abi.decode(data, (bool)))) {
-                revert transfer_in_failed();
-            }
-            uint256 balanceAfter = IERC20(token).balanceOf(to);
-            if (balanceAfter - balanceBefore != value) revert transfer_in_failed();
-
+            _transferFromToken(from, token, value, to);
             _checkAndBurn(outToken, value);
         }
+    }
+
+    function _transferFromToken(address from, address token, uint256 amount, address receiver) internal {
+        uint256 balanceBefore = IERC20(token).balanceOf(receiver);
+        // bytes4(keccak256(bytes('transferFrom(address,address,uint256)'))); transferFrom
+        token.call(abi.encodeWithSelector(0x23b872dd, from, receiver, amount));
+        uint256 balanceAfter = IERC20(token).balanceOf(receiver);
+        if (balanceAfter != (balanceBefore + amount)) revert transfer_in_failed();
     }
 
     function _getOrderId(address user) internal returns (bytes32 orderId) {

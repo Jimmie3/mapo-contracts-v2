@@ -105,7 +105,7 @@ interface IVaultManager {
      * @return toVault The selected target vault public key on destination chain
      * @return gasInfo Gas information for the destination chain transaction
      */
-    function transferOut(TxItem memory txItem, uint256 fromChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
+    function transferOut(TxItem calldata txItem, uint256 fromChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
 
     /**
      * @notice Update vault state after transfer is confirmed on destination chain

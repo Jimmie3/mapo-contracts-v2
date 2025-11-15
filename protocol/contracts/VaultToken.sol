@@ -16,6 +16,11 @@ contract VaultToken is ERC4626Upgradeable, BaseImplementation {
     event VaultIncreased(address indexed token, uint256 feeAmount, uint256 totalValue);
     event VaultDecreased(address indexed token, uint256 feeAmount, uint256 totalValue);
 
+    modifier onlyManager() {
+        if (msg.sender != vaultManager) revert only_manager_role();
+        _;
+    }
+
     function initialize(address _defaultAdmin, address _token, string memory name_, string memory symbol_) public initializer {
         __BaseImplementation_init(_defaultAdmin);
         __ERC4626_init(IERC20(_token));
@@ -27,18 +32,12 @@ contract VaultToken is ERC4626Upgradeable, BaseImplementation {
     }
 
 
-    function increaseVault(uint256 assets) external {
-        if (_msgSender() != vaultManager) {
-            revert only_manager_role();
-        }
+    function increaseVault(uint256 assets) external onlyManager {
         balance += assets;
         emit VaultIncreased(asset(), assets, balance);
     }
 
-    function decreaseVault(uint256 assets) external {
-        if (_msgSender() != vaultManager) {
-            revert only_manager_role();
-        }
+    function decreaseVault(uint256 assets) external onlyManager {
         balance -= assets;
         emit VaultDecreased(asset(), assets, balance);
     }
@@ -46,7 +45,6 @@ contract VaultToken is ERC4626Upgradeable, BaseImplementation {
     function totalAssets() public view override returns (uint256) {
         return balance;
     }
-
 
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
         if (caller != vaultManager) {

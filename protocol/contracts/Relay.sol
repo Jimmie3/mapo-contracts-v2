@@ -25,6 +25,7 @@ contract Relay is BaseGateway, IRelay {
     mapping(uint256 => uint256) private chainSequence;
     mapping(uint256 => uint256) private chainLastScanBlock;
 
+    // todo: save in/out tx hash?
     mapping(bytes32 => bool) private outOrderExecuted;
 
     IPeriphery public periphery;
@@ -226,6 +227,7 @@ contract Relay is BaseGateway, IRelay {
 
         (, uint256 chain) = _getFromAndToChain(bridgeItem.chainAndGasLimit);
         if(chain == selfChainId) return;
+
         _updateLastScanBlock(chain, txOutItem.height);
 
         TxItem memory txItem;
@@ -241,18 +243,18 @@ contract Relay is BaseGateway, IRelay {
         }
 
         if (vaultManager.checkVault(txItem, bridgeItem.vault)) {
-            uint256 gasAmount = 0;
+            uint256 gasForSender = 0;
             uint256 transferAmount = 0;
 
             (txItem.token, txItem.amount) = _getRelayTokenAndAmount(chain, bridgeItem.token, bridgeItem.amount);
 
             if (bridgeItem.txType == TxType.MIGRATE) {
-                (gasAmount, transferAmount) = vaultManager.migrationComplete(txItem, bridgeItem.vault, bridgeItem.payload, order.estimateGas, usedGas);
+                (gasForSender, transferAmount) = vaultManager.migrationComplete(txItem, bridgeItem.vault, bridgeItem.payload, uint128(usedGas), order.estimateGas);
             } else {
-                (gasAmount, transferAmount) = vaultManager.transferComplete(txItem, bridgeItem.vault, usedGas, order.estimateGas);
+                (gasForSender, transferAmount) = vaultManager.transferComplete(txItem, bridgeItem.vault, uint128(usedGas), order.estimateGas);
             }
-            if (gasAmount > 0) {
-                _sendToken(txItem.token, gasAmount, txOutItem.sender, true);
+            if (gasForSender > 0) {
+                _sendToken(txItem.token, gasForSender, txOutItem.sender, true);
             }
             if (transferAmount > 0) {
                 _checkAndBurn(txItem.token, transferAmount);
@@ -262,7 +264,7 @@ contract Relay is BaseGateway, IRelay {
             // refund from retired vault on non-contract vault
         }
 
-        delete orderInfos[txItem.orderId];
+        delete orderInfos[txOutItem.orderId];
 
         emit BridgeCompleted(
             txOutItem.orderId,
@@ -359,7 +361,7 @@ contract Relay is BaseGateway, IRelay {
         return (tokenOut, amountOut);
     }
 
-    function execute(BridgeItem memory bridgeItem, TxItem memory txItem, uint256 toChain, bytes memory relayPayload, bytes memory targetPayload) public returns (uint256) {
+    function execute(BridgeItem calldata bridgeItem, TxItem calldata txItem, uint256 toChain, bytes calldata relayPayload, bytes calldata targetPayload) public returns (uint256) {
         require(msg.sender == address(this));
         return _executeInternal(bridgeItem, txItem, toChain, relayPayload, targetPayload);
     }
@@ -393,10 +395,8 @@ contract Relay is BaseGateway, IRelay {
             }
         } else {
             // 1 collect vault fee and balance fee
-
             // 2.1 calculate to chain gas fee
             // 2.2 choose to chain vault
-
             // 3 update from chain and to chain vault
             (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.bridge(txItem,bridgeItem.vault,  toChain,targetPayload.length > 0);
             if (!choose) {

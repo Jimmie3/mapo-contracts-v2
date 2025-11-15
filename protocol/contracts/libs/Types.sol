@@ -3,9 +3,12 @@ pragma solidity ^0.8.0;
 
 uint256 constant MAX_RATE_UNIT = 1_000_000;         // unit is 0.01 bps
 
+
 enum ChainType {
-    CONTRACT,
-    NON_CONTRACT
+    CONTRACT,       // smart contract chain supports a general-purpose smart contract virtual machine (e.g., EVM, WASM).
+    NATIVE          // native chain refers to a blockchain that provides only built-in, native functionality,
+                    // such as basic account operations, asset transfers, or a fixed scripting system.
+                    // typical native chain includes Bitcoin (BTC), Litecoin (LTC), Dogecoin (DOGE), Zcash (ZEC), XRP Ledger (XR), etc.
 }
 
 enum TxType {
@@ -36,7 +39,8 @@ struct BridgeItem {
     bytes vault;
     TxType txType;
     uint256 sequence;
-    bytes token;
+    bytes token;            // token address on the destination chain
+                            // if migration, will be gas token
     uint256 amount;
     bytes from;
     bytes to;

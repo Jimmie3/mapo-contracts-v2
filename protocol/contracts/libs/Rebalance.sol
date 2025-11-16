@@ -116,7 +116,7 @@ library Rebalance {
             // get a fix swapOut balance fee
             rate = balanceFeeRate.fixedToBalance;
         } else {
-            if (info.wt == 0) {
+            if (info.wt == 0 || (info.wx == 0 && info.wy == 0)) {
                 // not set chain weight, will collect fix balance fee
                 rate = balanceFeeRate.fixedFromBalance + balanceFeeRate.fixedToBalance;
             } else {

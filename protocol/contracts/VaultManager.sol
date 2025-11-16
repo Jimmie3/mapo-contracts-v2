@@ -464,7 +464,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         txOutItem.chain = toChain;
         txOutItem.chainType = periphery.getChainType(toChain);
 
-        txOutItem.amount = _collectBridgeFee(txItem,toChain);
+        txOutItem.amount = _collectFee(txItem.orderId, txItem.chain, toChain, txItem.token, txItem.amount, false, false);
 
         uint256 totalOutAmount;
         (vaultKey, outAmount, totalOutAmount, gasInfo) = _chooseVault(txOutItem, withCall);
@@ -486,14 +486,14 @@ contract VaultManager is BaseImplementation, IVaultManager {
         bytes32 vaultKey = keccak256(fromVault);
         _updateFromVault(vaultKey, txItem, false);
 
-        outAmount = _collectTransferInFee(txItem);
+        outAmount = _collectFee(txItem.orderId, txItem.chain, selfChainId, txItem.token, txItem.amount, true, false);
 
         return outAmount;
     }
 
     function transferOut(TxItem calldata txItem, uint256, bool withCall) external override returns (bool choose, uint256 outAmount, bytes memory vault, GasInfo memory gasInfo) {
         TxItem memory txOutItem = txItem;
-        txOutItem.amount = _collectTransferOutFee(txItem);
+        txOutItem.amount = _collectFee(txItem.orderId, selfChainId, txItem.chain,  txItem.token, txItem.amount, false, true);
 
         bytes32 vaultKey;
         uint256 totalOutAmount;
@@ -524,7 +524,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
         bytes32 vaultKey = keccak256(vault);
         _updateFromVault(vaultKey, txItem, false);
 
-        uint256 outAmount = _collectRefundFee(txItem);
+        uint256 outAmount = _collectFee(txItem.orderId, selfChainId, txItem.chain,  txItem.token, txItem.amount, false, true);
+
         if (outAmount <= gasInfo.estimateGas) {
             // out of gas, save as reserved fee and return
             reservedFees[txItem.token] += outAmount;
@@ -562,7 +563,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         address redeemToken = vaultToken.asset();
         uint256 redeemAmount = vaultToken.redeem(_share, _receiver, _owner);
 
-        uint256 outAmount = _collectRedeemFee(redeemToken, redeemAmount);
+        uint256 outAmount = _collectFee(bytes32(0x00), selfChainId, selfChainId, redeemToken, redeemAmount, true, false);
 
         _updateToVaultPending(activeVaultKey, ChainType.CONTRACT,  selfChainId,  redeemToken, uint128(outAmount), false);
 
@@ -742,7 +743,9 @@ contract VaultManager is BaseImplementation, IVaultManager {
         uint256 balanceFee = feeInfo.balanceFee;
         IVaultToken vaultToken = IVaultToken(tokenList.get(token));
         // todo: check vault token exist
-        vaultToken.increaseVault(feeInfo.vaultFee);
+        if (feeInfo.vaultFee > 0) {
+            vaultToken.increaseVault(feeInfo.vaultFee);
+        }
 
         if (feeInfo.incentive) {
             if (feeInfo.balanceFee >= balanceFees[token]) {
@@ -761,68 +764,23 @@ contract VaultManager is BaseImplementation, IVaultManager {
         emit FeeCollected(orderId, token, feeInfo.vaultFee, feeInfo.ammFee, balanceFee, feeInfo.incentive);
     }
 
-    function _collectBridgeFee(TxItem calldata txItem, uint256 toChain) internal returns (uint256) {
+    function _collectFee(bytes32 orderId, uint256 fromChain, uint256 toChain, address token, uint256 amount, bool isSwapIn, bool isSwapOut) internal returns (uint256) {
         FeeInfo memory feeInfo;
 
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(txItem.chain, toChain, txItem.token, txItem.amount, false, false);
+        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(fromChain, toChain, token, amount, isSwapIn, isSwapOut);
         if (!feeInfo.incentive) {
             // will not collect vault fee when rebalance incentive
-            feeInfo.ammFee = _getFee(txItem.amount, vaultFeeRate.ammVault);
-            feeInfo.vaultFee = _getFee(txItem.amount, vaultFeeRate.toVault);
+            if (isSwapIn) {
+                feeInfo.vaultFee = _getFee(amount, vaultFeeRate.fromVault);
+            } else if (isSwapOut) {
+                feeInfo.vaultFee = _getFee(amount, vaultFeeRate.toVault);
+            } else {
+                feeInfo.ammFee = _getFee(amount, vaultFeeRate.ammVault);
+                feeInfo.vaultFee = _getFee(amount, vaultFeeRate.toVault);
+            }
         }
 
-        return _collectVaultAndBalanceFee(txItem.orderId, txItem.token,txItem.amount, feeInfo);
-    }
-
-    function _collectTransferInFee(TxItem calldata txItem) internal returns (uint256) {
-        FeeInfo memory feeInfo;
-
-        // get a fix swapIn balance fee
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(txItem.chain, selfChainId, txItem.token, txItem.amount, true, false);
-        if (!feeInfo.incentive) {
-            // will not collect vault fee when rebalance incentive
-            feeInfo.vaultFee = _getFee(txItem.amount, vaultFeeRate.fromVault);
-        }
-
-        return _collectVaultAndBalanceFee(txItem.orderId, txItem.token,txItem.amount, feeInfo);
-    }
-
-    function _collectTransferOutFee(TxItem calldata txItem) internal returns (uint256) {
-        FeeInfo memory feeInfo;
-        // get a fix swapOut balance fee
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(selfChainId, txItem.chain, txItem.token, txItem.amount, false, true);
-        if (!feeInfo.incentive) {
-            // will not collect vault fee when rebalance incentive
-            feeInfo.vaultFee = _getFee(txItem.amount, vaultFeeRate.toVault);
-        }
-
-        return _collectVaultAndBalanceFee(txItem.orderId, txItem.token,txItem.amount, feeInfo);
-    }
-
-    function _collectRefundFee(TxItem calldata txItem) internal returns (uint256) {
-        FeeInfo memory feeInfo;
-        // get a fix refund balance fee
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(selfChainId, txItem.chain, txItem.token, txItem.amount, false, true);
-        if (!feeInfo.incentive) {
-            // will not collect vault fee when rebalance incentive
-            feeInfo.ammFee = _getFee(txItem.amount, vaultFeeRate.ammVault);
-            feeInfo.vaultFee = _getFee(txItem.amount, vaultFeeRate.toVault);
-        }
-
-        return _collectVaultAndBalanceFee(txItem.orderId, txItem.token,txItem.amount, feeInfo);
-    }
-
-    function _collectRedeemFee(address token, uint256 amount) internal returns (uint256) {
-        FeeInfo memory feeInfo;
-        // get a fix redeem balance fee
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(selfChainId, selfChainId, token, amount, true, false);
-        if (!feeInfo.incentive) {
-            // will not collect vault fee when rebalance incentive
-            feeInfo.ammFee = _getFee(amount, vaultFeeRate.ammVault);
-            feeInfo.vaultFee = _getFee(amount, vaultFeeRate.toVault);
-        }
-
-        return _collectVaultAndBalanceFee(bytes32(0), token, amount, feeInfo);
+        return _collectVaultAndBalanceFee(orderId, token,amount, feeInfo);
     }
 
     // add token balance

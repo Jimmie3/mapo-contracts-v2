@@ -10,12 +10,12 @@ import {IVaultManager} from "./interfaces/IVaultManager.sol";
 import {ChainType, TxItem, GasInfo} from "./libs/Types.sol";
 import {Errs} from "./libs/Errors.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 import {IPeriphery} from "./interfaces/IPeriphery.sol";
+import {Rebalance} from "./libs/Rebalance.sol";
 
 /**
  * @title VaultManager
@@ -101,9 +101,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     uint256 constant MAX_RATE_UNIT = 1_000_000;         // unit is 0.01 bps
 
-    int24 constant MAX_BALANCE_CHANGE = 600000;         // 60%
-    int24 constant MIN_BALANCE_CHANGE = -600000;        // -60%
-
     uint128 private constant MAX_MIGRATION_AMOUNT = 3;
     bytes32 private constant NON_VAULT_KEY = bytes32(0x00);
 
@@ -123,27 +120,11 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     struct VaultFeeRate {
-        uint24  ammVault;           // the vault fee to amm
-        uint24  fromVault;          // the vault fee to swap in token
-        uint24  toVault;            // the vault fee to bridge/swap out token
+        uint32  ammVault;           // the vault fee to amm
+        uint32  fromVault;          // the vault fee to swap in token
+        uint32  toVault;            // the vault fee to bridge/swap out token
 
         uint160 reserved;            // reserved for future use
-    }
-
-    struct BalanceFeeRate {
-        uint24 balanceThreshold;    // balance fee calculation threshold
-
-        int24  fixedFromBalance;    // a fixed balance fee for source chain transfer, mostly is zero
-        int24  fixedToBalance;      // the fixed balance fee for target chain transfer
-        int24  minBalance;          // the min balance fee, it might be a negative value
-        int24  maxBalance;          // the max balance fee, it might be a negative value
-
-        uint96 reserved;            // reserved for future use
-    }
-
-    struct TokenBalance {
-        uint128 balance;
-        uint128 pendingOut;
     }
 
     struct ChainTokenVault {
@@ -172,7 +153,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     // not used for mintable token
     struct TokenChainState {
-        uint24 weight;              // chain weight for target balance
+        uint32 weight;              // chain weight for target balance
         uint128 minAmount;          // minimum migration amount
         uint128 reserved;           // reserved for transfer out
         uint128 maxCredit;          // reserved
@@ -181,8 +162,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     struct TokenState {
-        uint24 deltaSMax;
-        uint24 totalWeight;
+        uint32 deltaSMax;
+        uint32 totalWeight;
         uint128 balance;
         uint128 pendingOut;
 
@@ -193,7 +174,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     IPeriphery public periphery;
 
     VaultFeeRate public vaultFeeRate;
-    BalanceFeeRate public balanceFeeRate;
+    Rebalance.BalanceFeeRate public balanceFeeRate;
 
     // only one active vault and one retiring vault at a time
     // after migration, only one active vault, no retiring vault
@@ -222,12 +203,12 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     event FeeCollected(bytes32 indexed orderId, address token, uint256 vaultFee, uint256 ammVaultFee, uint256 balanceFee, bool incentive);
 
-    event UpdateTokenWeight(address indexed token, uint256 chain, uint24 weight);
-    event UpdateBalanceIndicator(address indexed token, uint24 totalWeight, uint24 deltaMax);
+    event UpdateTokenWeight(address indexed token, uint256 chain, uint32 weight);
+    event UpdateBalanceIndicator(address indexed token, uint32 totalWeight, uint32 deltaMax);
 
     event UpdateVaultFeeRate(VaultFeeRate _vaultFeeRate);
 
-    event UpdateBalanceFeeRate(BalanceFeeRate _vaultFeeRate);
+    event UpdateBalanceFeeRate(Rebalance.BalanceFeeRate _vaultFeeRate);
 
     modifier onlyRelay() {
         if (msg.sender != address(relay)) revert Errs.no_access();
@@ -272,11 +253,13 @@ contract VaultManager is BaseImplementation, IVaultManager {
         emit UpdateVaultFeeRate(_vaultFeeRate);
     }
 
-    function updateBalanceFeeRate(BalanceFeeRate calldata _balanceFeeRate) external restricted {
+
+    function updateBalanceFeeRate(Rebalance.BalanceFeeRate calldata _balanceFeeRate) external restricted {
         // todo: check rate
         balanceFeeRate = _balanceFeeRate;
         emit UpdateBalanceFeeRate(_balanceFeeRate);
     }
+
 
     function updateTokenWeights(address token, uint256[] memory chains, uint256[] memory weights) external restricted {
         uint256 len = chains.length;
@@ -290,7 +273,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
             chain = chains[i];
 
             TokenChainState storage chainState = tokenState.chainStates[chain];
-            uint24 weight = uint24(weights[i]);
+            uint32 weight = uint32(weights[i]);
             tokenState.totalWeight = tokenState.totalWeight - chainState.weight + weight;
             chainState.weight = weight;
 
@@ -404,7 +387,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     override
     returns (bool, uint256)
     {
-        return _getBalanceFeeInfo(fromChain, toChain, token, amount, false, false);
+        return _getBalanceFee(fromChain, toChain, token, amount, false, false);
     }
 
     // --------------------------------------------- external ----------------------------------------------
@@ -500,7 +483,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
     // collect transfer in fee
     // update vault balance
     function transferIn(TxItem calldata txItem, bytes calldata fromVault, uint256) external override returns (uint256 outAmount) {
-
         bytes32 vaultKey = keccak256(fromVault);
         _updateFromVault(vaultKey, txItem, false);
 
@@ -782,7 +764,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     function _collectBridgeFee(TxItem calldata txItem, uint256 toChain) internal returns (uint256) {
         FeeInfo memory feeInfo;
 
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFeeInfo(txItem.chain, toChain, txItem.token, txItem.amount, false, false);
+        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(txItem.chain, toChain, txItem.token, txItem.amount, false, false);
         if (!feeInfo.incentive) {
             // will not collect vault fee when rebalance incentive
             feeInfo.ammFee = _getFee(txItem.amount, vaultFeeRate.ammVault);
@@ -796,7 +778,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         FeeInfo memory feeInfo;
 
         // get a fix swapIn balance fee
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(txItem.amount, balanceFeeRate.fixedFromBalance);
+        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(txItem.chain, selfChainId, txItem.token, txItem.amount, true, false);
         if (!feeInfo.incentive) {
             // will not collect vault fee when rebalance incentive
             feeInfo.vaultFee = _getFee(txItem.amount, vaultFeeRate.fromVault);
@@ -808,7 +790,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     function _collectTransferOutFee(TxItem calldata txItem) internal returns (uint256) {
         FeeInfo memory feeInfo;
         // get a fix swapOut balance fee
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(txItem.amount, balanceFeeRate.fixedToBalance);
+        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(selfChainId, txItem.chain, txItem.token, txItem.amount, false, true);
         if (!feeInfo.incentive) {
             // will not collect vault fee when rebalance incentive
             feeInfo.vaultFee = _getFee(txItem.amount, vaultFeeRate.toVault);
@@ -820,7 +802,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     function _collectRefundFee(TxItem calldata txItem) internal returns (uint256) {
         FeeInfo memory feeInfo;
         // get a fix refund balance fee
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(txItem.amount, balanceFeeRate.fixedFromBalance);
+        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(selfChainId, txItem.chain, txItem.token, txItem.amount, false, true);
         if (!feeInfo.incentive) {
             // will not collect vault fee when rebalance incentive
             feeInfo.ammFee = _getFee(txItem.amount, vaultFeeRate.ammVault);
@@ -833,7 +815,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     function _collectRedeemFee(address token, uint256 amount) internal returns (uint256) {
         FeeInfo memory feeInfo;
         // get a fix redeem balance fee
-        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(amount, balanceFeeRate.fixedFromBalance);
+        (feeInfo.incentive, feeInfo.balanceFee) = _getBalanceFee(selfChainId, selfChainId, token, amount, true, false);
         if (!feeInfo.incentive) {
             // will not collect vault fee when rebalance incentive
             feeInfo.ammFee = _getFee(amount, vaultFeeRate.ammVault);
@@ -941,13 +923,13 @@ contract VaultManager is BaseImplementation, IVaultManager {
     //- All other chains are empty: Vᵢ = 0 for i ≠ k (thus rᵢ = -1)
     // Wₜ = 1, S_k = (1 - Wₖ)/Wₖ
     function _updateBalanceIndicator(address _token) internal {
-        uint24 minWeight = type(uint24).max;
+        uint32 minWeight = type(uint32).max;
         uint256 length = chainList.length();
 
         TokenState storage tokenState = tokenStates[_token];
         for (uint256 i = 0; i < length; i++) {
             uint256 chain = chainList.at(i);
-            uint24 w = tokenState.chainStates[chain].weight;
+            uint32 w = tokenState.chainStates[chain].weight;
             if (w == 0) {
                 continue;
             }
@@ -1021,78 +1003,26 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
 
-    function _getBalanceChange(uint256 fromChain, uint256 toChain, address token, uint256 amount) internal view returns (int24 deltaS) {
-        uint256 total = tokenStates[token].balance;
-        // ΔS = [2a(vₓ×wᵧ - vᵧ×wₓ) + a²(wₓ + wᵧ)] / (wₓ×wᵧ×Tᵥ²)
-        //    = [2avₓ×wᵧ + a²(wₓ + wᵧ) - 2avᵧ×wₓ ] / (wₓ×wᵧ×Tᵥ²)
-        TokenChainState memory x = tokenStates[token].chainStates[fromChain];
-        TokenChainState memory y = tokenStates[token].chainStates[toChain];
-
-        // int24 deltaS;
-        uint256 totalWeight = tokenStates[token].totalWeight;
-
-        // 2avₓ×wᵧ + a²(wₓ + wᵧ)
-        uint256 s1 = 2 * amount * uint128(x.balance) * y.weight + amount * amount * (x.weight + y.weight);
-        // 2avᵧ×wₓ
-        uint256 s2 = 2 * amount * uint128(y.balance) * x.weight;
-
-        if (s1 > s2) {
-            uint256 delta = _divUint256(((s1 - s2) * totalWeight), (x.weight * y.weight * total * total));
-            deltaS = int24(int256(delta));
-        } else {
-            uint256 delta = _divUint256(((s2 - s1) * totalWeight), (x.weight * y.weight * total * total));
-            deltaS = 0 - int24(int256(delta));
-        }
-        // int24 deltaSMax = int24(tokenStates[token].deltaSMax);
-        // return _divInt24(deltaS * int24(MAX_RATE_UNIT), deltaSMax);
-    }
-
-    function _getBalanceChangePercent(uint256 fromChain, uint256 toChain, address token, uint256 amount) internal view returns (int24 deltaPercent) {
-        int24 deltaS = _getBalanceChange(fromChain, toChain, token, amount);
-
-        int24 deltaSMax = int24(tokenStates[token].deltaSMax);
-        return _divInt24(deltaS * int24(uint24(MAX_RATE_UNIT)), deltaSMax);
-    }
-
-    function _getBalanceFeeInfo(uint256 fromChain, uint256 toChain, address token, uint256 amount, bool isSwapIn, bool isSwapOut)
+    function _getBalanceFee(uint256 fromChain, uint256 toChain, address token, uint256 amount, bool isSwapIn, bool isSwapOut)
     internal
     view
     returns (bool incentive, uint256 fee)
     {
-        BalanceFeeRate memory feeRate = balanceFeeRate;
+        Rebalance.BalanceInfo memory info;
+        info.a = int256(amount);
+        info.vt = int256(int128(tokenStates[token].balance));
+        info.wt = int256(int32(tokenStates[token].totalWeight));
 
-        if (isSwapIn) {
-            // get a fix swapIn balance fee
-            return _getBalanceFee(amount, feeRate.fixedFromBalance);
-        }
-        if (isSwapOut) {
-            // get a fix swapOut balance fee
-            return _getBalanceFee(amount, feeRate.fixedToBalance);
-        }
+        info.wx = int256(int32(tokenStates[token].chainStates[fromChain].weight));
+        info.wy = int256(int32(tokenStates[token].chainStates[toChain].weight));
+        info.vx = int256(int128(tokenStates[token].chainStates[fromChain].balance));
+        info.vy = int256(int128(tokenStates[token].chainStates[toChain].balance));
 
-        if (tokenStates[token].totalWeight == 0) {
-            // not set chain weight, will collect fix balance fee
-            return _getBalanceFee(amount, (feeRate.fixedFromBalance + feeRate.fixedToBalance));
-        }
+        int32 rate = Rebalance.getBalanceFeeRate(info, balanceFeeRate, int32(tokenStates[token].deltaSMax), isSwapIn, isSwapOut);
 
-        uint256 total = tokenStates[token].balance;
-        // To save gas, when the cross-chain amount is less than a certain threshold (e.g., 0.1% of total vault),
-        // instead of directly calculating balance fee/incentive, charge a fixed fee
-        if (amount * MAX_RATE_UNIT <= total * feeRate.balanceThreshold) {
-            return _getBalanceFee(amount, (feeRate.fixedFromBalance + feeRate.fixedToBalance));
-        }
-
-        int24 rate;
-        int24 deltaPercent = _getBalanceChangePercent(fromChain, toChain, token, amount);
-        if (deltaPercent >= MAX_BALANCE_CHANGE) {
-            rate = feeRate.maxBalance;
-        } else if (deltaPercent <= MIN_BALANCE_CHANGE) {
-            rate = feeRate.minBalance;
-        } else {
-            rate = _divInt24(deltaPercent * (MAX_BALANCE_CHANGE - MIN_BALANCE_CHANGE), ((feeRate.maxBalance - feeRate.minBalance) + feeRate.minBalance));
-        }
-
-        return _getBalanceFee(amount, rate);
+        incentive = (rate < 0);
+        uint256 feeRate = incentive ? uint256(int256(-rate)) : uint256(int256(rate));
+        fee = _getFee(amount, feeRate);
     }
 
 
@@ -1101,21 +1031,5 @@ contract VaultManager is BaseImplementation, IVaultManager {
             return 0;
         }
         fee = amount * feeRate / MAX_RATE_UNIT;
-    }
-
-    function _getBalanceFee(uint256 amount, int24 feeRate) internal pure returns (bool incentive, uint256 fee) {
-        incentive = (feeRate > 0);
-        uint256 rate = incentive ? uint256(int256(feeRate)) : uint256(int256(-feeRate));
-        fee = _getFee(amount, rate);
-    }
-
-    function _divUint256(uint256 a, uint256 b) internal pure returns(uint256) {
-        if (b == 0) return 0;
-        return a / b;
-    }
-
-    function _divInt24(int24 a, int24 b) internal pure returns(int24) {
-        if (b == 0) return 0;
-        return a / b;
     }
 }

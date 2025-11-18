@@ -14,7 +14,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
-import {IPeriphery} from "./interfaces/IPeriphery.sol";
 import {Rebalance} from "./libs/Rebalance.sol";
 
 /**

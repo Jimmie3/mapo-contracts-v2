@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IGasService} from "./interfaces/IGasService.sol";
-import {IRegistry, ContractAddress} from "./interfaces/IRegistry.sol";
+import {IRegistry, ContractType} from "./interfaces/IRegistry.sol";
 
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
@@ -43,9 +43,11 @@ contract GasService is BaseImplementation, IGasService {
         uint256 transactionSizeWithCall,
         uint256 transactionRate
     ) external override {
-        _checkAccess(ContractAddress.RELAY);
+        _checkAccess(ContractType.RELAY);
 
         NetworkFee storage fee = chainNetworkFee[chain];
+        // block number casting to 'uint64' is safe
+        // forge-lint: disable-next-line(unsafe-typecast)
         fee.height = uint64(height);
         fee.transactionRate = uint128(transactionRate);
         fee.transactionSize = uint128(transactionSize);
@@ -102,7 +104,7 @@ contract GasService is BaseImplementation, IGasService {
         transactionSizeWithCall = fee.transactionSizeWithCall;
     }
 
-    function _checkAccess(ContractAddress contractAddress) internal view {
+    function _checkAccess(ContractType contractAddress) internal view {
         if (msg.sender != registry.getContractAddress(contractAddress)) revert Errs.no_access();
     }
 }

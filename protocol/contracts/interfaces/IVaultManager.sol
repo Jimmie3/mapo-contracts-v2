@@ -10,7 +10,7 @@ interface IVaultManager {
     function getBridgeTokens() external view returns (address[] memory);
 
     function getVaultToken(address relayToken) external view returns(address);
-    
+
     function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view returns(int256 balance, uint256 pendingOut);
 
     function getBalanceFee(uint256 fromChain, uint256 toChain, address token, uint256 amount)
@@ -25,7 +25,6 @@ interface IVaultManager {
     function getActiveVault() external view returns (bytes memory);
 
     function getRetiringVault() external view returns (bytes memory);
-
 
     function rotate(bytes calldata retiringVault, bytes calldata activeVault) external;
 

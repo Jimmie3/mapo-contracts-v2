@@ -5,7 +5,7 @@ import {ChainType, GasInfo} from "../libs/Types.sol";
 import {IGasService} from "../interfaces/IGasService.sol";
 import {IVaultManager} from "../interfaces/IVaultManager.sol";
 import {IRelay} from "../interfaces/IRelay.sol";
-import {IRegistry, ContractAddress, ChainType, GasInfo} from "../interfaces/IRegistry.sol";
+import {IRegistry, ContractType, ChainType, GasInfo} from "../interfaces/IRegistry.sol";
 import {ITSSManager} from "../interfaces/ITSSManager.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
@@ -44,10 +44,12 @@ contract ViewController is BaseImplementation {
         bytes pubkey;
         VaultRouter[] routers;
     }
-    function getPublickeys() external view returns(VaultInfo[] memory infos) {
+
+
+    function getPublicKeys() external view returns(VaultInfo[] memory infos) {
         IVaultManager vm = _getVaultManager();
         IRegistry r = registry;
-        uint256[] memory chains = r.getChains();
+        uint256[] memory chains = vm.getBridgeChains();
         bytes memory active = vm.getActiveVault();
         bytes memory retiring = vm.getRetiringVault();
         if(retiring.length > 0) {
@@ -145,7 +147,7 @@ contract ViewController is BaseImplementation {
             } else {
                 vaultView.routerTokens[i].router = pubkey;
             }
-            
+
             vaultView.routerTokens[i].coins = new Token[](tokenLen);
             for (uint j = 0; j < tokenLen; j++) {
                 bytes memory toChainToken = r.getToChainToken(tokens[j], chain);
@@ -178,18 +180,18 @@ contract ViewController is BaseImplementation {
     }
 
     function _getRelay() internal view returns (IRelay relay) {
-        relay = IRelay(registry.getContractAddress(ContractAddress.RELAY));
+        relay = IRelay(registry.getContractAddress(ContractType.RELAY));
     }
 
     function _getGasService() internal view returns (IGasService gasService) {
-        gasService = IGasService(registry.getContractAddress(ContractAddress.GAS_SERVICE));
+        gasService = IGasService(registry.getContractAddress(ContractType.GAS_SERVICE));
     }
 
     function _getVaultManager() internal view returns (IVaultManager vaultManager) {
-        vaultManager = IVaultManager(registry.getContractAddress(ContractAddress.VAULT_MANAGER));
+        vaultManager = IVaultManager(registry.getContractAddress(ContractType.VAULT_MANAGER));
     }
 
     function _getTSSManager() internal view returns (ITSSManager TSSManager) {
-        TSSManager = ITSSManager(registry.getContractAddress(ContractAddress.TSS_MANAGER));
+        TSSManager = ITSSManager(registry.getContractAddress(ContractType.TSS_MANAGER));
     }
 }

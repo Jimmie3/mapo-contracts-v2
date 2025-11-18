@@ -9,7 +9,7 @@ import {Gateway} from "../../contracts/Gateway.sol";
 import {GasService} from "../../contracts/GasService.sol";
 import {Registry} from "../../contracts/Registry.sol";
 import {ViewController} from "../../contracts/len/ViewController.sol";
-import {IRegistry, ContractAddress} from "../../contracts/interfaces/IRegistry.sol";
+import {IRegistry, ContractType} from "../../contracts/interfaces/IRegistry.sol";
 
 contract DeployAndSetUp is BaseScript {
     function run() public virtual broadcast {
@@ -46,7 +46,7 @@ contract DeployAndSetUp is BaseScript {
     }
 
    function deployRelay(string memory networkName, address authority) internal returns(Relay relay) {
-        string memory salt = vm.envString("GATEWAY_SALT"); 
+        string memory salt = vm.envString("GATEWAY_SALT");
         Relay impl = new Relay();
         bytes memory initData = abi.encodeWithSelector(Relay.initialize.selector, authority);
         address r = deployProxyByFactory(salt, address(impl), initData);
@@ -62,7 +62,7 @@ contract DeployAndSetUp is BaseScript {
    }
 
     function deployGateway(string memory networkName, address authority) internal returns(Gateway gateway) {
-        string memory salt = vm.envString("GATEWAY_SALT"); 
+        string memory salt = vm.envString("GATEWAY_SALT");
         Gateway impl = new Gateway();
         bytes memory initData = abi.encodeWithSelector(Gateway.initialize.selector, authority);
         address g = deployProxyByFactory(salt, address(impl), initData);
@@ -156,13 +156,13 @@ contract DeployAndSetUp is BaseScript {
         address swapManager = readConfigAddr(networkName, "SwapManager");
         address affiliateManager = readConfigAddr(networkName, "AffiliateManager");
         Registry registry = Registry(registry_addr);
-        registry.setContractAddress(ContractAddress.RELAY, relay_addr);
-        registry.setContractAddress(ContractAddress.GAS_SERVICE, gasService_addr);
-        registry.setContractAddress(ContractAddress.VAULT_MANAGER, vaultManager_addr);
-        registry.setContractAddress(ContractAddress.TSS_MANAGER, TSSManager);
-        registry.setContractAddress(ContractAddress.AFFILIATE, affiliateManager);
-        registry.setContractAddress(ContractAddress.SWAP, swapManager);
-        registry.setContractAddress(ContractAddress.PROTOCOL_FEE, protocolFee_addr);
+        registry.registerContract(ContractType.RELAY, relay_addr);
+        registry.registerContract(ContractType.GAS_SERVICE, gasService_addr);
+        registry.registerContract(ContractType.VAULT_MANAGER, vaultManager_addr);
+        registry.registerContract(ContractType.TSS_MANAGER, TSSManager);
+        registry.registerContract(ContractType.AFFILIATE, affiliateManager);
+        registry.registerContract(ContractType.SWAP, swapManager);
+        registry.registerContract(ContractType.PROTOCOL_FEE, protocolFee_addr);
    }
 
    function upgrade(string memory c) internal {
@@ -205,6 +205,6 @@ contract DeployAndSetUp is BaseScript {
      } {
           revert("unknow contract");
      }
-   } 
+   }
 
 }

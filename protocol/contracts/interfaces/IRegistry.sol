@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ChainType, GasInfo, ContractAddress} from "../libs/Types.sol";
+import {ChainType, GasInfo, ContractType} from "../libs/Types.sol";
 
 interface IRegistry {
 
-    function getContractAddress(ContractAddress _contractAddress) external view  returns(address);
+    function getContractAddress(ContractType _contractType) external view  returns(address);
 
     function getTokenAddressById(uint96 id) external view returns (address token);
 
@@ -21,6 +21,8 @@ interface IRegistry {
     external
     view
     returns (bytes memory toToken, uint8 decimals);
+
+    function getRelayChainGasAmount(uint256 chain, uint256 gasAmount) external view returns (uint256 relayGasAmount);
 
     // Get token and vault token address on relay chain
     function getRelayChainToken(uint256 _fromChain, bytes memory _fromToken) external view returns (address);
@@ -60,7 +62,7 @@ interface IRegistry {
     function getChainBaseToken(uint256 chain) external view returns (address);
 
     function getTokenAddressByNickname(uint256 chain, string memory nickname) external view returns (bytes memory);
-    
+
     function getProtocolFee(address token, uint256 amount) external view returns (address, uint256);
 
     function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) external view returns (uint256);

@@ -9,7 +9,7 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
-import {IProtocolFee} from "./interfaces/IProtocolFee.sol";
+import {IProtocolFee} from "./interfaces/periphery/IProtocolFee.sol";
 
 contract ProtocolFee is BaseImplementation, IProtocolFee {
     using EnumerableMap for EnumerableMap.AddressToUintMap;

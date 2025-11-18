@@ -3,10 +3,10 @@
 pragma solidity 0.8.24;
 
 import {Utils} from "./libs/Utils.sol";
-import {ISwap} from "./interfaces/ISwap.sol";
+import {ISwap} from "./interfaces/swap/ISwap.sol";
 import {IGasService} from "./interfaces/IGasService.sol";
-import {IProtocolFee} from "./interfaces/IProtocolFee.sol";
-import {IRegistry, ChainType, ContractAddress, GasInfo } from "./interfaces/IRegistry.sol";
+import {IProtocolFee} from "./interfaces/periphery/IProtocolFee.sol";
+import {IRegistry, ChainType, ContractType, GasInfo } from "./interfaces/IRegistry.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -48,7 +48,7 @@ contract Registry is BaseImplementation, IRegistry {
     }
 
     EnumerableSet.UintSet private chainList;
-    mapping(ContractAddress => address) public addresses;
+    mapping(ContractType => address) public addresses;
     mapping(uint256 => string) private chainToNames;
     mapping(string => uint256) private nameToChain;
     mapping(uint256 => ChainInfo) private chainInfos;
@@ -68,7 +68,7 @@ contract Registry is BaseImplementation, IRegistry {
 
     mapping(uint256 => mapping(string => bytes)) public tokenNicknameToAddress;
 
-    event SetContractAddress(ContractAddress contractAddress, address _addr);
+    event RegisterContract(ContractType contractAddress, address _addr);
     event RegisterToken(uint96 indexed id, address indexed _token);
     event MapToken(address indexed _token, uint256 indexed _fromChain, bytes _fromToken, uint8 _decimals);
     event DeregisterChain(uint256 chain);
@@ -91,9 +91,9 @@ contract Registry is BaseImplementation, IRegistry {
         __BaseImplementation_init(_defaultAdmin);
     }
 
-    function setContractAddress(ContractAddress _contractAddress, address _addr) external restricted checkAddress(_addr) {
+    function registerContract(ContractType _contractAddress, address _addr) external restricted checkAddress(_addr) {
         addresses[_contractAddress] = _addr;
-        emit SetContractAddress(_contractAddress, _addr);
+        emit RegisterContract(_contractAddress, _addr);
     }
 
     function registerChain(
@@ -154,7 +154,7 @@ contract Registry is BaseImplementation, IRegistry {
         external
         restricted
         checkAddress(_token)
-    {  
+    {
         if (Utils.bytesEq(_fromToken, bytes(""))) revert invalid_token();
         if(_fromChain == selfChainId) revert map_token_relay_chain();
         if (!chainList.contains(_fromChain)) revert chain_not_registered();
@@ -199,8 +199,8 @@ contract Registry is BaseImplementation, IRegistry {
         emit SetTokenTicker(_chain, _token, _nickname);
     }
 
-    function getContractAddress(ContractAddress _contractAddress) external view override returns(address) {
-        return addresses[_contractAddress];
+    function getContractAddress(ContractType _contractType) external view override returns(address) {
+        return addresses[_contractType];
     }
 
     function getTokenAddressById(uint96 id) external view override returns (address token) {
@@ -244,6 +244,12 @@ contract Registry is BaseImplementation, IRegistry {
         return _getTargetAmount(_token, _fromChain, selfChainId, _amount);
     }
 
+    function getRelayChainGasAmount(uint256 chain, uint256 gasAmount) external view override returns (uint256 relayGasAmount) {
+        address relayGasToken = chainInfos[chain].gasToken;
+        // get relay chain amount
+        return _getTargetAmount(relayGasToken, chain, selfChainId, gasAmount);
+    }
+
     function getTargetToken(uint256 _fromChain, uint256 _toChain, bytes memory _fromToken)
         external
         view
@@ -258,12 +264,12 @@ contract Registry is BaseImplementation, IRegistry {
     view
     override
     returns (bytes memory token, uint8 decimals, bool mintable)
-    {   
+    {
         token = _getToChainToken(_relayToken, _fromChain);
         if(token.length > 0) {
             TokenInfo storage info = tokenInfos[_getTokenId(_fromChain, token)];
             decimals = info.decimals;
-            mintable = info.mintable; 
+            mintable = info.mintable;
         }
     }
 
@@ -339,7 +345,7 @@ contract Registry is BaseImplementation, IRegistry {
     }
 
     function getProtocolFee(address token, uint256 amount) external view override returns (address, uint256) {
-        address feeManager = addresses[ContractAddress.PROTOCOL_FEE];
+        address feeManager = addresses[ContractType.PROTOCOL_FEE];
         uint256 fee = IProtocolFee(feeManager).getProtocolFee(token, amount);
 
         return (feeManager, fee);
@@ -370,7 +376,7 @@ contract Registry is BaseImplementation, IRegistry {
     }
 
     function _getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) internal view returns (uint256) {
-        return ISwap(addresses[ContractAddress.SWAP]).getAmountOut(tokenIn, tokenOut, amountIn);
+        return ISwap(addresses[ContractType.SWAP]).getAmountOut(tokenIn, tokenOut, amountIn);
     }
 
     function _getRelayChainToken(uint256 _fromChain, bytes memory _fromToken) internal view returns (address token) {
@@ -386,7 +392,7 @@ contract Registry is BaseImplementation, IRegistry {
     view
     returns (GasInfo memory)
     {
-        (uint256 networkFee, uint256 transactionRate, uint256 transactionSize) = IGasService(addresses[ContractAddress.GAS_SERVICE]).getNetworkFeeInfo(chain, withCall);
+        (uint256 networkFee, uint256 transactionRate, uint256 transactionSize) = IGasService(addresses[ContractType.GAS_SERVICE]).getNetworkFeeInfo(chain, withCall);
 
         address relayGasToken = chainInfos[chain].gasToken;
         // get relay chain amount

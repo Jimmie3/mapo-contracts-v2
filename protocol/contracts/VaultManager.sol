@@ -119,7 +119,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     struct VaultFeeRate {
-        uint32  ammVault;           // the vault fee to amm
+        uint32  ammVault;           // reserved for fee to amm
         uint32  fromVault;          // the vault fee to swap in token
         uint32  toVault;            // the vault fee to bridge/swap out token
 
@@ -231,8 +231,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
         registry = IRegistry(_registry);
         emit SetRegistry(_registry);
     }
-
-
 
     function registerToken(address _token, address _vaultToken) external restricted {
         IVaultToken vault = IVaultToken(_vaultToken);
@@ -348,7 +346,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
         return (true, 0);
     }
-
 
     function checkVault(TxItem calldata txItem, bytes calldata vault) external view returns (bool) {
         if (txItem.chainType == ChainType.CONTRACT) {
@@ -787,8 +784,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
             } else if (isSwapOut) {
                 feeInfo.vaultFee = _getFee(amount, vaultFeeRate.toVault);
             } else {
-                feeInfo.ammFee = _getFee(amount, vaultFeeRate.ammVault);
-                feeInfo.vaultFee = _getFee(amount, vaultFeeRate.toVault);
+                // feeInfo.ammFee = _getFee(amount, vaultFeeRate.ammVault);
+                feeInfo.vaultFee = _getFee(amount, vaultFeeRate.fromVault + vaultFeeRate.toVault);
             }
         }
 

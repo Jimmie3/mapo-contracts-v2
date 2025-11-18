@@ -5,7 +5,6 @@ import "./subs/registry";
 import "./subs/protocolFee";
 import "./subs/gasService";
 import "./subs/relay";
-import "./subs/periphery";
 
 
 import { task } from "hardhat/config";

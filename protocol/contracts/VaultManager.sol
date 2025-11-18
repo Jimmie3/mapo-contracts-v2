@@ -171,7 +171,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     address public relay;
-    IPeriphery public periphery;
+    IRegistry public registry;
 
     VaultFeeRate public vaultFeeRate;
     Rebalance.BalanceFeeRate public balanceFeeRate;
@@ -197,7 +197,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     mapping(address => uint256) public reservedFees;
 
     event SetRelay(address _relay);
-    event SetPeriphery(address _periphery);
+    event SetRegistry(address _registry);
 
     event RegisterToken(address indexed _token, address _vaultToken);
 
@@ -227,11 +227,12 @@ contract VaultManager is BaseImplementation, IVaultManager {
         emit SetRelay(_relay);
     }
 
-    function setPeriphery(address _periphery) external restricted {
-        require(_periphery != address(0));
-        periphery = IPeriphery(_periphery);
-        emit SetPeriphery(_periphery);
+    function setRegistry(address _registry) external restricted {
+        require(_registry != address(0));
+        registry = IRegistry(_registry);
+        emit SetRegistry(_registry);
     }
+
 
 
     function registerToken(address _token, address _vaultToken) external restricted {
@@ -368,8 +369,20 @@ contract VaultManager is BaseImplementation, IVaultManager {
         else return bytes("");
     }
 
+    function getVaultToken(address relayToken) external view override returns(address) {
+        return tokenList.get(relayToken);
+    }
+
+    function getBridgeChains() external view override returns(uint256[] memory) {
+        return chainList.values();
+    }
+
+    function getBridgeTokens() external view override returns (address[] memory){
+        return tokenList.keys();
+    }
+
    function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view returns(int256 balance, uint256 pendingOut) {
-       ChainType chainType = periphery.getChainType(chain);
+       ChainType chainType = registry.getChainType(chain);
        if (chainType == ChainType.CONTRACT) {
             TokenChainState storage state =  tokenStates[token].chainStates[chain];
             balance = state.balance;
@@ -432,7 +445,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
                 // migrating, continue to other chain migration
                 continue;
             } else if (v.migrationStatus[chain] == MigrationStatus.MIGRATED) {
-                txItem.chainType = periphery.getChainType(chain);
+                txItem.chainType = registry.getChainType(chain);
                 if (txItem.chainType == ChainType.CONTRACT) {
                     _removeChainFromVault(retiringVaultKey, chain);
                     continue;
@@ -462,7 +475,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         TxItem memory txOutItem;
         txOutItem.token = txItem.token;
         txOutItem.chain = toChain;
-        txOutItem.chainType = periphery.getChainType(toChain);
+        txOutItem.chainType = registry.getChainType(toChain);
 
         txOutItem.amount = _collectFee(txItem.orderId, txItem.chain, toChain, txItem.token, txItem.amount, false, false);
 
@@ -513,7 +526,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     onlyRelay
     returns (uint256, GasInfo memory)
     {
-        GasInfo memory gasInfo = periphery.getNetworkFeeInfoWithToken(txItem.token, txItem.chain,false);
+        GasInfo memory gasInfo = registry.getNetworkFeeInfoWithToken(txItem.token, txItem.chain,false);
         if (fromRetiredVault) {
             if (txItem.amount <= gasInfo.estimateGas) {
                 return (0, gasInfo);
@@ -633,7 +646,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
         if (cv.tokens.length == 0) {
             // add native token first
-            address nativeToken = periphery.getChainGasToken(chain);
+            address nativeToken = registry.getChainGasToken(chain);
             cv.tokens.push(nativeToken);
             cv.tokenVaults[nativeToken].isAdded = true;
             if (token == nativeToken) {
@@ -663,10 +676,10 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     function _migrate(uint256 chain) internal returns (bool completed, TxItem memory txItem, GasInfo memory gasInfo) {
-        txItem.chainType = periphery.getChainType(chain);
+        txItem.chainType = registry.getChainType(chain);
         txItem.chain = chain;
 
-        gasInfo = periphery.getNetworkFeeInfo(chain,false);
+        gasInfo = registry.getNetworkFeeInfo(chain,false);
 
         if (txItem.chainType == ChainType.CONTRACT) {
             vaultList[retiringVaultKey].migrationStatus[chain] = MigrationStatus.MIGRATING;
@@ -914,7 +927,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
         // todo: support alt token on non-contract chain
         //      get gas for gas token
-        gasInfo = periphery.getNetworkFeeInfoWithToken(txItem.token, txItem.chain,withCall);
+        gasInfo = registry.getNetworkFeeInfoWithToken(txItem.token, txItem.chain,withCall);
 
         if (txItem.amount <= gasInfo.estimateGas) {
             return (NON_VAULT_KEY, 0, 0, gasInfo);

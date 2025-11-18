@@ -89,7 +89,8 @@ export async function getChainTokenByNetwork(network:string) {
 }
 
 type TokenRegister = {
-    VaultFeeRate: VaultFeeRate,
+    vaultFeeRate: VaultFeeRate,
+    balanceFeeRate: BalanceFeeRate,
     tokens: TokenInfo[]
 }
 
@@ -110,6 +111,10 @@ type VaultFeeRate = {
     ammVault: number,
     fromVault: number,
     toVault: number,
+    reserved: number,
+}
+
+type BalanceFeeRate = {
     balanceThreshold: number,
     fixedFromBalance: number,
     fixedToBalance: number,
@@ -131,9 +136,24 @@ export async function getVaultFeeRate(network:string) {
    let tokenRegister: TokenRegister;
    let rawdata = fs.readFileSync(p, "utf-8");
    tokenRegister = JSON.parse(rawdata);
-   return tokenRegister.VaultFeeRate;
+   return tokenRegister.vaultFeeRate;
 }
 
+export async function getBalanceFeeRate(network:string) {
+
+   let filePath; 
+   if(isMainnet(network)) {
+        filePath = "../../configs/mainnet/"
+   } else {
+        filePath = "../../configs/testnet/"
+   }
+   let p = path.join(__dirname, filePath + "tokenRegister.json");
+   if(!fs.existsSync(p)) throw (`file ${p} not exist`);
+   let tokenRegister: TokenRegister;
+   let rawdata = fs.readFileSync(p, "utf-8");
+   tokenRegister = JSON.parse(rawdata);
+   return tokenRegister.balanceFeeRate;
+}
 
 export async function getTokenRegsterByTokenName(network:string, tokenName:string) {
 

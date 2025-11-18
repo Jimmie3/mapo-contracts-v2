@@ -5,11 +5,11 @@ import {BaseScript, console} from "./Base.s.sol";
 import {Relay} from "../../contracts/Relay.sol";
 import {VaultManager} from "../../contracts/VaultManager.sol";
 import {ProtocolFee} from "../../contracts/ProtocolFee.sol";
-import {Periphery} from "../../contracts/Periphery.sol";
 import {Gateway} from "../../contracts/Gateway.sol";
 import {GasService} from "../../contracts/GasService.sol";
 import {Registry} from "../../contracts/Registry.sol";
 import {ViewController} from "../../contracts/len/ViewController.sol";
+import {IRegistry, ContractAddress} from "../../contracts/interfaces/IRegistry.sol";
 
 contract DeployAndSetUp is BaseScript {
     function run() public virtual broadcast {
@@ -24,7 +24,6 @@ contract DeployAndSetUp is BaseScript {
         uint256 chainId = block.chainid;
         if(chainId == 212 || chainId == 22776) {
                deployRelay(networkName, authority);
-               deployPeriphery(networkName, authority);
                deployGasService(networkName, authority);
                deployProtocolFee(networkName, authority);
                deployRegistry(networkName, authority);
@@ -97,15 +96,6 @@ contract DeployAndSetUp is BaseScript {
         saveConfig(networkName, "ProtocolFee", p);
    }
 
-   function deployPeriphery(string memory networkName, address authority) internal returns(Periphery periphery) {
-        Periphery impl = new Periphery();
-        bytes memory initData = abi.encodeWithSelector(Periphery.initialize.selector, authority);
-        address p = deployProxy(address(impl), initData);
-        periphery = Periphery(p);
-
-        console.log("Periphery address:", p);
-        saveConfig(networkName, "Periphery", p);
-   }
 
     function deployRegistry(string memory networkName, address authority) internal returns(Registry registry) {
         Registry impl = new Registry();
@@ -142,8 +132,6 @@ contract DeployAndSetUp is BaseScript {
         console.log("Relay address:", relay_addr);
         address vaultManager_addr = readConfigAddr(networkName, "VaultManager");
         console.log("VaultManager address:", vaultManager_addr);
-        address periphery_addr = readConfigAddr(networkName, "Periphery");
-        console.log("Periphery address:", periphery_addr);
         address protocolFee_addr = readConfigAddr(networkName, "ProtocolFee");
         console.log("ProtocolFee address:", protocolFee_addr);
         address gasService_addr = readConfigAddr(networkName, "GasService");
@@ -156,26 +144,25 @@ contract DeployAndSetUp is BaseScript {
 
         Relay r = Relay(relay_addr);
         r.setVaultManager(vaultManager_addr);
-        r.setPeriphery(periphery_addr);
+        r.setRegistry(registry_addr);
 
         VaultManager v = VaultManager(vaultManager_addr);
         v.setRelay(relay_addr);
-        v.setPeriphery(periphery_addr);
+        v.setRegistry(registry_addr);
 
         GasService g = GasService(gasService_addr);
-        g.setPeriphery(periphery_addr);
+        g.setRegistry(registry_addr);
 
-        Periphery p = Periphery(periphery_addr);
-        p.setRelay(relay_addr);
-        p.setGasService(gasService_addr);
-        p.setVaultManager(vaultManager_addr);
-        p.setTSSManager(TSSManager);
-        p.setTokenRegister(registry_addr);
-        p.setProtocolFeeManager(protocolFee_addr);
         address swapManager = readConfigAddr(networkName, "SwapManager");
         address affiliateManager = readConfigAddr(networkName, "AffiliateManager");
-        p.setAffiliateManager(affiliateManager);
-        p.setSwapManager(swapManager);
+        Registry registry = Registry(registry_addr);
+        registry.setContractAddress(ContractAddress.RELAY, relay_addr);
+        registry.setContractAddress(ContractAddress.GAS_SERVICE, gasService_addr);
+        registry.setContractAddress(ContractAddress.VAULT_MANAGER, vaultManager_addr);
+        registry.setContractAddress(ContractAddress.TSS_MANAGER, TSSManager);
+        registry.setContractAddress(ContractAddress.AFFILIATE, affiliateManager);
+        registry.setContractAddress(ContractAddress.SWAP, swapManager);
+        registry.setContractAddress(ContractAddress.PROTOCOL_FEE, protocolFee_addr);
    }
 
    function upgrade(string memory c) internal {
@@ -195,11 +182,6 @@ contract DeployAndSetUp is BaseScript {
           GasService g = GasService(gasService_addr);
           GasService impl = new GasService();
           g.upgradeToAndCall(address(impl), bytes(""));
-     } else if(keccak256(bytes(c)) == keccak256(bytes("Periphery"))) {
-          address periphery_addr = readConfigAddr(networkName, "Periphery");
-          Periphery p = Periphery(periphery_addr);
-          Periphery impl = new Periphery();
-          p.upgradeToAndCall(address(impl), bytes(""));
      } else if(keccak256(bytes(c)) == keccak256(bytes("Registry"))) {
           address registry_addr = readConfigAddr(networkName, "Registry");
           Registry r = Registry(registry_addr);

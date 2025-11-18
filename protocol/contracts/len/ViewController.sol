@@ -5,27 +5,25 @@ import {ChainType, GasInfo} from "../libs/Types.sol";
 import {IGasService} from "../interfaces/IGasService.sol";
 import {IVaultManager} from "../interfaces/IVaultManager.sol";
 import {IRelay} from "../interfaces/IRelay.sol";
-import {IRegistry} from "../interfaces/IRegistry.sol";
-import {IPeriphery} from "../interfaces/IPeriphery.sol";
+import {IRegistry, ContractAddress, ChainType, GasInfo} from "../interfaces/IRegistry.sol";
 import {ITSSManager} from "../interfaces/ITSSManager.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 contract ViewController is BaseImplementation {
     uint256 public immutable selfChainId = block.chainid;
 
+    IRegistry public registry;
 
-    IPeriphery public periphery;
-
-    event SetPeriphery(address _periphery);
+    event SetRegistry(address _registry);
 
     function initialize(address _defaultAdmin) public initializer {
         __BaseImplementation_init(_defaultAdmin);
     }
 
-    function setPeriphery(address _periphery) external restricted {
-        require(_periphery != address(0));
-        periphery = IPeriphery(_periphery);
-        emit SetPeriphery(_periphery);
+    function setRegistry(address _registry) external restricted {
+        require(_registry != address(0));
+        registry = IRegistry(_registry);
+        emit SetRegistry(_registry);
     }
 
     function getLastTxOutHeight() external view returns (uint256) {
@@ -48,7 +46,7 @@ contract ViewController is BaseImplementation {
     }
     function getPublickeys() external view returns(VaultInfo[] memory infos) {
         IVaultManager vm = _getVaultManager();
-        IRegistry r = _getRegistery();
+        IRegistry r = registry;
         uint256[] memory chains = r.getChains();
         bytes memory active = vm.getActiveVault();
         bytes memory retiring = vm.getRetiringVault();
@@ -88,7 +86,7 @@ contract ViewController is BaseImplementation {
 
     function getInboundAddress() external view returns (InboundAddress[] memory inbounds) {
         IVaultManager vm = _getVaultManager();
-        IRegistry r = _getRegistery();
+        IRegistry r = registry;
         IGasService g = _getGasService();
         uint256[] memory chains = r.getChains();
         bytes memory active = vm.getActiveVault();
@@ -126,14 +124,19 @@ contract ViewController is BaseImplementation {
     }
 
     function getVault(bytes calldata pubkey) external view returns (VaultView memory vaultView) {
-        IVaultManager vm = _getVaultManager();
-        IRegistry r = _getRegistery();
-        vaultView.pubKey = pubkey;
-        vaultView.chains = r.getChains();
 
+        IRegistry r = registry;
+        vaultView.pubKey = pubkey;
+
+        IVaultManager vm = _getVaultManager();
+        vaultView.chains = vm.getBridgeChains();
+        vaultView.members = _getMembers(pubkey);
+        address[] memory tokens = vm.getBridgeTokens();
+
+        uint256 tokenLen = tokens.length;
         uint256 len = vaultView.chains.length;
         vaultView.routerTokens = new RouterTokens[](len);
-        vaultView.members = _getMembers(pubkey);
+
         for (uint i = 0; i < len; i++) {
             uint256 chain = vaultView.chains[i];
             vaultView.routerTokens[i].chain = chain;
@@ -142,21 +145,21 @@ contract ViewController is BaseImplementation {
             } else {
                 vaultView.routerTokens[i].router = pubkey;
             }
-            bytes[] memory tokens = r.getChainTokens(chain);
-            uint256 tokenLen = tokens.length;
+            
             vaultView.routerTokens[i].coins = new Token[](tokenLen);
             for (uint j = 0; j < tokenLen; j++) {
-                vaultView.routerTokens[i].coins[j].token = tokens[j];
+                bytes memory toChainToken = r.getToChainToken(tokens[j], chain);
+                vaultView.routerTokens[i].coins[j].token = toChainToken;
                 if(chain == selfChainId) {
                     vaultView.routerTokens[i].coins[j].decimals = 18;
-                    address relayToken = r.getRelayChainToken(chain, tokens[j]);
-                    (vaultView.routerTokens[i].coins[j].balance, vaultView.routerTokens[i].coins[j].pendingOut) = vm.getVaultTokenBalance(pubkey, chain, relayToken);
+                    (vaultView.routerTokens[i].coins[j].balance, vaultView.routerTokens[i].coins[j].pendingOut) = vm.getVaultTokenBalance(pubkey, chain, tokens[j]);
                 } else {
-                    vaultView.routerTokens[i].coins[j].decimals = r.getTokenDecimals(chain, tokens[j]);
-                    address relayToken = r.getRelayChainToken(chain, tokens[j]);
-                    (int256 balance, uint256 pendingOut) = vm.getVaultTokenBalance(pubkey, chain, relayToken);
-                    vaultView.routerTokens[i].coins[j].balance = _adjustDecimalsInt256(balance, vaultView.routerTokens[i].coins[j].decimals);
-                    vaultView.routerTokens[i].coins[j].pendingOut = _adjustDecimals(pendingOut, vaultView.routerTokens[i].coins[j].decimals);
+                    if(toChainToken.length > 0) {
+                        vaultView.routerTokens[i].coins[j].decimals = r.getTokenDecimals(chain, toChainToken);
+                        (int256 balance, uint256 pendingOut) = vm.getVaultTokenBalance(pubkey, chain, tokens[j]);
+                        vaultView.routerTokens[i].coins[j].balance = _adjustDecimalsInt256(balance, vaultView.routerTokens[i].coins[j].decimals);
+                        vaultView.routerTokens[i].coins[j].pendingOut = _adjustDecimals(pendingOut, vaultView.routerTokens[i].coins[j].decimals);
+                    }
                 }
             }
         }
@@ -175,22 +178,18 @@ contract ViewController is BaseImplementation {
     }
 
     function _getRelay() internal view returns (IRelay relay) {
-        relay = IRelay(periphery.getAddress(0));
-    }
-
-    function _getRegistery() internal view returns (IRegistry registery) {
-        registery = IRegistry(periphery.getAddress(3));
+        relay = IRelay(registry.getContractAddress(ContractAddress.RELAY));
     }
 
     function _getGasService() internal view returns (IGasService gasService) {
-        gasService = IGasService(periphery.getAddress(1));
+        gasService = IGasService(registry.getContractAddress(ContractAddress.GAS_SERVICE));
     }
 
     function _getVaultManager() internal view returns (IVaultManager vaultManager) {
-        vaultManager = IVaultManager(periphery.getAddress(2));
+        vaultManager = IVaultManager(registry.getContractAddress(ContractAddress.VAULT_MANAGER));
     }
 
     function _getTSSManager() internal view returns (ITSSManager TSSManager) {
-        TSSManager = ITSSManager(periphery.getAddress(4));
+        TSSManager = ITSSManager(registry.getContractAddress(ContractAddress.TSS_MANAGER));
     }
 }

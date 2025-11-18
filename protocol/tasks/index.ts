@@ -34,10 +34,12 @@ task("upgrade", "upgrade contract")
 // 1. deploy contract
 // 2. set up contract   
 // 3. gateway and relay -> gateway:updateTokens
-// 4. vaultManager -> vaultManager:updateVaultFeeRate
-// 5. vaultManager -> vaultManager:registerToken
-// 6. vaultManager -> vaultManager:updateAllTokenWeights
-// 7. registry -> registry:registerAllChain
-// 8. registry -> registry:registerAllToken
-// 9. registry -> registry:mapAllToken
-// 10.registry -> registry:setAllTokenNickname
+// 4. relay -> relay:addAllChain
+// 5. vaultManager -> vaultManager:updateVaultFeeRate
+// 6. vaultManager -> vaultManager:updateBalanceFeeRate
+// 7. vaultManager -> vaultManager:registerToken
+// 8. vaultManager -> vaultManager:updateAllTokenWeights
+// 9. registry -> registry:registerAllChain
+// 10. registry -> registry:registerAllToken
+// 11. registry -> registry:mapAllToken
+// 12.registry -> registry:setAllTokenNickname

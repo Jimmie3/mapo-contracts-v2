@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ChainType} from "../libs/Types.sol";
+import {ChainType, GasInfo, ContractAddress} from "../libs/Types.sol";
 
 interface IRegistry {
+
+    function getContractAddress(ContractAddress _contractAddress) external view  returns(address);
+
     function getTokenAddressById(uint96 id) external view returns (address token);
+
     // Get token address on target chain
     function getToChainToken(address _token, uint256 _toChain) external view returns (bytes memory _toChainToken);
 
@@ -13,11 +17,16 @@ interface IRegistry {
     view
     returns (bytes memory token, uint8 decimals, bool mintable);
 
-    // Get token amount on target chain
-    function getToChainAmount(address _token, uint256 _amount, uint256 _toChain) external view returns (uint256);
+    function getTargetToken(uint256 _fromChain, uint256 _toChain, bytes memory _fromToken)
+    external
+    view
+    returns (bytes memory toToken, uint8 decimals);
 
     // Get token and vault token address on relay chain
     function getRelayChainToken(uint256 _fromChain, bytes memory _fromToken) external view returns (address);
+
+    // Get token amount on target chain
+    function getToChainAmount(address _token, uint256 _amount, uint256 _toChain) external view returns (uint256);
 
     // Get token amount on relay chain
     function getRelayChainAmount(bytes memory _fromToken, uint256 _fromChain, uint256 _amount)
@@ -25,17 +34,10 @@ interface IRegistry {
         view
         returns (uint256);
 
-    function getTargetToken(uint256 _fromChain, uint256 _toChain, bytes memory _fromToken)
-        external
-        view
-        returns (bytes memory toToken, uint8 decimals, uint256 vaultBalance);
-
     function getTargetAmount(uint256 _fromChain, uint256 _toChain, bytes memory _fromToken, uint256 _amount)
         external
         view
         returns (uint256 toAmount);
-
-    function getBaseFeeReceiver() external view returns (address);
 
     function getChains() external view returns (uint256[] memory);
 
@@ -58,6 +60,19 @@ interface IRegistry {
     function getChainBaseToken(uint256 chain) external view returns (address);
 
     function getTokenAddressByNickname(uint256 chain, string memory nickname) external view returns (bytes memory);
+    
+    function getProtocolFee(address token, uint256 amount) external view returns (address, uint256);
 
-    // function getVaultBalanceByToken(uint256 chain, bytes memory token) external view returns (uint256 vaultBalance);
+    function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) external view returns (uint256);
+
+    function getNetworkFeeInfoWithToken(address token, uint256 chain, bool withCall)
+    external
+    view
+    returns (GasInfo memory);
+
+    function getNetworkFeeInfo(uint256 chain, bool withCall)
+    external
+    view
+    returns (GasInfo memory);
+
 }

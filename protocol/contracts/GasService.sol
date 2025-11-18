@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IGasService} from "./interfaces/IGasService.sol";
-import {IPeriphery} from "./interfaces/IPeriphery.sol";
+import {IRegistry, ContractAddress} from "./interfaces/IRegistry.sol";
 
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
@@ -16,12 +16,12 @@ contract GasService is BaseImplementation, IGasService {
         uint128 transactionSizeWithCall;
     }
 
-    IPeriphery public periphery;
+    IRegistry public registry;
 
     mapping(uint256 => NetworkFee) public chainNetworkFee;
 
     event SetSwap(address _swap);
-    event SetPeriphery(address _periphery);
+    event SetRegistry(address _registry);
     event PostNetworkFee(
         uint256 chain, uint256 height, uint256 transactionSize, uint256 transactionSizeWithCall, uint256 transactionRate
     );
@@ -30,10 +30,10 @@ contract GasService is BaseImplementation, IGasService {
         __BaseImplementation_init(_defaultAdmin);
     }
 
-    function setPeriphery(address _periphery) external restricted {
-        require(_periphery != address(0));
-        periphery = IPeriphery(_periphery);
-        emit SetPeriphery(_periphery);
+    function setRegistry(address _registry) external restricted {
+        require(_registry != address(0));
+        registry = IRegistry(_registry);
+        emit SetRegistry(_registry);
     }
 
     function postNetworkFee(
@@ -43,7 +43,7 @@ contract GasService is BaseImplementation, IGasService {
         uint256 transactionSizeWithCall,
         uint256 transactionRate
     ) external override {
-        _checkAccess(0);
+        _checkAccess(ContractAddress.RELAY);
 
         NetworkFee storage fee = chainNetworkFee[chain];
         fee.height = uint64(height);
@@ -102,7 +102,7 @@ contract GasService is BaseImplementation, IGasService {
         transactionSizeWithCall = fee.transactionSizeWithCall;
     }
 
-    function _checkAccess(uint256 t) internal view {
-        if (msg.sender != periphery.getAddress(t)) revert Errs.no_access();
+    function _checkAccess(ContractAddress contractAddress) internal view {
+        if (msg.sender != registry.getContractAddress(contractAddress)) revert Errs.no_access();
     }
 }

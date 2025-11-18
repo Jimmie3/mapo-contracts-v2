@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.20;
 
 
 import { IFactory } from "./interfaces/IFactory.sol";
@@ -20,7 +20,7 @@ abstract contract BaseScript is Script {
         } else {
             privateKey = vm.envUint("PRIVATE_KEY");
         }
-        
+
         broadcaster = vm.addr(privateKey);
         broadcasterPK = privateKey;
     }

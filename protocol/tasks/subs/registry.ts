@@ -42,7 +42,7 @@ task("registry:registerChainByNetwork", "register Chain info By Network name")
         await registerChain(taskArgs.name, registry, chainToken)
 });
 
-task("registry:removeChain", "register Chain info")
+task("registry:deregisterChain", "deregisterChain")
     .addParam("chain", "chain id")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
@@ -52,9 +52,8 @@ task("registry:removeChain", "register Chain info")
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
         console.log(`removeChain chain(${taskArgs.chain})`);
-        await(await registry.removeChain(taskArgs.chain)).wait();
+        await(await registry.deregisterChain(taskArgs.chain)).wait();
 });
-
 
 task("registry:registerToken", "register Chain info by token name")
     .addParam("name", "token name")
@@ -68,7 +67,7 @@ task("registry:registerToken", "register Chain info by token name")
         let token = await getTokenRegsterByTokenName(network.name, taskArgs.name);
         if(!token || token === null) throw("token not set");
         console.log(`registerToken ${token.name} id(${token.id}), addr(${token.addr}, vaultToken(${token.vaultToken}))`);
-        await(await registry.registerToken(token.id, token.addr, token.vaultToken)).wait();
+        await(await registry.registerToken(token.id, token.addr)).wait();
 });
 
 task("registry:registerAllToken", "register Chain info")
@@ -84,12 +83,13 @@ task("registry:registerAllToken", "register Chain info")
         for (let index = 0; index < tokens.length; index++) {
             const token = tokens[index];
             console.log(`registerToken ${token.name} id(${token.id}), addr(${token.addr}, vaultToken(${token.vaultToken}))`);
-            await(await registry.registerToken(token.id, token.addr, token.vaultToken)).wait();
+            await(await registry.registerToken(token.id, token.addr)).wait();
         }
 });
 
 
-task("registry:setTokenNickname", "set TokenNick name")
+
+task("registry:setTokenTicker", "set TokenNick name")
     .addParam("chain", "chain id")
     .addParam("addr", "token address")
     .addParam("name", "token nickname")
@@ -101,7 +101,7 @@ task("registry:setTokenNickname", "set TokenNick name")
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
         console.log(`set Token Nickname  chain(${taskArgs.chain}), addr(${taskArgs.addr}, name(${taskArgs.name}))`);
-        await(await registry.setTokenNickname(taskArgs.chain, taskArgs.addr, taskArgs.name)).wait();
+        await(await registry.setTokenTicker(taskArgs.chain, taskArgs.addr, taskArgs.name)).wait();
 });
 
 task("registry:setAllTokenNickname", "set TokenNick name")
@@ -125,7 +125,7 @@ task("registry:setAllTokenNickname", "set TokenNick name")
                 let preNickname = await registry.getTokenNickname(element.chainId, token.addr);
                 if(preNickname !== token.name) {
                    console.log(`update Token Nickname  chain(${element.chainId}), addr(${token.addr}, name(${token.name}))`); 
-                   await(await registry.setTokenNickname(element.chainId, token.addr, token.name)).wait();
+                   await(await registry.setTokenTicker(element.chainId, token.addr, token.name)).wait();
                 }
             }
             
@@ -223,12 +223,11 @@ async function registerChain(network: string, registry: Registry, chainToken: {
 
         let router = await getRouter(network);
         console.log(
-            `registerChain ${network} chain(${chainToken.chainId}), chainType(${chainType}), lastScanBlock(${chainToken.lastScanBlock}), router(${router}), gasToken(${chainToken.gasToken}), baseFeeToken(${chainToken.baseFeeToken})`
+            `registerChain ${network} chain(${chainToken.chainId}), chainType(${chainType}), router(${router}), gasToken(${chainToken.gasToken}), baseFeeToken(${chainToken.baseFeeToken})`
         );
         await(await registry.registerChain(
             chainToken.chainId,
             chainType,
-            chainToken.lastScanBlock,
             router,
             chainToken.gasToken,
             chainToken.baseFeeToken,

@@ -18,4 +18,5 @@ library Errs {
     error not_bridge_able();
     error zero_amount_out();
     error approve_token_failed();
+    error token_not_registered();
 }

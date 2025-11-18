@@ -3,6 +3,15 @@ pragma solidity ^0.8.0;
 
 uint256 constant MAX_RATE_UNIT = 1_000_000;         // unit is 0.01 bps
 
+enum ContractAddress { 
+    RELAY,
+    GAS_SERVICE, 
+    VAULT_MANAGER,
+    TSS_MANAGER, 
+    AFFILIATE, 
+    SWAP,
+    PROTOCOL_FEE 
+}
 
 enum ChainType {
     CONTRACT,       // smart contract chain supports a general-purpose smart contract virtual machine (e.g., EVM, WASM).

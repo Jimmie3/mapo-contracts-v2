@@ -1,6 +1,6 @@
 import { task } from "hardhat/config";
 import { VaultManager } from "../../typechain-types/contracts"
-import { getDeploymentByKey, getVaultFeeRate, getTokenRegsterByTokenName, getAllTokenRegster } from "./utils"
+import { getDeploymentByKey, getVaultFeeRate, getTokenRegsterByTokenName, getAllTokenRegster, getBalanceFeeRate } from "./utils"
 
 task("vaultManager:updateVaultFeeRate", "update Vault Fee Rate")
     .setAction(async (taskArgs, hre) => {
@@ -14,6 +14,20 @@ task("vaultManager:updateVaultFeeRate", "update Vault Fee Rate")
         console.log(`pre vaultFeeRate === `, await vaultManager.vaultFeeRate())
         await(await vaultManager.updateVaultFeeRate(vaultFeeRate)).wait()
         console.log(`after vaultFeeRate === `, await vaultManager.vaultFeeRate())
+});
+
+task("vaultManager:updateBalanceFeeRate", "update Balance Fee Rate")
+    .setAction(async (taskArgs, hre) => {
+        const { network, ethers } = hre;
+        const [deployer] = await ethers.getSigners();
+        console.log("deployer address:", await deployer.getAddress())
+        const VaultManagerFactory = await ethers.getContractFactory("VaultManager");
+        let addr = await getDeploymentByKey(network.name, "VaultManager");
+        const vaultManager = VaultManagerFactory.attach(addr) as VaultManager;
+        let balanceFeeRate = await getBalanceFeeRate(network.name);
+        console.log(`pre balanceFeeRate === `, await vaultManager.balanceFeeRate())
+        await(await vaultManager.updateBalanceFeeRate(balanceFeeRate)).wait()
+        console.log(`after balanceFeeRate === `, await vaultManager.balanceFeeRate())
 });
 
 task("vaultManager:setRelay", "set Relay address")
@@ -31,7 +45,7 @@ task("vaultManager:setRelay", "set Relay address")
         console.log(`after relay === `, await vaultManager.relay())
 });
 
-task("vaultManager:setPeriphery", "set Periphery address")
+task("vaultManager:setRegistry", "set registry address")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
         const [deployer] = await ethers.getSigners();
@@ -39,11 +53,11 @@ task("vaultManager:setPeriphery", "set Periphery address")
         const VaultManagerFactory = await ethers.getContractFactory("VaultManager");
         let addr = await getDeploymentByKey(network.name, "VaultManager");
         const vaultManager = VaultManagerFactory.attach(addr) as VaultManager;
-        let periphery = await getDeploymentByKey(network.name, "Periphery");
+        let registry = await getDeploymentByKey(network.name, "Registry");
 
-        console.log(`pre periphery === `, await vaultManager.periphery())
-        await(await vaultManager.setPeriphery(periphery)).wait()
-        console.log(`after periphery === `, await vaultManager.periphery())
+        console.log(`pre registry === `, await vaultManager.registry())
+        await(await vaultManager.setRegistry(registry)).wait()
+        console.log(`after registry === `, await vaultManager.registry())
 });
 
 task("vaultManager:updateTokenWeights", "update Token Weights by token name")

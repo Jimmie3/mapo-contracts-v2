@@ -4,9 +4,8 @@ pragma solidity 0.8.24;
 import {Utils} from "./libs/Utils.sol";
 import {IRelay} from "./interfaces/IRelay.sol";
 import {ITSSManager} from "./interfaces/ITSSManager.sol";
-import {IRegistry} from "./interfaces/IRegistry.sol";
+import {IRegistry, ContractAddress} from "./interfaces/IRegistry.sol";
 import {IGasService} from "./interfaces/IGasService.sol";
-import {IPeriphery} from "./interfaces/IPeriphery.sol";
 import {IVaultManager} from "./interfaces/IVaultManager.sol";
 import {ISwap} from "./interfaces/ISwap.sol";
 import {IAffiliateFeeManager} from "./interfaces/IAffiliateFeeManager.sol";
@@ -28,7 +27,7 @@ contract Relay is BaseGateway, IRelay {
     // todo: save in/out tx hash?
     mapping(bytes32 => bool) private outOrderExecuted;
 
-    IPeriphery public periphery;
+    IRegistry public registry;
     IVaultManager public vaultManager;
 
     struct OrderInfo {
@@ -41,8 +40,7 @@ contract Relay is BaseGateway, IRelay {
 
     mapping(bytes32 => OrderInfo) public orderInfos;
 
-    event SetSwap(address _swap);
-    event SetPeriphery(address _periphery);
+    event SetRegistry(address _registry);
     event SetVaultManager(address _vaultManager);
     event SetAffiliateFeeManager(address _affiliateFeeManager);
 
@@ -108,10 +106,10 @@ contract Relay is BaseGateway, IRelay {
         emit SetVaultManager(_vaultManager);
     }
 
-    function setPeriphery(address _periphery) external restricted {
-        require(_periphery != address(0));
-        periphery = IPeriphery(_periphery);
-        emit SetPeriphery(_periphery);
+    function setRegistry(address _registry) external restricted {
+        require(_registry != address(0));
+        registry = IRegistry(_registry);
+        emit SetRegistry(_registry);
     }
 
     function addChain(
@@ -153,13 +151,13 @@ contract Relay is BaseGateway, IRelay {
 
 
     function rotate(bytes memory retiringVault, bytes memory activeVault) external override {
-        _checkAccess(4);
+        _checkAccess(ContractAddress.TSS_MANAGER);
 
         vaultManager.rotate(retiringVault, activeVault);
     }
 
     function migrate() external override returns (bool) {
-        _checkAccess(4);
+        _checkAccess(ContractAddress.TSS_MANAGER);
 
         (bool completed, TxItem memory txItem, GasInfo memory gasInfo, bytes memory fromVault, bytes memory toVault) = vaultManager.migrate();
         if (completed) {
@@ -210,14 +208,14 @@ contract Relay is BaseGateway, IRelay {
         uint256 transactionSizeWithCall,
         uint256 transactionRate
     ) external override {
-        _checkAccess(4);
+        _checkAccess(ContractAddress.TSS_MANAGER);
 
-        IGasService gasService = IGasService(periphery.getAddress(1));
+        IGasService gasService = IGasService(registry.getContractAddress(ContractAddress.GAS_SERVICE));
         gasService.postNetworkFee(chain, height, transactionSize, transactionSizeWithCall, transactionRate);
     }
 
     function executeTxOut(TxOutItem calldata txOutItem) external override {
-        _checkAccess(4);
+        _checkAccess(ContractAddress.TSS_MANAGER);
 
         if (outOrderExecuted[txOutItem.orderId]) revert Errs.order_executed();
 
@@ -233,7 +231,7 @@ contract Relay is BaseGateway, IRelay {
         TxItem memory txItem;
         txItem.orderId = txOutItem.orderId;
         txItem.chain = chain;
-        txItem.chainType = _getRegistry().getChainType(chain);
+        txItem.chainType = registry.getChainType(chain);
 
         OrderInfo memory order = orderInfos[txOutItem.orderId];
 
@@ -280,7 +278,7 @@ contract Relay is BaseGateway, IRelay {
 
     // swap: affiliate data | relay data | target data
     function executeTxIn(TxInItem calldata txInItem) external override {
-        _checkAccess(4);
+        _checkAccess(ContractAddress.TSS_MANAGER);
 
         if (orderExecuted[txInItem.orderId]) revert Errs.order_executed();
         orderExecuted[txInItem.orderId] = true;
@@ -297,7 +295,7 @@ contract Relay is BaseGateway, IRelay {
         _checkAndMint(txItem.token, txItem.amount);
 
         txItem.chain = fromChain;
-        txItem.chainType = periphery.getChainType(fromChain);
+        txItem.chainType = registry.getChainType(fromChain);
 
         if (!vaultManager.checkVault(txItem, bridgeItem.vault)) {
             // refund if vault is retired
@@ -325,7 +323,7 @@ contract Relay is BaseGateway, IRelay {
                 if (toChain == selfChainId) {
                     txItem.amount = amount;
                     txItem.chain = toChain;
-                    txItem.chainType = periphery.getChainType(txItem.chain);
+                    txItem.chainType = registry.getChainType(txItem.chain);
                     vaultManager.transferComplete(txItem, bridgeItem.vault, 0, 0);
                     emit BridgeCompleted(
                         txInItem.orderId,
@@ -354,7 +352,7 @@ contract Relay is BaseGateway, IRelay {
 
     function _swap(address tokenIn, uint256 amountInt, bytes memory payload) internal returns (address , uint256) {
         (address tokenOut, uint256 amountOutMin) = abi.decode(payload, (address, uint256));
-        ISwap swap = ISwap(periphery.getSwap());
+        ISwap swap = ISwap(registry.getContractAddress(ContractAddress.SWAP));
         _approveToken(tokenIn, amountInt, address(swap));
         uint amountOut = swap.swap(tokenIn, amountInt, tokenOut, amountOutMin);
         _transferFromToken(address(swap), tokenOut, amountOut, address(this));
@@ -382,7 +380,7 @@ contract Relay is BaseGateway, IRelay {
 
             // todo: update target payload
             txItem.chain = toChain;
-            txItem.chainType = periphery.getChainType(toChain);
+            txItem.chainType = registry.getChainType(toChain);
 
             // 3.1 collect to chain vault fee and balance fee
             // 3.2 calculate to chain gas fee
@@ -405,7 +403,7 @@ contract Relay is BaseGateway, IRelay {
             }
 
             txItem.chain = toChain;
-            txItem.chainType = periphery.getChainType(toChain);
+            txItem.chainType = registry.getChainType(toChain);
         }
 
         // todo: check relay min amount
@@ -492,7 +490,7 @@ contract Relay is BaseGateway, IRelay {
     {
         uint256 affiliateFee;
         if (affiliateData.length > 0) {
-            IAffiliateFeeManager affiliateFeeManager = IAffiliateFeeManager(periphery.getAffiliateManager());
+            IAffiliateFeeManager affiliateFeeManager = IAffiliateFeeManager(registry.getContractAddress(ContractAddress.AFFILIATE));
             try affiliateFeeManager.collectAffiliatesFee(txItem.orderId, txItem.token, txItem.amount, affiliateData) returns (uint256 totalFee) {
                 affiliateFee = totalFee;
                 _sendToken(txItem.token, affiliateFee, address(affiliateFeeManager), true);
@@ -501,7 +499,7 @@ contract Relay is BaseGateway, IRelay {
             }
         }
 
-        (address receiver, uint256 protocolFee) = periphery.getProtocolFee(txItem.token, txItem.amount);
+        (address receiver, uint256 protocolFee) = registry.getProtocolFee(txItem.token, txItem.amount);
         _sendToken(txItem.token, protocolFee, receiver, true);
 
         uint256 amount = txItem.amount - affiliateFee - protocolFee;
@@ -610,33 +608,27 @@ contract Relay is BaseGateway, IRelay {
 
 
     function _getRelayChainGasAmount(uint256 chain, uint256 gasAmount) internal view returns (uint256 relayGasAmount) {
-        address gasToken = _getRegistry().getChainGasToken(chain);
-        bytes memory toToken = _getRegistry().getToChainToken(gasToken, chain);
+        address gasToken = registry.getChainGasToken(chain);
+        bytes memory toToken = registry.getToChainToken(gasToken, chain);
 
-        relayGasAmount = _getRegistry().getRelayChainAmount(toToken, chain, gasAmount);
+        relayGasAmount = registry.getRelayChainAmount(toToken, chain, gasAmount);
+        if(gasAmount > 0 && relayGasAmount == 0) revert Errs.token_not_registered();
     }
 
     function _getRelayTokenAndAmount(uint256 chain, bytes memory fromToken, uint256 fromAmount) internal view returns (address token, uint256 amount){
-        IRegistry registry = _getRegistry();
-
         token = registry.getRelayChainToken(chain, fromToken);
         amount = registry.getRelayChainAmount(fromToken, chain, fromAmount);
+        if(fromAmount > 0 && amount == 0) revert Errs.token_not_registered();
     }
 
     function _getToChainTokenAndAmount(uint256 chain, address relayToken, uint256 relayAmount) internal view returns (bytes memory token, uint256 amount){
-        IRegistry registry = _getRegistry();
-
         token = registry.getToChainToken(relayToken, chain);
         amount = registry.getToChainAmount(relayToken, relayAmount, chain);
+        if(relayAmount > 0 && amount == 0) revert Errs.token_not_registered();
     }
-
 
     function _getOrderId() internal returns (bytes32 orderId) {
         return keccak256(abi.encodePacked(selfChainId, address(this), ++nonce));
-    }
-
-    function _getRegistry() internal view returns (IRegistry registry) {
-        registry = IRegistry(periphery.getAddress(3));
     }
 
     function _getChainAndGasLimit(uint256 _fromChain, uint256 _toChain, uint256 _transactionRate, uint256 _transactionSize)
@@ -647,7 +639,7 @@ contract Relay is BaseGateway, IRelay {
         chainAndGasLimit = ((_fromChain << 192) | (_toChain << 128) | (_transactionRate << 64) | _transactionSize);
     }
 
-    function _checkAccess(uint256 t) internal view {
-        if (msg.sender != periphery.getAddress(t)) revert Errs.no_access();
+    function _checkAccess(ContractAddress contractAddress) internal view {
+        if (msg.sender != registry.getContractAddress(contractAddress)) revert Errs.no_access();
     }
 }

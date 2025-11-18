@@ -5,6 +5,12 @@ import {TxItem, GasInfo} from "../libs/Types.sol";
 
 interface IVaultManager {
 
+    function getBridgeChains() external view returns(uint256[] memory);
+
+    function getBridgeTokens() external view returns (address[] memory);
+
+    function getVaultToken(address relayToken) external view returns(address);
+    
     function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view returns(int256 balance, uint256 pendingOut);
 
     function getBalanceFee(uint256 fromChain, uint256 toChain, address token, uint256 amount)

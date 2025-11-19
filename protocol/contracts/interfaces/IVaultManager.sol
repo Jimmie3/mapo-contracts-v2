@@ -75,19 +75,19 @@ interface IVaultManager {
      */
     function redeem(address vaultToken, uint256 share, address owner, address receiver) external returns (uint256 amount);
 
-    /**
-     * @notice Process vault operations for a bridge transfer
-     * @dev Updates source vault, collects bridge fees and vault fees, selects target vault, and calculates cross-chain amount and gas
-     * @param txItem The source transaction item
-     * @param fromVault The source vault public key
-     * @param toChain The destination chain ID
-     * @param withCall True if destination includes swap data (used for gas estimation)
-     * @return choose True if a suitable vault is available for the transfer
-     * @return outAmount The amount to send to destination after fees and gas deduction
-     * @return toVault The selected target vault public key on destination chain
-     * @return gasInfo Gas information for the destination chain transaction
-     */
-    function bridge(TxItem calldata txItem, bytes calldata fromVault, uint256 toChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
+    // /**
+    //  * @notice Process vault operations for a bridge transfer
+    //  * @dev Updates source vault, collects bridge fees and vault fees, selects target vault, and calculates cross-chain amount and gas
+    //  * @param txItem The source transaction item
+    //  * @param fromVault The source vault public key
+    //  * @param toChain The destination chain ID
+    //  * @param withCall True if destination includes swap data (used for gas estimation)
+    //  * @return choose True if a suitable vault is available for the transfer
+    //  * @return outAmount The amount to send to destination after fees and gas deduction
+    //  * @return toVault The selected target vault public key on destination chain
+    //  * @return gasInfo Gas information for the destination chain transaction
+    //  */
+    // function bridge(TxItem calldata txItem, bytes calldata fromVault, uint256 toChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
 
     /**
      * @notice Process vault operations for incoming transfer to relay chain

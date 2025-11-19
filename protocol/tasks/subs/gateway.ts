@@ -35,6 +35,22 @@ task("gateway:setTssAddress", "set tss pubkey")
         console.log(`after pubkey is: `, await gateway.activeTss())
 });
 
+task("gateway:setTransferFailedReceiver", "set Transfer Failed Receiver")
+    .setAction(async (taskArgs, hre) => {
+        const { network, ethers } = hre;
+        const [deployer] = await ethers.getSigners();
+        console.log("deployer address:", await deployer.getAddress())
+        const GatewayFactory = await ethers.getContractFactory("Gateway");
+        let addr = await getDeploymentByKey(network.name, "Gateway");
+        const gateway = GatewayFactory.attach(addr) as Gateway;
+        let transferFailedReceiver = (await getChainTokenByNetwork(network.name)).transferFailedReceiver
+        if(!transferFailedReceiver || transferFailedReceiver.length == 0) return;
+
+        await(await gateway.setTransferFailedReceiver(transferFailedReceiver)).wait();
+
+        console.log(`${network.name} transferFailedReceiver is:`, await gateway.transferFailedReceiver());
+});
+
 
 task("gateway:updateTokens", "update Tokens")
     .setAction(async (taskArgs, hre) => {

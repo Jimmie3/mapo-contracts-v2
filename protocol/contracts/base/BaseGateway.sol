@@ -34,6 +34,8 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
 
     address public wToken;
 
+    address public transferFailedReceiver;
+
     mapping(bytes32 => bytes32) internal orderExecuted;
 
     // token => feature
@@ -72,7 +74,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         address to,
         bytes data      // migration: new vault
     );
-
+    event SetTransferFailedReceiver(address _transferFailedReceiver);
     event BridgeFailed(bytes32 indexed orderId, address token, uint256 amount, bytes data, bytes reason);
 
     error transfer_in_failed();
@@ -99,6 +101,13 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
             tokenFeatureList[_tokens[i]] = _feature;
             emit UpdateTokens(_tokens[i], _feature);
         }
+    }
+
+    function setTransferFailedReceiver(address _transferFailedReceiver) external restricted {
+        require(_transferFailedReceiver != address(0));
+        transferFailedReceiver = _transferFailedReceiver;
+
+        emit SetTransferFailedReceiver(_transferFailedReceiver);
     }
 
     function isOrderExecuted(bytes32 orderId, bool) external view virtual returns (bool) {
@@ -194,18 +203,23 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
 
         if (txItem.amount > 0 && to != address(0)) {
             bool needCall = _needCall(to, bridgeItem.payload.length);
-            bool result = _safeTransferOut(txItem.token, to, txItem.amount, needCall);
-            if (result && needCall) {
-                uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
-                uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
-                try IReceiver(to).onReceived{gas: gasForCall}(
-                    txItem.orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
-                ) {} catch {}
-
+            if (_safeTransferOut(txItem.token, to, txItem.amount, needCall)) {
+                if(needCall) {
+                    uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
+                    uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
+                    try IReceiver(to).onReceived{gas: gasForCall}(
+                        txItem.orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
+                    ) {} catch {}
+                }
                 return;
             }
         }
-
+        if(txItem.amount > 0) {
+            address _transferFailedReceiver = transferFailedReceiver;
+            if(_transferFailedReceiver != address(0)) {
+                _transferOut(txItem.token, _transferFailedReceiver, txItem.amount);
+            }
+        }
         _bridgeFailed(hash, bridgeItem,  txItem, bytes("transferFailed"));
     }
 
@@ -222,20 +236,20 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
 
     function _safeTransferOut(address token, address to, uint256 value, bool needCall) internal returns (bool result) {
         address _wToken = wToken;
-        if (token == _wToken && !needCall) {
+        if(token == _wToken && !needCall) {
             bool success;
             bytes memory data;
             // unwrap wToken
             (success, data) = _wToken.call(abi.encodeWithSelector(0x2e1a7d4d, value));
             result = (success && (data.length == 0 || abi.decode(data, (bool))));
-            if (result) {
-                // transfer native token to the recipient
-                (success, data) = to.call{value: value}("");
-            } else {
-                // if unwrap failed, fallback to transfer wToken
-                (success, data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, value));
-            }
-            result = (success && (data.length == 0 || abi.decode(data, (bool))));
+            if(result) token = ZERO_ADDRESS;
+        } 
+        result = _transferOut(token, to, value);  
+    }
+
+    function _transferOut(address token, address to, uint256 value) internal returns(bool result) {
+        if(token == ZERO_ADDRESS) {
+            (result,) = to.call{value: value}("");
         } else {
             uint256 balanceBefore = IERC20(token).balanceOf(address(this));
             token.call(abi.encodeWithSelector(0xa9059cbb, to, value));

@@ -19,7 +19,6 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {BaseGateway} from "./base/BaseGateway.sol";
 
 contract Relay is BaseGateway, IRelay {
-    uint256 constant MAX_RATE_UNIT = 1_000_000;         // unit is 0.01 bps
 
     mapping(uint256 => uint256) private chainSequence;
     mapping(uint256 => uint256) private chainLastScanBlock;
@@ -116,6 +115,8 @@ contract Relay is BaseGateway, IRelay {
         uint256 _chain,
         uint256 _lastScanBlock
     ) external restricted {
+        if (!registry.isRegistered(_chain)) revert Errs.chain_not_registered();
+
         _updateLastScanBlock(_chain, uint64(_lastScanBlock));
         vaultManager.addChain(_chain);
 
@@ -133,7 +134,7 @@ contract Relay is BaseGateway, IRelay {
 
 
     function isOrderExecuted(bytes32 orderId, bool isTxIn) external view override returns (bool executed) {
-        executed = isTxIn ? orderExecuted[orderId] : outOrderExecuted[orderId];
+        executed = isTxIn ? (orderExecuted[orderId] != ORDER_NOT_EXIST) : outOrderExecuted[orderId];
     }
 
 
@@ -280,8 +281,8 @@ contract Relay is BaseGateway, IRelay {
     function executeTxIn(TxInItem calldata txInItem) external override {
         _checkAccess(ContractType.TSS_MANAGER);
 
-        if (orderExecuted[txInItem.orderId]) revert Errs.order_executed();
-        orderExecuted[txInItem.orderId] = true;
+        if (orderExecuted[txInItem.orderId] != ORDER_NOT_EXIST) revert Errs.order_executed();
+        orderExecuted[txInItem.orderId] = ORDER_EXECUTED;
 
         BridgeItem memory bridgeItem = txInItem.bridgeItem;
 

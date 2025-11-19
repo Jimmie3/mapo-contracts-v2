@@ -20,6 +20,9 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     address internal constant ZERO_ADDRESS = address(0);
     uint256 internal constant MIN_GAS_FOR_LOG = 20_000;
 
+    bytes32 internal constant ORDER_NOT_EXIST = bytes32(0);
+    bytes32 internal constant ORDER_EXECUTED = bytes32(uint256(1));
+
     uint256 constant TOKEN_BRIDGEABLE = 0x01;
     uint256 constant TOKEN_MINTABLE = 0x02;
     uint256 constant TOKEN_BURNFROM = 0x04;
@@ -31,12 +34,12 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
 
     address public wToken;
 
-    mapping(bytes32 => bool) internal orderExecuted;
+    mapping(bytes32 => bytes32) internal orderExecuted;
 
     // token => feature
     mapping(address => uint256) public tokenFeatureList;
 
-    mapping(bytes32 => bool) public failedHash;
+    // mapping(bytes32 => bool) public failedHash;
 
     event SetWToken(address _wToken);
     event UpdateTokens(address token, uint256 feature);
@@ -99,7 +102,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     }
 
     function isOrderExecuted(bytes32 orderId, bool) external view virtual returns (bool) {
-        return orderExecuted[orderId];
+        return (orderExecuted[orderId] != ORDER_NOT_EXIST);
     }
 
     function isMintable(address _token) external view returns (bool) {
@@ -210,7 +213,9 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         if (hash == bytes32(0x00)) {
             hash = _getSignHash(txItem.orderId, bridgeItem);
         }
-        failedHash[hash] = true;
+        // failedHash[hash] = true;
+        // save item hash for retry
+        orderExecuted[txItem.orderId] = hash;
         bytes memory bridgeData = abi.encode(bridgeItem);
         emit BridgeFailed(txItem.orderId, txItem.token, txItem.amount, bridgeData, reason);
     }

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-// import {IReceiver} from "./interfaces/IReceiver.sol";
 import {TxType, BridgeItem, TxItem} from "./libs/Types.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
@@ -53,9 +52,9 @@ contract Gateway is BaseGateway {
         whenNotPaused
         nonReentrant
     {
-        if (orderExecuted[orderId]) revert order_executed();
+        if (orderExecuted[orderId] != ORDER_NOT_EXIST) revert order_executed();
 
-        orderExecuted[orderId] = true;
+        orderExecuted[orderId] = ORDER_EXECUTED;
 
         BridgeItem memory bridgeItem = abi.decode(params, (BridgeItem));
 

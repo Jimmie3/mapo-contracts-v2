@@ -309,11 +309,11 @@ contract Relay is BaseGateway, IRelay {
             address to = Utils.fromBytes(bridgeItem.to);
             _depositIn(txItem, bridgeItem.from, bridgeItem.vault, to);
         } else if (bridgeItem.txType == TxType.TRANSFER) {
+
             (bytes memory affiliateData, bytes memory relayData, bytes memory targetData) =
                 abi.decode(bridgeItem.payload, (bytes, bytes, bytes));
 
-            // collect affiliate and protocol fee first
-            txItem.amount = _collectAffiliateAndProtocolFee(txItem, affiliateData);
+            txItem.amount = _transferInAndCollectFee(txItem, bridgeItem.vault, affiliateData, toChain);
             if (txItem.amount == 0) {
                 // emit complete event
                 emit BridgeError(txItem.orderId, "zero out amount");
@@ -371,49 +371,29 @@ contract Relay is BaseGateway, IRelay {
         GasInfo memory gasInfo;
         uint256 fromChain = txItem.chain;
 
-        if (relayPayload.length > 0) {
-            // 1.1 collect from chain vault fee and balance fee
-            // 1.2 update from chain vault
-            txItem.amount = vaultManager.transferIn(txItem, bridgeItem.vault, toChain);
+        if (relayPayload.length > 0) { 
 
-            // 2 swap
             (txItem.token, txItem.amount) = _swap(txItem.token, txItem.amount, relayPayload);
-
-            // todo: update target payload
-            txItem.chain = toChain;
-            txItem.chainType = registry.getChainType(toChain);
-
-            // 3.1 collect to chain vault fee and balance fee
-            // 3.2 calculate to chain gas fee
-            // 3.3 choose to chain vault
-            // 3.4 update to chain vault
-            (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.transferOut(txItem, fromChain, targetPayload.length > 0);
-            if (!choose) {
-                // no vault
-                revert Errs.invalid_vault();
-            }
-        } else {
-            // 1 collect vault fee and balance fee
-            // 2.1 calculate to chain gas fee
-            // 2.2 choose to chain vault
-            // 3 update from chain and to chain vault
-            (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.bridge(txItem,bridgeItem.vault,  toChain,targetPayload.length > 0);
-            if (!choose) {
-                // no target vault
-                revert Errs.invalid_vault();
-            }
-
-            txItem.chain = toChain;
-            txItem.chainType = registry.getChainType(toChain);
         }
 
-        // todo: check relay min amount
+        txItem.chain = toChain;
+        txItem.chainType = registry.getChainType(toChain);
 
-        bridgeItem.payload = targetPayload;
-        bridgeItem.txType = TxType.TRANSFER;
+        // 2.1 collect to chain vault fee and balance fee
+        // 2.2 calculate to chain gas fee
+        // 2.3 choose to chain vault
+        // 2.4 update to chain vault
+        (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.transferOut(txItem, fromChain, targetPayload.length > 0);
+        if (!choose) {
+            // no vault
+            revert Errs.invalid_vault();
+        }
 
         // 4 emit BridgeRelay event
         if (toChain != selfChainId) {
+            // todo: check relay min amount
+            bridgeItem.payload = targetPayload;
+            bridgeItem.txType = TxType.TRANSFER;
             _emitRelay(fromChain, bridgeItem, txItem, gasInfo);
         }
 
@@ -478,10 +458,18 @@ contract Relay is BaseGateway, IRelay {
             abi.decode(payload, (bytes, bytes, bytes));
 
         // collect affiliate and bridge fee first
-        txItem.amount = _collectAffiliateAndProtocolFee(txItem, affiliateData);
+        txItem.amount = _transferInAndCollectFee(txItem, _getActiveVault(), affiliateData, toChain);
         if (txItem.amount == 0) revert Errs.zero_amount_out();
 
         _executeInternal(bridgeItem, txItem, toChain, relayPayload, targetPayload);
+    }
+
+    function _transferInAndCollectFee(TxItem memory txItem, bytes memory vault, bytes memory affiliateData, uint256 toChain) internal returns(uint256) {
+        // 1 update from chain vault
+        // 2 collect from chain vault fee and balance fee
+        txItem.amount = vaultManager.transferIn(txItem, vault, toChain);
+        // 3 collect affiliate and bridge fee 
+        return _collectAffiliateAndProtocolFee(txItem, affiliateData);
     }
 
 

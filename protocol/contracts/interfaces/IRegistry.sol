@@ -61,6 +61,8 @@ interface IRegistry {
 
     function getChainBaseToken(uint256 chain) external view returns (address);
 
+    function isRegistered(uint256 chain) external view returns (bool);
+
     function getTokenAddressByNickname(uint256 chain, string memory nickname) external view returns (bytes memory);
 
     function getProtocolFee(address token, uint256 amount) external view returns (address, uint256);

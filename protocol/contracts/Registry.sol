@@ -2,6 +2,7 @@
 pragma solidity 0.8.25;
 
 import {Utils} from "./libs/Utils.sol";
+import {Errs} from "./libs/Errors.sol";
 import {ISwap} from "./interfaces/swap/ISwap.sol";
 import {IGasService} from "./interfaces/IGasService.sol";
 import {IProtocolFee} from "./interfaces/periphery/IProtocolFee.sol";
@@ -19,8 +20,10 @@ contract Registry is BaseImplementation, IRegistry {
     uint256 public immutable selfChainId = block.chainid;
 
     struct TokenInfo {
+        bool registered;
         uint8 decimals;
         bool mintable;
+        uint256 chainId;
         bytes token;
     }
 
@@ -34,6 +37,7 @@ contract Registry is BaseImplementation, IRegistry {
     }
 
     struct ChainInfo {
+        bool registered;
         ChainType chainType;
         address gasToken;           // the chain native token address mapped on relay chain
         address baseFeeToken;       // the base fee token address mapped on relay chain
@@ -48,8 +52,8 @@ contract Registry is BaseImplementation, IRegistry {
 
     EnumerableSet.UintSet private chainList;
     mapping(ContractType => address) public addresses;
-    mapping(uint256 => string) private chainToNames;
-    mapping(string => uint256) private nameToChain;
+
+    mapping(string => uint256) private nameToChainId;
     mapping(uint256 => ChainInfo) private chainInfos;
 
     // hash(chainId, tokenAddress)
@@ -68,21 +72,20 @@ contract Registry is BaseImplementation, IRegistry {
     mapping(uint256 => mapping(string => bytes)) public tokenNicknameToAddress;
 
     event RegisterContract(ContractType contractAddress, address _addr);
-    event RegisterToken(uint96 indexed id, address indexed _token);
-    event MapToken(address indexed _token, uint256 indexed _fromChain, bytes _fromToken, uint8 _decimals);
-    event DeregisterChain(uint256 chain);
+
     event RegisterChain(uint256 _chain, ChainType _chainType, bytes _router, string _chainName, address _gasToken);
+    event DeregisterChain(uint256 chain);
+
+    event RegisterToken(uint96 indexed id, address indexed _token);
+
+    event MapToken(address indexed _token, uint256 indexed _fromChain, bytes _fromToken, uint8 _decimals);
     event UnmapToken(uint256 indexed _fromChain, bytes _fromToken);
+
     event SetTokenTicker(uint256 _chain, bytes _token, string _nickname);
 
-    error zero_address();
-    error invalid_token();
-    error map_token_relay_chain();
-    error relay_token_not_registered();
-    error chain_not_registered();
 
     modifier checkAddress(address _address) {
-        if(_address != address(0)) revert zero_address();
+        if(_address != address(0)) revert Errs.zero_address();
         _;
     }
 
@@ -90,9 +93,9 @@ contract Registry is BaseImplementation, IRegistry {
         __BaseImplementation_init(_defaultAdmin);
     }
 
-    function registerContract(ContractType _contractAddress, address _addr) external restricted checkAddress(_addr) {
-        addresses[_contractAddress] = _addr;
-        emit RegisterContract(_contractAddress, _addr);
+    function registerContract(ContractType _contractType, address _addr) external restricted checkAddress(_addr) {
+        addresses[_contractType] = _addr;
+        emit RegisterContract(_contractType, _addr);
     }
 
     function registerChain(
@@ -104,6 +107,11 @@ contract Registry is BaseImplementation, IRegistry {
         string memory _chainName
     ) external restricted {
         ChainInfo storage chainInfo = chainInfos[_chain];
+
+        // string memory oldName = chainInfo.name[_chain];
+        delete nameToChainId[chainInfo.name];
+
+        chainInfo.registered = true;
         chainInfo.router = _router;
 
         // check gasToken and baseToken
@@ -113,13 +121,10 @@ contract Registry is BaseImplementation, IRegistry {
         chainInfo.gasToken = _gasToken;
         chainInfo.baseFeeToken = _baseToken;
 
-        string memory oldName = chainToNames[_chain];
-        delete nameToChain[oldName];
-
         chainInfo.name = _chainName;
         chainInfo.chainType = _chainType;
 
-        nameToChain[_chainName] = _chain;
+        nameToChainId[_chainName] = _chain;
         chainList.add(_chain);
 
         emit RegisterChain(_chain, _chainType, _router, _chainName, _gasToken);
@@ -127,7 +132,11 @@ contract Registry is BaseImplementation, IRegistry {
 
     function deregisterChain(uint256 _chain) external restricted {
         ChainInfo storage chainInfo = chainInfos[_chain];
-        delete nameToChain[chainInfo.name];
+        if (!chainInfo.registered) revert Errs.chain_not_registered();
+
+        require(chainInfo.tokens.length() == 0);
+
+        delete nameToChainId[chainInfo.name];
         delete chainInfos[_chain];
         chainList.remove(_chain);
         emit DeregisterChain(_chain);
@@ -154,12 +163,12 @@ contract Registry is BaseImplementation, IRegistry {
         restricted
         checkAddress(_token)
     {
-        if (Utils.bytesEq(_fromToken, bytes(""))) revert invalid_token();
-        if(_fromChain == selfChainId) revert map_token_relay_chain();
-        if (!chainList.contains(_fromChain)) revert chain_not_registered();
+        if (Utils.bytesEq(_fromToken, bytes(""))) revert Errs.invalid_token();
+        if(_fromChain == selfChainId) revert Errs.map_token_relay_chain();
+        if (!chainList.contains(_fromChain)) revert Errs.chain_not_registered();
 
         Token storage token = tokenList[_token];
-        if (token.tokenAddress == address(0)) revert relay_token_not_registered();
+        if (token.tokenAddress == address(0)) revert Errs.relay_token_not_registered();
 
         token.decimals[_fromChain] = _decimals;
         token.mappingList[_fromChain] = _fromToken;
@@ -171,9 +180,9 @@ contract Registry is BaseImplementation, IRegistry {
     }
 
     function unmapToken(uint256 _fromChain, bytes memory _fromToken) external restricted {
-        if (_fromChain == selfChainId) revert map_token_relay_chain();
+        if (_fromChain == selfChainId) revert Errs.map_token_relay_chain();
         address relayToken = tokenMappingList[_fromChain][_fromToken];
-        if (relayToken != address(0)) revert relay_token_not_registered();
+        if (relayToken != address(0)) revert Errs.relay_token_not_registered();
 
         Token storage token = tokenList[relayToken];
         if (token.tokenAddress != address(0)) {
@@ -316,6 +325,10 @@ contract Registry is BaseImplementation, IRegistry {
         return chainInfos[chain].baseFeeToken;
     }
 
+    function isRegistered(uint256 chain) external view override returns (bool) {
+        return chainInfos[chain].registered;
+    }
+
     function getTokenDecimals(uint256 chain, bytes calldata token) external view override returns (uint256) {
         address relayToken = tokenMappingList[chain][token];
         Token storage t = tokenList[relayToken];
@@ -327,7 +340,7 @@ contract Registry is BaseImplementation, IRegistry {
     }
 
     function getChainByName(string memory name) external view override returns (uint256) {
-        return nameToChain[name];
+        return nameToChainId[name];
     }
 
     function getTokenNickname(uint256 chain, bytes memory token) external view override returns (string memory) {

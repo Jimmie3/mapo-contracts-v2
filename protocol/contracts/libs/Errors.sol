@@ -19,4 +19,10 @@ library Errs {
     error zero_amount_out();
     error approve_token_failed();
     error token_not_registered();
+
+    error zero_address();
+    error invalid_token();
+    error map_token_relay_chain();
+    error relay_token_not_registered();
+    error chain_not_registered();
 }

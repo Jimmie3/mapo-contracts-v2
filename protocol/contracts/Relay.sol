@@ -229,10 +229,7 @@ contract Relay is BaseGateway, IRelay {
 
         _updateLastScanBlock(chain, txOutItem.height);
 
-        TxItem memory txItem;
-        txItem.orderId = txOutItem.orderId;
-        txItem.chain = chain;
-        txItem.chainType = registry.getChainType(chain);
+        TxItem memory txItem = _getTxItem(txOutItem.orderId, txOutItem.bridgeItem, chain);
 
         OrderInfo memory order = orderInfos[txOutItem.orderId];
 
@@ -245,7 +242,7 @@ contract Relay is BaseGateway, IRelay {
             uint256 gasForSender = 0;
             uint256 transferAmount = 0;
 
-            (txItem.token, txItem.amount) = _getRelayTokenAndAmount(chain, bridgeItem.token, bridgeItem.amount);
+            // (txItem.token, txItem.amount) = _getRelayTokenAndAmount(chain, bridgeItem.token, bridgeItem.amount);
 
             if (bridgeItem.txType == TxType.MIGRATE) {
                 (gasForSender, transferAmount) = vaultManager.migrationComplete(txItem, bridgeItem.vault, bridgeItem.payload, uint128(usedGas), order.estimateGas);
@@ -261,21 +258,21 @@ contract Relay is BaseGateway, IRelay {
 
         } else {
             // refund from retired vault on non-contract vault
+            // no need update vault balance
         }
 
         delete orderInfos[txOutItem.orderId];
 
         emit BridgeCompleted(
             txOutItem.orderId,
-            bridgeItem.chainAndGasLimit,
-            bridgeItem.txType,
-            bridgeItem.vault,
-            bridgeItem.sequence,
+            txOutItem.bridgeItem.chainAndGasLimit,
+            txOutItem.bridgeItem.txType,
+            txOutItem.bridgeItem.vault,
+            txOutItem.bridgeItem.sequence,
             txOutItem.sender,
-            bridgeItem.payload
+            txOutItem.bridgeItem.payload
         );
     }
-
 
     // swap: affiliate data | relay data | target data
     function executeTxIn(TxInItem calldata txInItem) external override {
@@ -290,13 +287,7 @@ contract Relay is BaseGateway, IRelay {
 
         _updateLastScanBlock(fromChain, txInItem.height);
 
-        TxItem memory txItem;
-        txItem.orderId = txInItem.orderId;
-        (txItem.token, txItem.amount) = _getRelayTokenAndAmount(fromChain, bridgeItem.token, bridgeItem.amount);
-        _checkAndMint(txItem.token, txItem.amount);
-
-        txItem.chain = fromChain;
-        txItem.chainType = registry.getChainType(fromChain);
+        TxItem memory txItem = _getTxItem(txInItem.orderId, txInItem.bridgeItem, fromChain);
 
         if (!vaultManager.checkVault(txItem, bridgeItem.vault)) {
             // refund if vault is retired
@@ -305,23 +296,28 @@ contract Relay is BaseGateway, IRelay {
             return _refund(bridgeItem, txItem, true);
         }
 
+        _checkAndMint(txItem.token, txItem.amount);
+        // update source vault first
+        vaultManager.updateFromVault(txItem, txInItem.bridgeItem.vault, toChain);
+
         if (bridgeItem.txType == TxType.DEPOSIT) {
             address to = Utils.fromBytes(bridgeItem.to);
             _depositIn(txItem, bridgeItem.from, bridgeItem.vault, to);
         } else if (bridgeItem.txType == TxType.TRANSFER) {
-
             (bytes memory affiliateData, bytes memory relayData, bytes memory targetData) =
                 abi.decode(bridgeItem.payload, (bytes, bytes, bytes));
 
-            txItem.amount = _transferInAndCollectFee(txItem, bridgeItem.vault, affiliateData, toChain);
+            // collect affiliate and bridge fee
+            txItem.amount = _collectAffiliateAndProtocolFee(txItem, affiliateData);
             if (txItem.amount == 0) {
                 // emit complete event
                 emit BridgeError(txItem.orderId, "zero out amount");
                 return;
             }
 
-            try this.execute(bridgeItem, txItem, toChain, relayData, targetData) returns (uint256 amount) {
+            try this.execute(bridgeItem, txItem, toChain, relayData, targetData) returns (address token, uint256 amount) {
                 if (toChain == selfChainId) {
+                    txItem.token = token;
                     txItem.amount = amount;
                     txItem.chain = toChain;
                     txItem.chainType = registry.getChainType(txItem.chain);
@@ -351,7 +347,7 @@ contract Relay is BaseGateway, IRelay {
         }
     }
 
-    function _swap(address tokenIn, uint256 amountInt, bytes memory payload) internal returns (address , uint256) {
+    function _swap(address tokenIn, uint256 amountInt, bytes calldata payload) internal returns (address , uint256) {
         (address tokenOut, uint256 amountOutMin) = abi.decode(payload, (address, uint256));
         ISwap swap = ISwap(registry.getContractAddress(ContractType.SWAP));
         _approveToken(tokenIn, amountInt, address(swap));
@@ -360,33 +356,50 @@ contract Relay is BaseGateway, IRelay {
         return (tokenOut, amountOut);
     }
 
-    function execute(BridgeItem calldata bridgeItem, TxItem calldata txItem, uint256 toChain, bytes calldata relayPayload, bytes calldata targetPayload) public returns (uint256) {
+    function execute(BridgeItem calldata bridgeItem, TxItem calldata txItem, uint256 toChain, bytes calldata relayPayload, bytes calldata targetPayload) public returns (address, uint256) {
         require(msg.sender == address(this));
         return _executeInternal(bridgeItem, txItem, toChain, relayPayload, targetPayload);
     }
 
 
-    function _executeInternal(BridgeItem memory bridgeItem, TxItem memory txItem, uint256 toChain, bytes memory relayPayload, bytes memory targetPayload) internal returns (uint256) {
+    function _executeInternal(BridgeItem memory bridgeItem, TxItem memory txItem, uint256 toChain, bytes calldata relayPayload, bytes calldata targetPayload) internal returns (address, uint256) {
         bool choose;
         GasInfo memory gasInfo;
         uint256 fromChain = txItem.chain;
 
-        if (relayPayload.length > 0) { 
+        if (relayPayload.length > 0) {
+            // 1 collect from chain vault fee and balance fee
+            txItem.amount = vaultManager.transferIn(txItem, bridgeItem.vault, toChain);
 
+            // 2 swap
             (txItem.token, txItem.amount) = _swap(txItem.token, txItem.amount, relayPayload);
-        }
 
-        txItem.chain = toChain;
-        txItem.chainType = registry.getChainType(toChain);
+            // todo: update target payload
+            txItem.chain = toChain;
+            txItem.chainType = registry.getChainType(toChain);
 
-        // 2.1 collect to chain vault fee and balance fee
-        // 2.2 calculate to chain gas fee
-        // 2.3 choose to chain vault
-        // 2.4 update to chain vault
-        (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.transferOut(txItem, fromChain, targetPayload.length > 0);
-        if (!choose) {
-            // no vault
-            revert Errs.invalid_vault();
+            // 3.1 collect to chain vault fee and balance fee
+            // 3.2 calculate to chain gas fee
+            // 3.3 choose to chain vault
+            // 3.4 update to chain vault
+            (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.transferOut(txItem, fromChain, targetPayload.length > 0);
+            if (!choose) {
+                // no vault
+                revert Errs.invalid_vault();
+            }
+        } else {
+            // 1 collect vault fee and balance fee
+            // 2.1 calculate to chain gas fee
+            // 2.2 choose to chain vault
+            // 3 update from chain and to chain vault
+            (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.bridgeOut(txItem,bridgeItem.vault,  toChain,targetPayload.length > 0);
+            if (!choose) {
+                // no target vault
+                revert Errs.invalid_vault();
+            }
+
+            txItem.chain = toChain;
+            txItem.chainType = registry.getChainType(toChain);
         }
 
         // 4 emit BridgeRelay event
@@ -397,7 +410,7 @@ contract Relay is BaseGateway, IRelay {
             _emitRelay(fromChain, bridgeItem, txItem, gasInfo);
         }
 
-        return txItem.amount;
+        return (txItem.token, txItem.amount);
     }
 
     function _bridgeIn(TxItem memory txItem, BridgeItem memory bridgeItem) internal {
@@ -426,11 +439,12 @@ contract Relay is BaseGateway, IRelay {
         override
     {
         TxItem memory txItem = TxItem({
-        orderId: _orderId,
-        chain: selfChainId,
-        chainType: ChainType.CONTRACT,
-        token: _outToken,
-        amount: _amount});
+            orderId: _orderId,
+            chain: selfChainId,
+            chainType: ChainType.CONTRACT,
+            token: _outToken,
+            amount: _amount,
+            vaultKey: vaultManager.getActiveVaultKey() });
         bytes memory vault = vaultManager.getActiveVault();
 
         _depositIn(txItem,  Utils.toBytes(_from), vault, _to);
@@ -458,20 +472,11 @@ contract Relay is BaseGateway, IRelay {
             abi.decode(payload, (bytes, bytes, bytes));
 
         // collect affiliate and bridge fee first
-        txItem.amount = _transferInAndCollectFee(txItem, _getActiveVault(), affiliateData, toChain);
+        txItem.amount = _collectAffiliateAndProtocolFee(txItem, affiliateData);
         if (txItem.amount == 0) revert Errs.zero_amount_out();
 
         _executeInternal(bridgeItem, txItem, toChain, relayPayload, targetPayload);
     }
-
-    function _transferInAndCollectFee(TxItem memory txItem, bytes memory vault, bytes memory affiliateData, uint256 toChain) internal returns(uint256) {
-        // 1 update from chain vault
-        // 2 collect from chain vault fee and balance fee
-        txItem.amount = vaultManager.transferIn(txItem, vault, toChain);
-        // 3 collect affiliate and bridge fee 
-        return _collectAffiliateAndProtocolFee(txItem, affiliateData);
-    }
-
 
     function _collectAffiliateAndProtocolFee(TxItem memory txItem, bytes memory affiliateData)
     internal
@@ -605,6 +610,25 @@ contract Relay is BaseGateway, IRelay {
         token = registry.getToChainToken(relayToken, chain);
         amount = registry.getToChainAmount(relayToken, relayAmount, chain);
         if(relayAmount > 0 && amount == 0) revert Errs.token_not_registered();
+    }
+
+
+    function _getTxItem(bytes32 orderId, BridgeItem calldata bridgeItem, uint256 chain) internal returns (TxItem memory) {
+        TxItem memory txItem;
+
+        txItem.token = registry.getRelayChainToken(chain, bridgeItem.token);
+        if (txItem.token == ZERO_ADDRESS) revert Errs.token_not_registered();
+
+        txItem.amount = registry.getRelayChainAmount(bridgeItem.token, chain, bridgeItem.amount);
+        if (bridgeItem.amount > 0 && txItem.amount == 0) revert Errs.token_not_registered();
+
+        txItem.chain = chain;
+        txItem.chainType = registry.getChainType(chain);
+
+        txItem.orderId = orderId;
+        txItem.vaultKey = Utils.getVaultKey(bridgeItem.vault);
+
+        return txItem;
     }
 
     function _getOrderId() internal returns (bytes32 orderId) {

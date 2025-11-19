@@ -22,6 +22,8 @@ interface IVaultManager {
 
     function checkVault(TxItem calldata txItem, bytes calldata vault) external view returns (bool);
 
+    function getActiveVaultKey() external view returns (bytes32);
+
     function getActiveVault() external view returns (bytes memory);
 
     function getRetiringVault() external view returns (bytes memory);
@@ -87,7 +89,10 @@ interface IVaultManager {
     //  * @return toVault The selected target vault public key on destination chain
     //  * @return gasInfo Gas information for the destination chain transaction
     //  */
-    // function bridge(TxItem calldata txItem, bytes calldata fromVault, uint256 toChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
+    function bridgeOut(TxItem calldata txItem, bytes calldata fromVault, uint256 toChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
+
+
+    function updateFromVault(TxItem calldata txItem, bytes calldata fromVault, uint256) external;
 
     /**
      * @notice Process vault operations for incoming transfer to relay chain

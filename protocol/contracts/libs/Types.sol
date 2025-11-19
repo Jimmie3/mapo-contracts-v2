@@ -30,6 +30,7 @@ enum TxType {
 
 struct TxItem {
     bytes32 orderId;
+    bytes32 vaultKey;
     uint256 chain;
     ChainType chainType;
     address token;

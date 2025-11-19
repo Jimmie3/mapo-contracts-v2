@@ -11,7 +11,7 @@ interface IVaultManager {
 
     function getVaultToken(address relayToken) external view returns(address);
 
-    function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view returns(int256 balance, uint256 pendingOut);
+    function getVaultTokenBalance(bytes calldata vault, uint256 chain, address token) external view returns(int256 balance, uint256 pendingOut);
 
     function getBalanceFee(uint256 fromChain, uint256 toChain, address token, uint256 amount)
     external
@@ -67,13 +67,13 @@ interface IVaultManager {
     /**
      * @notice Process vault operations for redeeming vault tokens to withdraw assets
      * @dev Burns vault tokens, updates vault state for asset withdrawal from relay chain
-     * @param _vaultToken The vault token contract address
-     * @param _share The amount of vault tokens to redeem
-     * @param _owner The owner of the vault tokens
-     * @param _receiver The recipient of the underlying assets
+     * @param vaultToken The vault token contract address
+     * @param share The amount of vault tokens to redeem
+     * @param owner The owner of the vault tokens
+     * @param receiver The recipient of the underlying assets
      * @return amount The amount of underlying assets to be withdrawn
      */
-    function redeem(address _vaultToken, uint256 _share, address _owner, address _receiver) external returns (uint256 amount);
+    function redeem(address vaultToken, uint256 share, address owner, address receiver) external returns (uint256 amount);
 
     /**
      * @notice Process vault operations for a bridge transfer

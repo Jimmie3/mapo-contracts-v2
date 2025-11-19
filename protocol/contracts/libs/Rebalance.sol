@@ -75,7 +75,7 @@ library Rebalance {
         return MAX_RATE_UNIT * info.wt * (s1 - s2) / (info.wx * info.wy * info.vt * info.vt);
     }
 
-    function calcBalanceRate(BalanceInfo memory info, BalanceFeeRate memory balanceFeeRate, int256 deltaSMax) internal pure returns (int24) {
+    function calcBalanceRate(BalanceInfo memory info, BalanceFeeRate memory balanceFeeRate, int256 deltaSMax) internal pure returns (int32) {
         int256 deltaS;
         if (info.wy == 0) {
             deltaS = calcRelayBalanceChange(info, true);
@@ -98,7 +98,7 @@ library Rebalance {
             rate = MAX_RATE_UNIT * deltaPercent * maxChange / maxDelta + balanceFeeRate.minBalance;
         }
 
-        return int24(rate);
+        return int32(rate);
     }
 
 

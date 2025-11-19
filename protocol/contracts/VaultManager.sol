@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {Utils} from "./libs/Utils.sol";
+//import {Utils} from "./libs/Utils.sol";
 import {IVaultToken} from "./interfaces/IVaultToken.sol";
 import {IRegistry} from "./interfaces/IRegistry.sol";
 
@@ -187,7 +187,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     // token => vaultToken
     EnumerableMap.AddressToAddressMap private tokenList;
 
-    mapping(address => TokenState) public tokenStates;
+    mapping(address => TokenState) private tokenStates;
 
     // token => amount
     mapping(address => uint256) public balanceFees;
@@ -233,6 +233,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
     }
 
     function registerToken(address _token, address _vaultToken) external restricted {
+        // todo: check token register
+
         IVaultToken vault = IVaultToken(_vaultToken);
         if (_token != vault.asset()) revert Errs.invalid_vault_token();
 
@@ -377,7 +379,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         return tokenList.keys();
     }
 
-   function getVaultTokenBalance(bytes memory vault, uint256 chain, address token) external view returns(int256 balance, uint256 pendingOut) {
+   function getVaultTokenBalance(bytes calldata vault, uint256 chain, address token) external view returns(int256 balance, uint256 pendingOut) {
        ChainType chainType = registry.getChainType(chain);
        if (chainType == ChainType.CONTRACT) {
             TokenChainState storage state =  tokenStates[token].chainStates[chain];
@@ -484,7 +486,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
         _updateFromVault(vaultKey, txItem, false);
 
-        _updateToVaultPending(vaultKey, txOutItem.chainType, txOutItem.chain, txOutItem.token,uint128(totalOutAmount),   false);
+        _updateToVaultPending(vaultKey, txOutItem.chainType, txOutItem.chain, txOutItem.token, uint128(totalOutAmount),   false);
 
         return (true, outAmount, vaultList[vaultKey].pubkey, gasInfo);
     }

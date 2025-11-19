@@ -6,6 +6,7 @@
             "chainType": "contract",
             "gasToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91", 
             "baseFeeToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91",
+            "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
             "tokens": [
                 {
                     "name": "BTC",
@@ -37,6 +38,7 @@
             "chainType": "contract",
             "gasToken": "0x71239b11Ad68e27609e42cA6723645172FDB02c7", 
             "baseFeeToken": "0x71239b11Ad68e27609e42cA6723645172FDB02c7",
+            "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
             "tokens": [
                 {
                     "name": "BTC",
@@ -68,6 +70,7 @@
             "chainType": "contract",
             "gasToken": "0x4f2E7AE1B0b36da92F44903b3b5631f97F2CD52d", 
             "baseFeeToken": "0x4f2E7AE1B0b36da92F44903b3b5631f97F2CD52d",
+            "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
             "tokens": [
                 {
                     "name": "BTC",
@@ -99,6 +102,7 @@
             "chainType": "no-contract",
             "gasToken": "0x425443", 
             "baseFeeToken": "0x425443",
+            "transferFailedReceiver": "",
             "tokens": [
                 {
                     "name": "BTC",

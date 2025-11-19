@@ -53,6 +53,7 @@ type ChainToken = {
         chainType: string,
         gasToken: string,
         baseFeeToken:string,
+        transferFailedReceiver:string
         tokens: Token[]
     }
 }

@@ -243,8 +243,8 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
             (success, data) = _wToken.call(abi.encodeWithSelector(0x2e1a7d4d, value));
             result = (success && (data.length == 0 || abi.decode(data, (bool))));
             if(result) token = ZERO_ADDRESS;
-        } 
-        result = _transferOut(token, to, value);  
+        }
+        result = _transferOut(token, to, value);
     }
 
     function _transferOut(address token, address to, uint256 value) internal returns(bool result) {

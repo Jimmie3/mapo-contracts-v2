@@ -222,14 +222,14 @@ contract Relay is BaseGateway, IRelay {
 
         outOrderExecuted[txOutItem.orderId] = true;
 
-        BridgeItem memory bridgeItem = txOutItem.bridgeItem;
+        BridgeItem calldata bridgeItem = txOutItem.bridgeItem;
 
         (, uint256 chain) = _getFromAndToChain(bridgeItem.chainAndGasLimit);
         if(chain == selfChainId) return;
 
         _updateLastScanBlock(chain, txOutItem.height);
 
-        TxItem memory txItem = _getTxItem(txOutItem.orderId, txOutItem.bridgeItem, chain);
+        TxItem memory txItem = _getTxItem(txOutItem.orderId, bridgeItem, chain);
 
         OrderInfo memory order = orderInfos[txOutItem.orderId];
 
@@ -238,16 +238,16 @@ contract Relay is BaseGateway, IRelay {
             usedGas = registry.getRelayChainGasAmount(chain, txOutItem.gasUsed);
         }
 
-        if (vaultManager.checkVault(txItem, bridgeItem.vault)) {
+        if (vaultManager.checkVault(txItem)) {
             uint256 gasForSender = 0;
             uint256 transferAmount = 0;
 
             // (txItem.token, txItem.amount) = _getRelayTokenAndAmount(chain, bridgeItem.token, bridgeItem.amount);
 
             if (bridgeItem.txType == TxType.MIGRATE) {
-                (gasForSender, transferAmount) = vaultManager.migrationComplete(txItem, bridgeItem.vault, bridgeItem.payload, uint128(usedGas), order.estimateGas);
+                (gasForSender, transferAmount) = vaultManager.migrationComplete(txItem, bridgeItem.payload, uint128(usedGas), order.estimateGas);
             } else {
-                (gasForSender, transferAmount) = vaultManager.transferComplete(txItem, bridgeItem.vault, uint128(usedGas), order.estimateGas);
+                (gasForSender, transferAmount) = vaultManager.transferComplete(txItem, uint128(usedGas), order.estimateGas);
             }
             if (gasForSender > 0) {
                 _sendToken(txItem.token, gasForSender, txOutItem.sender, true);
@@ -281,28 +281,26 @@ contract Relay is BaseGateway, IRelay {
         if (orderExecuted[txInItem.orderId] != ORDER_NOT_EXIST) revert Errs.order_executed();
         orderExecuted[txInItem.orderId] = ORDER_EXECUTED;
 
-        BridgeItem memory bridgeItem = txInItem.bridgeItem;
+        BridgeItem calldata bridgeItem = txInItem.bridgeItem;
 
         (uint256 fromChain, uint256 toChain) = _getFromAndToChain(bridgeItem.chainAndGasLimit);
 
         _updateLastScanBlock(fromChain, txInItem.height);
 
-        TxItem memory txItem = _getTxItem(txInItem.orderId, txInItem.bridgeItem, fromChain);
+        TxItem memory txItem = _getTxItem(txInItem.orderId, bridgeItem, fromChain);
 
-        if (!vaultManager.checkVault(txItem, bridgeItem.vault)) {
+        if (!vaultManager.checkVault(txItem)) {
             // refund if vault is retired
-            bridgeItem.to = txInItem.refundAddr;
-            bridgeItem.payload = bytes("");
-            return _refund(bridgeItem, txItem, true);
+            return _refund(bridgeItem.from, txInItem.refundAddr, bridgeItem.vault, txItem, true);
         }
 
         _checkAndMint(txItem.token, txItem.amount);
-        // update source vault first
-        vaultManager.updateFromVault(txItem, txInItem.bridgeItem.vault, toChain);
+        // update source vault and relay chain vault balance
+        vaultManager.updateFromVault(txItem, toChain);
 
         if (bridgeItem.txType == TxType.DEPOSIT) {
             address to = Utils.fromBytes(bridgeItem.to);
-            _depositIn(txItem, bridgeItem.from, bridgeItem.vault, to);
+            _depositIn(txItem, bridgeItem.from, to);
         } else if (bridgeItem.txType == TxType.TRANSFER) {
             (bytes memory affiliateData, bytes memory relayData, bytes memory targetData) =
                 abi.decode(bridgeItem.payload, (bytes, bytes, bytes));
@@ -315,15 +313,15 @@ contract Relay is BaseGateway, IRelay {
                 return;
             }
 
-            try this.execute(bridgeItem, txItem, toChain, relayData, targetData) returns (address token, uint256 amount) {
+            try this.execute(bridgeItem.from, bridgeItem.to, txItem, toChain, relayData, targetData) returns (address token, uint256 amount) {
                 if (toChain == selfChainId) {
                     txItem.token = token;
                     txItem.amount = amount;
                     txItem.chain = toChain;
-                    txItem.chainType = registry.getChainType(txItem.chain);
-                    vaultManager.transferComplete(txItem, bridgeItem.vault, 0, 0);
+                    txItem.chainType = ChainType.CONTRACT;
+                    vaultManager.transferComplete(txItem, 0, 0);
                     emit BridgeCompleted(
-                        txInItem.orderId,
+                        txItem.orderId,
                         bridgeItem.chainAndGasLimit,
                         bridgeItem.txType,
                         bridgeItem.vault,
@@ -331,23 +329,21 @@ contract Relay is BaseGateway, IRelay {
                         msg.sender,
                         targetData
                     );
-                    _bridgeIn(txItem, bridgeItem);
+
+                    _bridgeIn(txItem, bridgeItem, targetData);
                 }
             } catch (bytes memory) {
                 // txItem.chain = fromChain;
                 // txItem.chainType = periphery.getChainType(fromChain);
 
-                bridgeItem.to = txInItem.refundAddr;
-                bridgeItem.payload = bytes("");
-
-                _refund(bridgeItem, txItem, false);
+                _refund(txInItem.bridgeItem.from, txInItem.refundAddr, txInItem.bridgeItem.vault, txItem, false);
 
                 return;
             }
         }
     }
 
-    function _swap(address tokenIn, uint256 amountInt, bytes calldata payload) internal returns (address , uint256) {
+    function _swap(address tokenIn, uint256 amountInt, bytes memory payload) internal returns (address , uint256) {
         (address tokenOut, uint256 amountOutMin) = abi.decode(payload, (address, uint256));
         ISwap swap = ISwap(registry.getContractAddress(ContractType.SWAP));
         _approveToken(tokenIn, amountInt, address(swap));
@@ -356,20 +352,22 @@ contract Relay is BaseGateway, IRelay {
         return (tokenOut, amountOut);
     }
 
-    function execute(BridgeItem calldata bridgeItem, TxItem calldata txItem, uint256 toChain, bytes calldata relayPayload, bytes calldata targetPayload) public returns (address, uint256) {
+    function execute(bytes calldata from, bytes calldata to, TxItem calldata txItem, uint256 toChain, bytes calldata relayPayload, bytes calldata targetPayload) public returns (address, uint256) {
         require(msg.sender == address(this));
-        return _executeInternal(bridgeItem, txItem, toChain, relayPayload, targetPayload);
+        return _executeInternal(from, to, txItem, toChain, relayPayload, targetPayload);
     }
 
 
-    function _executeInternal(BridgeItem memory bridgeItem, TxItem memory txItem, uint256 toChain, bytes calldata relayPayload, bytes calldata targetPayload) internal returns (address, uint256) {
+    function _executeInternal(bytes memory from, bytes memory to, TxItem memory txItem, uint256 toChain, bytes memory relayPayload, bytes memory targetPayload) internal returns (address, uint256) {
         bool choose;
         GasInfo memory gasInfo;
+        BridgeItem memory bridgeOutItem;
+
         uint256 fromChain = txItem.chain;
 
         if (relayPayload.length > 0) {
             // 1 collect from chain vault fee and balance fee
-            txItem.amount = vaultManager.transferIn(txItem, bridgeItem.vault, toChain);
+            txItem.amount = vaultManager.transferIn(txItem, toChain);
 
             // 2 swap
             (txItem.token, txItem.amount) = _swap(txItem.token, txItem.amount, relayPayload);
@@ -382,7 +380,7 @@ contract Relay is BaseGateway, IRelay {
             // 3.2 calculate to chain gas fee
             // 3.3 choose to chain vault
             // 3.4 update to chain vault
-            (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.transferOut(txItem, fromChain, targetPayload.length > 0);
+            (choose, txItem.amount, bridgeOutItem.vault, gasInfo) = vaultManager.transferOut(txItem, fromChain, targetPayload.length > 0);
             if (!choose) {
                 // no vault
                 revert Errs.invalid_vault();
@@ -392,7 +390,7 @@ contract Relay is BaseGateway, IRelay {
             // 2.1 calculate to chain gas fee
             // 2.2 choose to chain vault
             // 3 update from chain and to chain vault
-            (choose, txItem.amount, bridgeItem.vault, gasInfo) = vaultManager.bridgeOut(txItem,bridgeItem.vault,  toChain,targetPayload.length > 0);
+            (choose, txItem.amount, bridgeOutItem.vault, gasInfo) = vaultManager.bridgeOut(txItem,toChain,targetPayload.length > 0);
             if (!choose) {
                 // no target vault
                 revert Errs.invalid_vault();
@@ -402,19 +400,25 @@ contract Relay is BaseGateway, IRelay {
             txItem.chainType = registry.getChainType(toChain);
         }
 
+        // todo: check relay min amount
+
         // 4 emit BridgeRelay event
         if (toChain != selfChainId) {
-            // todo: check relay min amount
-            bridgeItem.payload = targetPayload;
-            bridgeItem.txType = TxType.TRANSFER;
-            _emitRelay(fromChain, bridgeItem, txItem, gasInfo);
+
+            bridgeOutItem.from = from;
+            bridgeOutItem.to = to;
+
+            bridgeOutItem.payload = targetPayload;
+            bridgeOutItem.txType = TxType.TRANSFER;
+            _emitRelay(fromChain, bridgeOutItem, txItem, gasInfo);
         }
 
         return (txItem.token, txItem.amount);
     }
 
-    function _bridgeIn(TxItem memory txItem, BridgeItem memory bridgeItem) internal {
+    function _bridgeIn(TxItem memory txItem, BridgeItem memory bridgeItem, bytes memory targetData) internal {
         address to = Utils.fromBytes(bridgeItem.to);
+        bridgeItem.payload = targetData;
         emit BridgeIn(
             txItem.orderId,
             bridgeItem.chainAndGasLimit,
@@ -445,9 +449,9 @@ contract Relay is BaseGateway, IRelay {
             token: _outToken,
             amount: _amount,
             vaultKey: vaultManager.getActiveVaultKey() });
-        bytes memory vault = vaultManager.getActiveVault();
+        // bytes memory vault = vaultManager.getActiveVault();
 
-        _depositIn(txItem,  Utils.toBytes(_from), vault, _to);
+        _depositIn(txItem,  Utils.toBytes(_from), _to);
     }
 
     function _bridgeOut(
@@ -463,10 +467,7 @@ contract Relay is BaseGateway, IRelay {
         txItem.token = token;
         txItem.amount = amount;
         txItem.chain = selfChainId;
-
-        BridgeItem memory bridgeItem;
-        bridgeItem.from = Utils.toBytes(msg.sender);
-        bridgeItem.to = to;
+        txItem.vaultKey = vaultManager.getActiveVaultKey();
 
         (bytes memory affiliateData, bytes memory relayPayload, bytes memory targetPayload) =
             abi.decode(payload, (bytes, bytes, bytes));
@@ -475,7 +476,7 @@ contract Relay is BaseGateway, IRelay {
         txItem.amount = _collectAffiliateAndProtocolFee(txItem, affiliateData);
         if (txItem.amount == 0) revert Errs.zero_amount_out();
 
-        _executeInternal(bridgeItem, txItem, toChain, relayPayload, targetPayload);
+        _executeInternal(Utils.toBytes(msg.sender), to, txItem, toChain, relayPayload, targetPayload);
     }
 
     function _collectAffiliateAndProtocolFee(TxItem memory txItem, bytes memory affiliateData)
@@ -510,22 +511,27 @@ contract Relay is BaseGateway, IRelay {
         }
     }
 
-    function _refund(BridgeItem memory bridgeItem, TxItem memory txItem, bool fromRetiredVault) internal {
+    function _refund(bytes calldata from, bytes calldata refundAddress, bytes calldata vault, TxItem memory txItem, bool fromRetiredVault) internal {
         GasInfo memory gasInfo;
 
         // refund to the from vault
-        (txItem.amount, gasInfo) = vaultManager.refund(txItem, bridgeItem.vault, fromRetiredVault);
+        (txItem.amount, gasInfo) = vaultManager.refund(txItem, fromRetiredVault);
         if (txItem.amount == 0) {
             emit BridgeError(txItem.orderId, "zero out amount");
             return;
         }
 
+        BridgeItem memory bridgeItem;
         bridgeItem.txType = TxType.REFUND;
+        bridgeItem.from = from;
+        bridgeItem.to = refundAddress;
+        bridgeItem.vault = vault;
+
         _emitRelay(txItem.chain, bridgeItem, txItem, gasInfo);
     }
 
-    function _depositIn(TxItem memory txItem, bytes memory from, bytes memory vault, address to) internal {
-        vaultManager.deposit(txItem, vault, to);
+    function _depositIn(TxItem memory txItem, bytes memory from, address to) internal {
+        vaultManager.deposit(txItem, to);
 
         emit Deposit(txItem.orderId, txItem.chain, txItem.token, txItem.amount, to, from);
     }
@@ -548,12 +554,11 @@ contract Relay is BaseGateway, IRelay {
     /**
      * @dev Emit bridge relay event and prepare cross-chain transaction
      * Main purpose:
-     * 1. Burn tokens on relay chain (except for contract chain migrations)
-     * 2. Convert token and amount to target chain format
-     * 3. Generate sequence number for target chain
-     * 4. Store order information including gas estimate and block height
-     * 5. Calculate and store signature hash for TSS signing
-     * 6. Emit BridgeRelay event for off-chain relayers to process
+     * 1. Convert token and amount to target chain format
+     * 2. Generate sequence number for target chain
+     * 3. Store order information including gas estimate and block height
+     * 4. Calculate and store signature hash for TSS signing
+     * 5. Emit BridgeRelay event for off-chain relayers to process
      *
      * Calling requirements:
      * - Vault must be already selected and updated before calling this function
@@ -613,7 +618,7 @@ contract Relay is BaseGateway, IRelay {
     }
 
 
-    function _getTxItem(bytes32 orderId, BridgeItem calldata bridgeItem, uint256 chain) internal returns (TxItem memory) {
+    function _getTxItem(bytes32 orderId, BridgeItem calldata bridgeItem, uint256 chain) internal view returns (TxItem memory) {
         TxItem memory txItem;
 
         txItem.token = registry.getRelayChainToken(chain, bridgeItem.token);

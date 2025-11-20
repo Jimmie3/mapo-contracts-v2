@@ -20,7 +20,7 @@ interface IVaultManager {
 
     function checkMigration() external view returns (bool completed, uint256 toMigrateChain);
 
-    function checkVault(TxItem calldata txItem, bytes calldata vault) external view returns (bool);
+    function checkVault(TxItem calldata txItem) external view returns (bool);
 
     function getActiveVaultKey() external view returns (bytes32);
 
@@ -50,21 +50,19 @@ interface IVaultManager {
      * @notice Process vault operations for a refund transaction
      * @dev Calculates refund amount after gas deduction, updates vault state for active/retiring vaults only
      * @param txItem The transaction to refund
-     * @param vault The vault public key on refund destination chain
      * @param fromRetiredVault True if refunding from a retired vault (no vault state update), false for active/retiring vault (updates state)
      * @return refundAmount The amount to refund after gas deduction
      * @return gasInfo Gas information for the refund transaction
      */
-    function refund(TxItem calldata txItem, bytes calldata vault, bool fromRetiredVault) external returns  (uint256 refundAmount, GasInfo memory gasInfo);
+    function refund(TxItem calldata txItem, bool fromRetiredVault) external returns  (uint256 refundAmount, GasInfo memory gasInfo);
 
     /**
      * @notice Process vault operations for depositing assets to receive vault tokens
      * @dev Updates source vault balance and mints vault tokens to recipient
      * @param txItem The deposit transaction item (specifies source chain)
-     * @param vault The source vault public key
      * @param to The recipient address for minted vault tokens
      */
-    function deposit(TxItem calldata txItem, bytes calldata vault, address to) external;
+    function deposit(TxItem calldata txItem, address to) external;
 
     /**
      * @notice Process vault operations for redeeming vault tokens to withdraw assets
@@ -81,7 +79,6 @@ interface IVaultManager {
     //  * @notice Process vault operations for a bridge transfer
     //  * @dev Updates source vault, collects bridge fees and vault fees, selects target vault, and calculates cross-chain amount and gas
     //  * @param txItem The source transaction item
-    //  * @param fromVault The source vault public key
     //  * @param toChain The destination chain ID
     //  * @param withCall True if destination includes swap data (used for gas estimation)
     //  * @return choose True if a suitable vault is available for the transfer
@@ -89,20 +86,19 @@ interface IVaultManager {
     //  * @return toVault The selected target vault public key on destination chain
     //  * @return gasInfo Gas information for the destination chain transaction
     //  */
-    function bridgeOut(TxItem calldata txItem, bytes calldata fromVault, uint256 toChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
+    function bridgeOut(TxItem calldata txItem, uint256 toChain, bool withCall) external returns (bool choose, uint256 outAmount, bytes memory toVault, GasInfo memory gasInfo);
 
 
-    function updateFromVault(TxItem calldata txItem, bytes calldata fromVault, uint256) external;
+    function updateFromVault(TxItem calldata txItem, uint256) external;
 
     /**
      * @notice Process vault operations for incoming transfer to relay chain
-     * @dev Updates source vault and collects transfer-in fees and vault fees
+     * @dev Collects transfer-in fees and vault fees
      * @param txItem The incoming transaction item (specifies source chain)
-     * @param fromVault The source vault public key
      * @param toChain The final destination chain ID (for auxiliary judgment, currently unused)
      * @return outAmount The amount after fees deduction
      */
-    function transferIn(TxItem calldata txItem, bytes calldata fromVault, uint256 toChain) external returns (uint256 outAmount);
+    function transferIn(TxItem calldata txItem, uint256 toChain) external returns (uint256 outAmount);
 
     /**
      * @notice Process vault operations for outgoing transfer from relay chain
@@ -121,24 +117,22 @@ interface IVaultManager {
      * @notice Update vault state after transfer is confirmed on destination chain
      * @dev Updates target vault balance, clears pending amounts based on actual gas usage
      * @param txItem The completed transaction item
-     * @param vault The target vault public key on destination chain
      * @param usedGas The actual gas used on destination chain, converted to relay chain token amount
      * @param estimatedGas The previously estimated gas for destination chain execution
      * @return reimbursedGas The gas amount to reimburse to maintainer (for contract chains, return estimated gas)
      * @return amount The amount to burn on relay chain to match actual vault balance (for non-contract chains)
      */
-    function transferComplete(TxItem calldata txItem, bytes calldata vault, uint128 usedGas, uint128 estimatedGas) external returns (uint256 reimbursedGas, uint256 amount);
+    function transferComplete(TxItem calldata txItem, uint128 usedGas, uint128 estimatedGas) external returns (uint256 reimbursedGas, uint256 amount);
 
     /**
      * @notice Update vault states after migration transaction is confirmed on chain
      * @dev Updates retiring vault (fromVault) and active vault (toVault) states, uses reserved fees to cover migration gas
      * @param txItem The completed migration transaction item
-     * @param fromVault The retiring vault public key (source of migration)
      * @param toVault The active vault public key (destination of migration)
      * @param usedGas The actual gas used for the migration transaction
      * @param estimatedGas The estimated gas for the migration transaction
      * @return reimbursedGas The gas amount to reimburse to maintainer (for contract chains, return estimated gas)
      * @return amount The amount to burn on relay chain to match actual vault balance (for non-contract chains)
      */
-    function migrationComplete(TxItem calldata txItem, bytes calldata fromVault, bytes calldata toVault, uint128 usedGas, uint128 estimatedGas) external returns (uint256 reimbursedGas, uint256 amount);
+    function migrationComplete(TxItem calldata txItem, bytes calldata toVault, uint128 usedGas, uint128 estimatedGas) external returns (uint256 reimbursedGas, uint256 amount);
 }

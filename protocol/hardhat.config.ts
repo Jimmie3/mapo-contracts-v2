@@ -55,6 +55,18 @@ const config: HardhatUserConfig = {
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
 
+    Tron: {
+      url: `https://api.trongrid.io/jsonrpc`,
+      chainId: 728126428,
+      accounts: process.env.TRON_PRIVATE_KEY !== undefined ? [process.env.TRON_PRIVATE_KEY] : [],
+    },
+
+    tron_test: {
+      url: `https://nile.trongrid.io/jsonrpc`,
+      chainId: 3448148188,
+      accounts: process.env.TESTNET_PRIVATE_KEY !== undefined ? [process.env.TESTNET_PRIVATE_KEY] : [],
+    },
+
     eth_test: {
       url: `https://eth-sepolia.api.onfinality.io/public`,
       chainId: 11155111,

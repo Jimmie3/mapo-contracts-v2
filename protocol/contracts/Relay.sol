@@ -169,7 +169,7 @@ contract Relay is BaseGateway, IRelay {
             return false;
         }
 
-        txItem.orderId = _getOrderId();
+        txItem.orderId = _getOrderId(address(this));
 
         BridgeItem memory bridgeItem;
         bridgeItem.vault = fromVault;
@@ -605,11 +605,11 @@ contract Relay is BaseGateway, IRelay {
         );
     }
 
-    function _getRelayTokenAndAmount(uint256 chain, bytes memory fromToken, uint256 fromAmount) internal view returns (address token, uint256 amount){
-        token = registry.getRelayChainToken(chain, fromToken);
-        amount = registry.getRelayChainAmount(fromToken, chain, fromAmount);
-        if(fromAmount > 0 && amount == 0) revert Errs.token_not_registered();
-    }
+    // function _getRelayTokenAndAmount(uint256 chain, bytes memory fromToken, uint256 fromAmount) internal view returns (address token, uint256 amount){
+    //     token = registry.getRelayChainToken(chain, fromToken);
+    //     amount = registry.getRelayChainAmount(fromToken, chain, fromAmount);
+    //     if(fromAmount > 0 && amount == 0) revert Errs.token_not_registered();
+    // }
 
     function _getToChainTokenAndAmount(uint256 chain, address relayToken, uint256 relayAmount) internal view returns (bytes memory token, uint256 amount){
         token = registry.getToChainToken(relayToken, chain);
@@ -636,9 +636,9 @@ contract Relay is BaseGateway, IRelay {
         return txItem;
     }
 
-    function _getOrderId() internal returns (bytes32 orderId) {
-        return keccak256(abi.encodePacked(selfChainId, address(this), ++nonce));
-    }
+    // function _getOrderId() internal returns (bytes32 orderId) {
+    //     return keccak256(abi.encodePacked(selfChainId, address(this), ++nonce));
+    // }
 
     function _getChainAndGasLimit(uint256 _fromChain, uint256 _toChain, uint256 _transactionRate, uint256 _transactionSize)
         internal

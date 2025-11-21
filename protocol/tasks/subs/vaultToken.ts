@@ -1,6 +1,6 @@
 import { task } from "hardhat/config";
 import { VaultToken } from "../../typechain-types/contracts"
-import { getDeploymentByKey, verify } from "./utils"
+import { getDeploymentByKey, verify } from "../utils/utils"
 
 task("vaultToken:deploy", "deploy vault token")
     .addParam("token", "asset address")

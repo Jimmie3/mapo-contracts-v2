@@ -1,13 +1,13 @@
 {
 
-    "VaultFeeRate": {
+    "vaultFeeRate": {
         "ammVault": 0,
         "fromVault": 0,
         "toVault": 0,
         "reserved": 0
     },
 
-   "BalanceFeeRate":  {
+   "balanceFeeRate":  {
         "balanceThreshold": 0,
         "fixedFromBalance": 0,    
         "fixedToBalance": 0,    

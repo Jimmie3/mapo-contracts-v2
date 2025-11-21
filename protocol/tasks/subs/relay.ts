@@ -1,6 +1,6 @@
 import { task } from "hardhat/config";
 import { Relay } from "../../typechain-types/contracts"
-import { getDeploymentByKey, getAllChainTokens } from "./utils"
+import { getDeploymentByKey, getAllChainTokens } from "../utils/utils"
 
 task("relay:setRegistry", "set registry address")
     .setAction(async (taskArgs, hre) => {
@@ -45,7 +45,7 @@ task("relay:addAllChain", "add Chain")
         for (let index = 0; index < keys.length; index++) {
             const name = keys[index];
             if(chainTokens[name].lastScanBlock && chainTokens[name].lastScanBlock > 0) {
-                console.log(`relay add chain chainId(${chainTokens[name].chainId}), lastScanBlock${chainTokens[name].lastScanBlock}`)
+                console.log(`relay add chain chainId(${chainTokens[name].chainId}), lastScanBlock(${chainTokens[name].lastScanBlock})`)
                 await relay.addChain(chainTokens[name].chainId, chainTokens[name].lastScanBlock);
             }
         }

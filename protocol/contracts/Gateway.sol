@@ -41,10 +41,21 @@ contract Gateway is BaseGateway {
         override
     {
         bytes memory receiver = abi.encodePacked(to);
-
+        _checkAndBurn(outToken, amount);
         emit BridgeOut(
             orderId, selfChainId << 192, TxType.DEPOSIT, activeTss, outToken, amount, from, refundAddr, receiver, bytes("")
         );
+    }
+
+    function _bridgeOut(
+        bytes32,
+        address token,
+        uint256 amount,
+        uint256,
+        bytes memory,
+        bytes memory
+    ) internal override {
+        _checkAndBurn(token, amount);
     }
 
     function bridgeIn(address sender, bytes32 orderId, bytes calldata params, bytes calldata signature)

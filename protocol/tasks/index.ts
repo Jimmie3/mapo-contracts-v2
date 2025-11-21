@@ -8,7 +8,7 @@ import "./subs/relay";
 
 
 import { task } from "hardhat/config";
-import { getDeploymentByKey } from "./subs/utils"
+import { getDeploymentByKey } from "./utils/utils"
 
 
 task("upgrade", "upgrade contract")
@@ -33,12 +33,13 @@ task("upgrade", "upgrade contract")
 // 1. deploy contract
 // 2. set up contract   
 // 3. gateway and relay -> gateway:updateTokens
-// 4. relay -> relay:addAllChain
+// 4. gateway and relay -> gateway:gateway:setTransferFailedReceiver
 // 5. vaultManager -> vaultManager:updateVaultFeeRate
 // 6. vaultManager -> vaultManager:updateBalanceFeeRate
 // 7. vaultManager -> vaultManager:registerToken
-// 8. vaultManager -> vaultManager:updateAllTokenWeights
-// 9. registry -> registry:registerAllChain
-// 10. registry -> registry:registerAllToken
-// 11. registry -> registry:mapAllToken
-// 12.registry -> registry:setAllTokenNickname
+// 8. registry -> registry:registerAllChain
+// 9. registry -> registry:registerAllToken
+// 10. registry -> registry:mapAllToken
+// 11. registry -> registry:setAllTokenNickname
+// 12. relay -> relay:addAllChain
+// 13. vaultManager -> vaultManager:updateAllTokenWeights

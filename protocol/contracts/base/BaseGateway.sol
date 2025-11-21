@@ -271,7 +271,6 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         } else {
             outToken = token;
             _transferFromToken(from, token, value, to);
-            _checkAndBurn(outToken, value);
         }
     }
 

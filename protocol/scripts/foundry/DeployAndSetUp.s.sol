@@ -28,6 +28,7 @@ contract DeployAndSetUp is BaseScript {
                deployProtocolFee(networkName, authority);
                deployRegistry(networkName, authority);
                deployVaultManager(networkName, authority);
+               deployViewController(networkName, authority);
         } else {
                deployGateway(networkName, authority);
         }
@@ -163,6 +164,11 @@ contract DeployAndSetUp is BaseScript {
         registry.registerContract(ContractType.AFFILIATE, affiliateManager);
         registry.registerContract(ContractType.SWAP, swapManager);
         registry.registerContract(ContractType.PROTOCOL_FEE, protocolFee_addr);
+
+        address viewController_addr = readConfigAddr(networkName, "ViewController");
+        ViewController vc = ViewController(viewController_addr);
+        console.log("ViewController address:", viewController_addr);
+        viewController.setRegistry(registry_addr);
    }
 
    function upgrade(string memory c) internal {

@@ -85,7 +85,7 @@ contract Registry is BaseImplementation, IRegistry {
 
 
     modifier checkAddress(address _address) {
-        if(_address != address(0)) revert Errs.zero_address();
+        if(_address == address(0)) revert Errs.zero_address();
         _;
     }
 

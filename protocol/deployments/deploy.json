@@ -1,49 +1,53 @@
 {
-  "Makalu": {
-    "TSSManager": "0x81F50D29166089FeB6305bec79B55eCf44448B7d",
-    "Authority": "0xB7447cf2832906d1d7566D34c5A378E9369e110F",
-    "Relay": "0x88E220b62227d84B7f30aC51B314B0C318e82e62",
-    "VaultManager": "0x43c43B8B75FBA01d667b23605e4b4A573aA4d7fC",
-    "GasService": "0xeA6B6Ae985A9b51BF544A59e020071a0B51Ea267",
-    "Periphery": "0x22B8d74E0E061D26B8C33ea9380325DA74404236",
-    "Registry": "0x52a95bf759641711C8060291b21565a3b3B08e0F",
-    "SwapManager": "0xa5712790922470D1E03BeD6afbC397F50B781356",
-    "AffiliateManager": " ",
-    "ProtocolFee": "0xfB6317604b124D919A09EF0c1dD0FD2D69F86803",
-    "ViewController": "0x1281a83F7c23f1a5E9de5e993ADc2a25BB87A9ff",
-    "wToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91"
-  },
-  "bsc_test": {
-    "Authority": "0x530Dc013Bfd32B8783884ACD4f681D9b3B084002",
-    "Gateway": "0xB449B28f0f3f569E90A65a1caeB612E3A9ca2051",
-    "wToken": "0xae13d989dac2f0debff460ac112a837c89baa7cd"
-  },
-  "eth_test": {
-    "Authority": "0x893a87Ad5d6092F705a9118Bcc8a95eC5Ce9f59E",
-    "Gateway": "0x297A54b40e48D1d3d8A2e91f77dE08a78a4ab10D",
-    "wToken": "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9"
-  },
-  "Mapo": {
-    "TSSManager": "",
-    "Authority": " ",
-    "Relay": " ",
-    "VaultManager": " ",
-    "GasService": " ",
-    "Periphery": " ",
-    "Registry": " ",
-    "SwapManager": " ",
-    "AffiliateManager": " ",
-    "ViewController": " ",
-    "wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
-  },
-  "Eth": {
-    "Authority": " ",
-    "Gateway": " ",
-    "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
-  },
-  "Bsc": {
-    "Authority": " ",
-    "Gateway": " ",
-    "wToken": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
-  }
+	"Makalu": {
+		"TSSManager": "0x650e730F93AFC4ea7d2724D5237a4292aEF49F78",
+		"Authority": "0xA6a4F4f0da29feA73F39D641CDF57B06103B4678",
+		"Relay": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+		"VaultManager": "0x0772a388fEb0CeEd928D40835E6288dfaE077452",
+		"GasService": "0xf9A825A2B9d62550610cDC5a9d05417bC35FF524",
+		"Registry": "0xF67db5535c337261e4EFff49ed956397e8F00078",
+		"SwapManager": "0xa5712790922470D1E03BeD6afbC397F50B781356",
+		"AffiliateManager": " ",
+		"ProtocolFee": "0x9a3EBE3EBF2CDeB3aD7b7f44aD9b56996ae23595",
+		"ViewController": "0xb79bAe710F69f5D9B53098aB16B57A26a762c7BF",
+		"wToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91"
+	},
+	"bsc_test": {
+		"Authority": "0x018a0b28125923823fa11638957e3124179b3b11",
+		"Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+		"wToken": "0xae13d989dac2f0debff460ac112a837c89baa7cd"
+	},
+	"eth_test": {
+		"Authority": "0x66C6e4974A9c52C378897EA21b65FDc9A935415A",
+		"Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+		"wToken": "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9"
+	},
+	"tron_test": {
+		"Authority": "TKjtxw24jmE33j2GMuhZiDhGfDHSL8juCV",
+		"Gateway": "TFgVqNsHTtL8xcuvfoT6FrtojpGNnEoowu",
+		"wToken": "TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a"
+	},
+	"Mapo": {
+		"TSSManager": "",
+		"Authority": " ",
+		"Relay": " ",
+		"VaultManager": " ",
+		"GasService": " ",
+		"Periphery": " ",
+		"Registry": " ",
+		"SwapManager": " ",
+		"AffiliateManager": " ",
+		"ViewController": " ",
+		"wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
+	},
+	"Eth": {
+		"Authority": " ",
+		"Gateway": " ",
+		"wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+	},
+	"Bsc": {
+		"Authority": " ",
+		"Gateway": " ",
+		"wToken": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+	}
 }

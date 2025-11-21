@@ -2,7 +2,7 @@
     {
         "Makalu": {
             "chainId": 212, 
-            "lastScanBlock": 0,
+            "lastScanBlock": 19177800,
             "chainType": "contract",
             "gasToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91", 
             "baseFeeToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91",
@@ -34,7 +34,7 @@
 
         "eth_test": {
             "chainId": 11155111, 
-            "lastScanBlock": 0,
+            "lastScanBlock": 9667140,
             "chainType": "contract",
             "gasToken": "0x71239b11Ad68e27609e42cA6723645172FDB02c7", 
             "baseFeeToken": "0x71239b11Ad68e27609e42cA6723645172FDB02c7",
@@ -66,7 +66,7 @@
 
         "bsc_test": {
             "chainId": 97, 
-            "lastScanBlock": 0,
+            "lastScanBlock": 73811503,
             "chainType": "contract",
             "gasToken": "0x4f2E7AE1B0b36da92F44903b3b5631f97F2CD52d", 
             "baseFeeToken": "0x4f2E7AE1B0b36da92F44903b3b5631f97F2CD52d",
@@ -98,10 +98,10 @@
 
         "btc_test": {
             "chainId": 1360095883558914, 
-            "lastScanBlock": 0,
+            "lastScanBlock": 279084,
             "chainType": "no-contract",
-            "gasToken": "0x425443", 
-            "baseFeeToken": "0x425443",
+            "gasToken": "0xE85C9Bc2Aef9374EAe55E844f1B6d8cB2cFA5A89", 
+            "baseFeeToken": "0xE85C9Bc2Aef9374EAe55E844f1B6d8cB2cFA5A89",
             "transferFailedReceiver": "",
             "tokens": [
                 {

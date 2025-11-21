@@ -1,18 +1,18 @@
 {
 
-    "VaultFeeRate": {
-        "ammVault": 0,
-        "fromVault": 0,
-        "toVault": 0,
+    "vaultFeeRate": {
+        "ammVault": 200,
+        "fromVault": 1000,
+        "toVault": 1000,
         "reserved": 0
     },
 
-   "BalanceFeeRate":  {
-        "balanceThreshold": 0,
-        "fixedFromBalance": 0,    
-        "fixedToBalance": 0,    
-        "minBalance": 0,        
-        "maxBalance": 0,      
+   "balanceFeeRate":  {
+        "balanceThreshold": 2500,
+        "fixedFromBalance": 500,    
+        "fixedToBalance": 500,    
+        "minBalance": 100,        
+        "maxBalance": 2000,      
         "reserved": 0          
     },
 
@@ -21,7 +21,7 @@
             "id": 1,
             "name": "BTC",
             "addr": "0xE85C9Bc2Aef9374EAe55E844f1B6d8cB2cFA5A89",
-            "vaultToken": "0x336DF8E16936F47e49aCe4ec413F4FF14C0CB9C3",
+            "vaultToken": "0xB250dd6E724E3E812aDdF27e58d1b29A0ce456e7",
             "chainWeights": [
                 {
                     "chainId": 97,
@@ -45,7 +45,7 @@
             "id": 2,
             "name": "ETH",
             "addr": "0x71239b11Ad68e27609e42cA6723645172FDB02c7",
-            "vaultToken": "0x43ccc52D8fC65bE16877a92933d92fe73f324110",
+            "vaultToken": "0xA9B72E02c84CbA1736620754414c0351e38D0BF7",
             "chainWeights": [
                 {
                     "chainId": 97,
@@ -65,7 +65,7 @@
             "id": 3,
             "name": "BNB",
             "addr": "0x4f2E7AE1B0b36da92F44903b3b5631f97F2CD52d",
-            "vaultToken": "0xfC06f1687e7973e399112Bb9902E795CF39876ee",
+            "vaultToken": "0x85AA6b42Ab2af456c5A86D612d54fAeF380db01D",
             "chainWeights": [
                 {
                     "chainId": 97,

@@ -1,6 +1,6 @@
 import { task } from "hardhat/config";
 import { ProtocolFee } from "../../typechain-types/contracts"
-import { getDeploymentByKey, getProtocolFeeConfig } from "./utils"
+import { getDeploymentByKey, getProtocolFeeConfig } from "../utils/utils"
 
 task("protocolFee:updateProtocolFee", "update Protocol Fee")
     .addOptionalParam("rate", "total fee rate")

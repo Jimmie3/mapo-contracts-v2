@@ -1,6 +1,6 @@
 import { task } from "hardhat/config";
 import { VaultManager } from "../../typechain-types/contracts"
-import { getDeploymentByKey, getVaultFeeRate, getTokenRegsterByTokenName, getAllTokenRegster, getBalanceFeeRate } from "./utils"
+import { getDeploymentByKey, getVaultFeeRate, getTokenRegsterByTokenName, getAllTokenRegster, getBalanceFeeRate } from "../utils/utils"
 
 task("vaultManager:updateVaultFeeRate", "update Vault Fee Rate")
     .setAction(async (taskArgs, hre) => {

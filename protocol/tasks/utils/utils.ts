@@ -38,6 +38,26 @@ async function readDeploymentFromFile(network: string): Promise<Deployment> {
     return deploy;
 }
 
+
+export async function saveDeployment(network:string, key:string, addr:string) {
+  let deployment = await readDeploymentFromFile(network);
+
+  deployment[network][key] = addr;
+  let p = path.join(__dirname, "../../deployments/deploy.json");
+  await folder("../../deployments/");
+  fs.writeFileSync(p, JSON.stringify(deployment, null, "\t"));
+}
+
+const folder = async (reaPath:string) => {
+  const absPath = path.resolve(__dirname, reaPath);
+  try {
+    await fs.promises.stat(absPath);
+  } catch (e) {
+    // {recursive: true}
+    await fs.promises.mkdir(absPath, { recursive: true });
+  }
+};
+
 type Token = {
     name: string,
     addr: string,

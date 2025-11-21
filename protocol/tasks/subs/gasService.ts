@@ -1,6 +1,6 @@
 import { task } from "hardhat/config";
 import { GasService } from "../../typechain-types/contracts"
-import { getDeploymentByKey } from "./utils"
+import { getDeploymentByKey } from "../utils/utils"
 
 task("gasService:setRegistry", "set registry address")
     .setAction(async (taskArgs, hre) => {

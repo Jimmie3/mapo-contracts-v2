@@ -3,7 +3,6 @@ import { ethers, network } from "hardhat";
 import {
  Registry,
  Relay,
- Periphery,
  GasService,
  Gateway,
  VaultManager,

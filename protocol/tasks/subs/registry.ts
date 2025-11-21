@@ -6,7 +6,7 @@ import {
     getChainTokenByNetwork,
     getTokenRegsterByTokenName,
     getAllTokenRegster
-} from "./utils"
+} from "../utils/utils"
 
 task("registry:registerAllChain", "register Chain info")
     .setAction(async (taskArgs, hre) => {
@@ -82,7 +82,7 @@ task("registry:registerAllToken", "register Chain info")
         if(!tokens || tokens.length === 0) throw("token not set");
         for (let index = 0; index < tokens.length; index++) {
             const token = tokens[index];
-            console.log(`registerToken ${token.name} id(${token.id}), addr(${token.addr}, vaultToken(${token.vaultToken}))`);
+            console.log(`registerToken ${token.name} id(${token.id}), addr(${token.addr})`);
             await(await registry.registerToken(token.id, token.addr)).wait();
         }
 });

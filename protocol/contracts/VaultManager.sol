@@ -411,7 +411,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     function rotate(bytes calldata retiringVault, bytes calldata activeVault) external override onlyRelay {
         if (retiringVaultKey != NON_VAULT_KEY) revert Errs.migration_not_completed();
         if (activeVaultKey != NON_VAULT_KEY && Utils.getVaultKey(retiringVault) != activeVaultKey) revert Errs.invalid_active_vault();
-        retiringVaultKey = NON_VAULT_KEY;
+        retiringVaultKey = activeVaultKey;
         activeVaultKey = Utils.getVaultKey(activeVault);
         vaultList[activeVaultKey].pubkey = activeVault;
     }
@@ -467,6 +467,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
         txItem.chain = 0;
         txItem.amount = 0;
+        retiringVaultKey == NON_VAULT_KEY;
         return (true, txItem, gasInfo, bytes(""), bytes(""));
     }
 

@@ -70,7 +70,7 @@ contract DeployAndSetUp is BaseScript {
         console.log("Relay address:", relay_addr);
 
         Maintainers m = Maintainers(payable(maintainer_addr));
-        m.set(maintainer_addr, parameters_addr);
+        m.set(manager_addr, parameters_addr);
 
         TSSManager t = TSSManager(manager_addr);
         t.set(maintainer_addr, relay_addr, parameters_addr);

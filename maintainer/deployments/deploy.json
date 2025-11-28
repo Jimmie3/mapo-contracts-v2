@@ -1,13 +1,13 @@
 {
   "Makalu": {
-    "Authority": "0xB7447cf2832906d1d7566D34c5A378E9369e110F",
-    "Maintainers": "",
-    "TSSManager": "",
-    "Parameters": "",
-    "Relay": "0x566a6dDfDffB719469114968AFE372392b5873a0"
+    "Authority": "0xA6a4F4f0da29feA73F39D641CDF57B06103B4678",
+    "Maintainers": "0x60c2e5bd5b785910424C48098292Ab410884B5ad",
+    "TSSManager": "0xeca45BE061CAa8F2Db2385e9Caa348acd55c85a2",
+    "Parameters": "0xdF9eD765065b5a1b9702272C9A3e3cBad45e43aB",
+    "Relay": "0x42D64eD9381bF456697b0C360e8acE139F176a80"
   },
   "Mapo": {
-    "Authority": "0xB7447cf2832906d1d7566D34c5A378E9369e110F",
+    "Authority": "",
     "Maintainers": "",
     "TSSManager": "",
     "Parameters": "",

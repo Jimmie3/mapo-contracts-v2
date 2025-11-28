@@ -410,9 +410,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     function rotate(bytes calldata retiringVault, bytes calldata activeVault) external override onlyRelay {
         if (retiringVaultKey != NON_VAULT_KEY) revert Errs.migration_not_completed();
-        retiringVaultKey = Utils.getVaultKey(retiringVault);
-        if (retiringVaultKey != activeVaultKey) revert Errs.invalid_active_vault();
-
+        if (activeVaultKey != NON_VAULT_KEY && Utils.getVaultKey(retiringVault) != activeVaultKey) revert Errs.invalid_active_vault();
+        retiringVaultKey = NON_VAULT_KEY;
         activeVaultKey = Utils.getVaultKey(activeVault);
         vaultList[activeVaultKey].pubkey = activeVault;
     }
@@ -759,10 +758,14 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     function _collectVaultAndBalanceFee(bytes32 orderId, address token, uint256 amount, FeeInfo memory feeInfo) internal returns (uint256 outAmount) {
         uint256 balanceFee = feeInfo.balanceFee;
-        IVaultToken vaultToken = IVaultToken(tokenList.get(token));
-        // todo: check vault token exist
         if (feeInfo.vaultFee > 0) {
-            vaultToken.increaseVault(feeInfo.vaultFee);
+            // todo: check vault token exist
+            IVaultToken vaultToken = IVaultToken(tokenList.get(token));
+            if(vaultToken.totalSupply() > 0) {
+                vaultToken.increaseVault(feeInfo.vaultFee);
+            } else {
+                reservedFees[token] += feeInfo.vaultFee;
+            }
         }
 
         if (feeInfo.incentive) {
@@ -825,6 +828,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     // update target vault pending amount, include gas info
     function _updateToVaultPending(bytes32 vaultKey, ChainType chainType, uint256 chain, address token, uint128 totalOutAmount, bool isMigration) internal {
+        totalOutAmount = uint128(_truncation(token, totalOutAmount, chain));
         // todo: support alt chain on non-contract chain
 
         // todo: check mintable
@@ -1006,5 +1010,21 @@ contract VaultManager is BaseImplementation, IVaultManager {
             return 0;
         }
         fee = amount * feeRate / MAX_RATE_UNIT;
+    }
+
+    function _truncation(address token, uint256 amount, uint256 chain) internal view returns(uint256) {
+        bytes memory tokenBytes = abi.encodePacked(token);
+        uint8 targetDecimals;
+        uint8 selfDecimals;
+        (,targetDecimals) = registry.getTargetToken(selfChainId, chain, tokenBytes);
+        (,selfDecimals) = registry.getTargetToken(selfChainId, selfChainId, tokenBytes);
+        if(targetDecimals == 0 || selfDecimals == 0) revert Errs.token_not_registered();
+        // 1. relay amount To target chain amount
+        // 2. target chain amount To relay amount
+        return _adjustDecimals(_adjustDecimals(amount, targetDecimals, selfDecimals), selfDecimals, targetDecimals);
+    }
+
+    function _adjustDecimals(uint256 amount, uint256 decimalsMul, uint256 decimalsDiv) internal pure returns(uint256) {
+        return amount * 10 ** decimalsMul / (10 ** decimalsDiv);
     }
 }

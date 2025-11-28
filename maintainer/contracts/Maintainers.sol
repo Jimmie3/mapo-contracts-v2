@@ -60,6 +60,8 @@ contract Maintainers is BaseImplementation, IMaintainers {
     event Deregister(address user);
     event Set(address _manager, address _parameter);
     event UpdateMaintainerLimit(uint256 limit);
+    event Preparation(address validator, address maintainer);
+    event CancelPreparation(address validator, address maintainer);
     event ReleaseFromJail(address m);
     event AddToJail(address m, uint256 jailBlock);
     event DistributeReward(uint256 epoch, address m, uint256 value);
@@ -101,7 +103,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         require(info.status == MaintainerStatus.UNKNOWN);
         _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress, maintainerAddr);
         if (!_isValidator(validator)) revert only_validator_can_register();
-        info.status = MaintainerStatus.STANDBY;
+        info.status = MaintainerStatus.REGISTERED;
         info.p2pAddress = p2pAddress;
         info.secp256Pubkey = secp256Pubkey;
         info.ed25519Pubkey = ed25519PubKey;
@@ -110,12 +112,35 @@ contract Maintainers is BaseImplementation, IMaintainers {
         emit Register(validator, maintainerAddr, secp256Pubkey, ed25519PubKey, p2pAddress);
     }
 
+    function preparation() external {
+        address maintainerAddr = msg.sender;
+        address validator = maintainerToValidator[maintainerAddr];
+        MaintainerInfo storage info = maintainerInfos[validator];
+        require(info.status == MaintainerStatus.REGISTERED);
+        info.status = MaintainerStatus.STANDBY;
+        emit Preparation(validator, maintainerAddr);
+    }
+
+    function cancelPreparation() external {
+        address maintainerAddr = msg.sender;
+        address validator = maintainerToValidator[maintainerAddr];
+        MaintainerInfo storage info = maintainerInfos[validator];
+        require(
+            info.status == MaintainerStatus.STANDBY || info.status == MaintainerStatus.READY || info.status == MaintainerStatus.ACTIVE
+        );
+        info.status = MaintainerStatus.REGISTERED;
+        emit CancelPreparation(validator, maintainerAddr);
+    }
+
+
     function update(address maintainerAddr, bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress) external {
         require(maintainerAddr != address(0));
         address validator = msg.sender;
         MaintainerInfo storage info = maintainerInfos[validator];
-        require(info.status == MaintainerStatus.STANDBY);
+        require(info.status == MaintainerStatus.REGISTERED);
+        require(info.lastActiveEpoch == 0 || info.lastActiveEpoch < currentEpoch);
         _checkRegisterParameters(secp256Pubkey, ed25519PubKey, p2pAddress, maintainerAddr);
+        info.status = MaintainerStatus.STANDBY;
         info.p2pAddress = p2pAddress;
         info.secp256Pubkey = secp256Pubkey;
         info.ed25519Pubkey = ed25519PubKey;
@@ -140,7 +165,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
     function deregister() external {
         address validator = msg.sender;
         MaintainerInfo storage info = maintainerInfos[validator];
-        require(info.status == MaintainerStatus.STANDBY);
+        require(info.status == MaintainerStatus.REGISTERED);
         require(info.lastActiveEpoch == 0 || (info.lastActiveEpoch + 1) < currentEpoch);
         delete maintainerToValidator[info.account];
         delete maintainerInfos[validator];
@@ -336,8 +361,14 @@ contract Maintainers is BaseImplementation, IMaintainers {
     {
         uint256 len = maintainers.length;
         for (uint256 i = 0; i < len; i++) {
+
             MaintainerInfo storage info = maintainerInfos[maintainerToValidator[maintainers[i]]];
-            if(info.status == keep || info.status == MaintainerStatus.REVOKED || info.status == MaintainerStatus.JAILED) continue;
+            
+            if(
+                info.status == keep || info.status == MaintainerStatus.REVOKED || 
+                info.status == MaintainerStatus.JAILED || info.status == MaintainerStatus.REGISTERED
+            ) continue;
+
             info.status = target;
         }
     }

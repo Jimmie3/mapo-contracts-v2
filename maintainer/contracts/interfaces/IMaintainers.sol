@@ -8,7 +8,8 @@ interface IMaintainers {
         STANDBY, // waiting to participate tss
         READY, // selected, the new tss member
         ACTIVE, // current tss member
-        JAILED
+        JAILED,
+        REGISTERED
     }
 
     struct MaintainerInfo {

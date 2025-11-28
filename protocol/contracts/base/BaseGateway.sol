@@ -199,21 +199,25 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     ) internal virtual {}
 
     function _bridgeTokenIn(bytes32 hash, BridgeItem memory bridgeItem, TxItem memory txItem) internal {
-        address to = Utils.fromBytes(bridgeItem.to);
+        
+        if(bridgeItem.to.length == 20) {
+            address to = Utils.fromBytes(bridgeItem.to);
 
-        if (txItem.amount > 0 && to != address(0)) {
-            bool needCall = _needCall(to, bridgeItem.payload.length);
-            if (_safeTransferOut(txItem.token, to, txItem.amount, needCall)) {
-                if(needCall) {
-                    uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
-                    uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
-                    try IReceiver(to).onReceived{gas: gasForCall}(
-                        txItem.orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
-                    ) {} catch {}
+            if (txItem.amount > 0 && to != address(0)) {
+                bool needCall = _needCall(to, bridgeItem.payload.length);
+                if (_safeTransferOut(txItem.token, to, txItem.amount, needCall)) {
+                    if(needCall) {
+                        uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
+                        uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
+                        try IReceiver(to).onReceived{gas: gasForCall}(
+                            txItem.orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
+                        ) {} catch {}
+                    }
+                    return;
                 }
-                return;
             }
         }
+
         if(txItem.amount > 0) {
             address _transferFailedReceiver = transferFailedReceiver;
             if(_transferFailedReceiver != address(0)) {

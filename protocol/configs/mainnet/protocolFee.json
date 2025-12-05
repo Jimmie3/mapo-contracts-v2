@@ -1,16 +1,12 @@
 {
-    "totalRate": 100,
+    "totalRate": 200,
     "tokens":[
         {
-            "addr": "",
+            "addr": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB", 
             "add": true
         },
         {
-            "addr": "",
-            "add": true
-        },
-        {
-            "addr": "",
+            "addr": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
             "add": true
         }
     ],
@@ -18,26 +14,26 @@
     "feeShares": [
         {
             "feeType": 0,
-            "share": 10,
-            "receiver": ""
+            "share": 250,
+            "receiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d"
         },
 
         {
             "feeType": 1,
-            "share": 10,
-            "receiver": ""
+            "share": 250,
+            "receiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d"
         },
 
         {
             "feeType": 2,
-            "share": 10,
-            "receiver": ""
+            "share": 250,
+            "receiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d"
         },
 
         {
             "feeType": 3,
-            "share": 10,
-            "receiver": ""
+            "share": 250,
+            "receiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d"
         }
     ]
 

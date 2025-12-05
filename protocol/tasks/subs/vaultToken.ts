@@ -19,15 +19,16 @@ task("vaultToken:deploy", "deploy vault token")
         let impl = await(await VaultTokenFactory.deploy()).waitForDeployment();
         let init_data = VaultTokenFactory.interface.encodeFunctionData("initialize", [authority, taskArgs.token, taskArgs.name, taskArgs.symbol]);
         let ContractProxy = await ethers.getContractFactory("ERC1967Proxy");
-        let c = await (await ContractProxy.deploy(impl, init_data)).waitForDeployment();
+        let c = await (await ContractProxy.deploy(await impl.getAddress(), init_data)).waitForDeployment();
         console.log("vaultToken deploy to :", await c.getAddress());
 
         let v = VaultTokenFactory.attach(await c.getAddress()) as VaultToken;
         console.log("pre vaultManager address is: ", await v.vaultManager());
         await (await v.setVaultManager(vaultManager)).wait()
         console.log("after vaultManager address is: ", await v.vaultManager());
-       // await verify(hre, await c.getAddress(), [impl, init_data], "node_modules/@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy");
-});
+    //    await verify(hre, await c.getAddress(), [await impl.getAddress(), init_data], "contracts/ERC1967Proxy.sol:ERC1967Proxy");
+        await verify(hre, await impl.getAddress(), [], "/contracts/VaultToken.sol:VaultToken");
+    });
 
 
 
@@ -43,6 +44,7 @@ task("vaultToken:upgrapde", "upgrapde vault token contract")
         console.log("pre impl address is:", await v.getImplementation())
         await(await v.upgradeToAndCall(await impl.getAddress(), "0x")).wait()
         console.log("pre impl address is:", await v.getImplementation())
+        await verify(hre, await impl.getAddress(), [], "/contracts/VaultToken.sol:VaultToken");
     })
 
 

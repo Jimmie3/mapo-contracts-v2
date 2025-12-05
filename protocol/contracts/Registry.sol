@@ -414,7 +414,15 @@ contract Registry is BaseImplementation, IRegistry {
             relayNetworkFee = _getAmountOut(relayGasToken, token, relayNetworkFee);
         }
 
-        return GasInfo(token, uint128(relayNetworkFee), transactionRate, transactionSize);
+        return GasInfo(token, uint128(_truncation(relayNetworkFee)), transactionRate, transactionSize);
+    }
+
+    function _truncation(uint256 amount) internal pure returns(uint256) {
+        return _adjustDecimals(_adjustDecimals(amount, 6, 18), 18, 6);
+    }
+
+    function _adjustDecimals(uint256 amount, uint256 decimalsMul, uint256 decimalsDiv) internal pure returns(uint256) {
+        return amount * 10 ** decimalsMul / (10 ** decimalsDiv);
     }
 
     function _getToChainToken(address _token, uint256 _toChain) internal view returns (bytes memory token) {

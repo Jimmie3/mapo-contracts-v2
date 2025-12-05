@@ -89,6 +89,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         if(deadline < block.timestamp) revert expired();
         _;
     }
+    receive() external payable {}
 
     function setWtoken(address _wToken) external restricted {
         require(_wToken != ZERO_ADDRESS);

@@ -51,7 +51,7 @@ contract DeployAndSetUp is BaseScript {
         Relay impl = new Relay();
         bytes memory initData = abi.encodeWithSelector(Relay.initialize.selector, authority);
         address r = deployProxyByFactory(salt, address(impl), initData);
-        relay = Relay(r);
+        relay = Relay(payable(r));
 
         console.log("Relay address:", r);
         saveConfig(networkName, "Relay", r);
@@ -67,7 +67,7 @@ contract DeployAndSetUp is BaseScript {
         Gateway impl = new Gateway();
         bytes memory initData = abi.encodeWithSelector(Gateway.initialize.selector, authority);
         address g = deployProxyByFactory(salt, address(impl), initData);
-        gateway = Gateway(g);
+        gateway = Gateway(payable(g));
 
         console.log("Gateway address:", g);
         saveConfig(networkName, "Gateway", g);
@@ -143,7 +143,7 @@ contract DeployAndSetUp is BaseScript {
         address TSSManager = readConfigAddr(networkName, "TSSManager");
         console.log("TSSManager address:", TSSManager);
 
-        Relay r = Relay(relay_addr);
+        Relay r = Relay(payable(relay_addr));
         r.setVaultManager(vaultManager_addr);
         r.setRegistry(registry_addr);
 
@@ -168,14 +168,14 @@ contract DeployAndSetUp is BaseScript {
         address viewController_addr = readConfigAddr(networkName, "ViewController");
         ViewController vc = ViewController(viewController_addr);
         console.log("ViewController address:", viewController_addr);
-        viewController.setRegistry(registry_addr);
+        vc.setRegistry(registry_addr);
    }
 
    function upgrade(string memory c) internal {
      string memory networkName = getNetworkName();
      if(keccak256(bytes(c)) == keccak256(bytes("Relay"))) {
           address relay_addr = readConfigAddr(networkName, "Relay");
-          Relay r = Relay(relay_addr);
+          Relay r = Relay(payable(relay_addr));
           Relay impl = new Relay();
           r.upgradeToAndCall(address(impl), bytes(""));
      } else if(keccak256(bytes(c)) == keccak256(bytes("VaultManager"))) {
@@ -200,7 +200,7 @@ contract DeployAndSetUp is BaseScript {
           p.upgradeToAndCall(address(impl), bytes(""));
      } else if(keccak256(bytes(c)) == keccak256(bytes("Gateway"))) {
           address gateway_addr = readConfigAddr(networkName, "Gateway");
-          Gateway g = Gateway(gateway_addr);
+          Gateway g = Gateway(payable(gateway_addr));
           Gateway impl = new Gateway();
           g.upgradeToAndCall(address(impl), bytes(""));
      } else if(keccak256(bytes(c)) == keccak256(bytes("ViewController"))) {

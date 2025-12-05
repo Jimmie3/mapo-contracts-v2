@@ -124,7 +124,7 @@ task("registry:setAllTokenNickname", "set TokenNick name")
                 const token = tokens[j];
                 let preNickname = await registry.getTokenNickname(element.chainId, token.addr);
                 if(preNickname !== token.name) {
-                   console.log(`update Token Nickname  chain(${element.chainId}), addr(${token.addr}, name(${token.name}))`); 
+                   console.log(`update Token Nickname  chain(${element.chainId}), addr(${token.addr}, name(${token.name})`); 
                    await(await registry.setTokenTicker(element.chainId, token.addr, token.name)).wait();
                 }
             }

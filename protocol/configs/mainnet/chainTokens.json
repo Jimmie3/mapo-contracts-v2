@@ -2,61 +2,36 @@
     {
         "Mapo": {
             "chainId": 22776, 
-            "lastScanBlock": 0,
+            "lastScanBlock": 21344539,
             "chainType": "contract",
-            "gasToken": "", 
-            "baseFeeToken": "",
-            "transferFailedReceiver": "",
+            "gasToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23", 
+            "baseFeeToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23",
+            "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
             "tokens": [
                 {
                     "name": "BTC",
-                    "addr": "",
-                    "decimals": 18,
-                    "bridgeAble": true,
-                    "mintAble": true
-                },
-                {
-                    "name": "ETH",
-                    "addr": "",
-                    "decimals": 18,
-                    "bridgeAble": true,
-                    "mintAble": true
-                },
-                {
-                    "name": "BNB",
-                    "addr": "",
-                    "decimals": 18,
-                    "bridgeAble": true,
-                    "mintAble": true
-                }
-            ]
-        },
-
-        "Eth": {
-            "chainId": 1, 
-            "lastScanBlock": 0,
-            "chainType": "contract",
-            "gasToken": "", 
-            "baseFeeToken": "",
-            "transferFailedReceiver": "",
-            "tokens": [
-                {
-                    "name": "BTC",
-                    "addr": "",
+                    "addr": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB",
                     "decimals": 18,
                     "bridgeAble": true,
                     "mintAble": false
                 },
                 {
                     "name": "ETH",
-                    "addr": "",
+                    "addr": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec",
                     "decimals": 18,
-                    "bridgeAble": true,
+                    "bridgeAble": false,
                     "mintAble": false
                 },
                 {
                     "name": "BNB",
-                    "addr": "",
+                    "addr": "0xc478A25240d9C072ebEC5109b417E0A78A41667c",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false
+                },
+                {
+                    "name": "USDT",
+                    "addr": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
                     "decimals": 18,
                     "bridgeAble": true,
                     "mintAble": false
@@ -66,29 +41,36 @@
 
         "Bsc": {
             "chainId": 56, 
-            "lastScanBlock": 0,
+            "lastScanBlock": 70547507,
             "chainType": "contract",
-            "gasToken": "", 
-            "baseFeeToken": "",
-            "transferFailedReceiver": "",
+            "gasToken": "0xc478A25240d9C072ebEC5109b417E0A78A41667c", 
+            "baseFeeToken": "0xc478A25240d9C072ebEC5109b417E0A78A41667c",
+            "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
             "tokens": [
                 {
                     "name": "BTC",
-                    "addr": "",
+                    "addr": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
                     "decimals": 18,
                     "bridgeAble": true,
                     "mintAble": false
                 },
                 {
                     "name": "ETH",
-                    "addr": "",
+                    "addr": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
                     "decimals": 18,
-                    "bridgeAble": true,
+                    "bridgeAble": false,
                     "mintAble": false
                 },
                 {
                     "name": "BNB",
-                    "addr": "",
+                    "addr": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false
+                },
+                {
+                    "name": "USDT",
+                    "addr": "0x55d398326f99059fF775485246999027B3197955",
                     "decimals": 18,
                     "bridgeAble": true,
                     "mintAble": false
@@ -98,10 +80,10 @@
 
         "Btc": {
             "chainId": 1360095883558913, 
-            "lastScanBlock": 0,
+            "lastScanBlock": 926495,
             "chainType": "no-contract",
-            "gasToken": "0x425443", 
-            "baseFeeToken": "0x425443",
+            "gasToken": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB", 
+            "baseFeeToken": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB",
             "transferFailedReceiver": "",
             "tokens": [
                 {

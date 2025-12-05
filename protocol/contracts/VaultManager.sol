@@ -546,7 +546,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
 
         uint256 outAmount = _collectFee(txItem.orderId, selfChainId, txItem.chain,  txItem.token, txItem.amount, false, true);
-
+        outAmount = _truncation(outAmount);
         if (outAmount <= gasInfo.estimateGas) {
             // out of gas, save as reserved fee and return
             reservedFees[txItem.token] += outAmount;
@@ -743,6 +743,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
             if (migrationAmount <= minAmount || (available - migrationAmount) <= minAmount) {
                 migrationAmount = available;
             }
+            migrationAmount = uint128(_truncation(migrationAmount));
             tokenBalance.migrationIndex++;
             _updateToVaultPending(retiringVaultKey, ChainType.NATIVE, _chain, token, migrationAmount,  true);
 
@@ -829,7 +830,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     // update target vault pending amount, include gas info
     function _updateToVaultPending(bytes32 vaultKey, ChainType chainType, uint256 chain, address token, uint128 totalOutAmount, bool isMigration) internal {
-        totalOutAmount = uint128(_truncation(token, totalOutAmount, chain));
         // todo: support alt chain on non-contract chain
 
         // todo: check mintable
@@ -937,7 +937,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         // todo: support alt token on non-contract chain
         //      get gas for gas token
         gasInfo = registry.getNetworkFeeInfoWithToken(txItem.token, txItem.chain,withCall);
-
+        txItem.amount = _truncation(txItem.amount);
         if (txItem.amount <= gasInfo.estimateGas) {
             return (NON_VAULT_KEY, 0, 0, gasInfo);
         }
@@ -1013,16 +1013,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
         fee = amount * feeRate / MAX_RATE_UNIT;
     }
 
-    function _truncation(address token, uint256 amount, uint256 chain) internal view returns(uint256) {
-        bytes memory tokenBytes = abi.encodePacked(token);
-        uint8 targetDecimals;
-        uint8 selfDecimals;
-        (,targetDecimals) = registry.getTargetToken(selfChainId, chain, tokenBytes);
-        (,selfDecimals) = registry.getTargetToken(selfChainId, selfChainId, tokenBytes);
-        if(targetDecimals == 0 || selfDecimals == 0) revert Errs.token_not_registered();
-        // 1. relay amount To target chain amount
-        // 2. target chain amount To relay amount
-        return _adjustDecimals(_adjustDecimals(amount, targetDecimals, selfDecimals), selfDecimals, targetDecimals);
+    function _truncation(uint256 amount) internal pure returns(uint256) {
+        return _adjustDecimals(_adjustDecimals(amount, 6, 18), 18, 6);
     }
 
     function _adjustDecimals(uint256 amount, uint256 decimalsMul, uint256 decimalsDiv) internal pure returns(uint256) {

@@ -1,18 +1,18 @@
 {
 
     "vaultFeeRate": {
-        "ammVault": 0,
-        "fromVault": 0,
-        "toVault": 0,
+        "ammVault": 200,
+        "fromVault": 500,
+        "toVault": 800,
         "reserved": 0
     },
 
    "balanceFeeRate":  {
-        "balanceThreshold": 0,
-        "fixedFromBalance": 0,    
-        "fixedToBalance": 0,    
-        "minBalance": 0,        
-        "maxBalance": 0,      
+        "balanceThreshold": 2500,
+        "fixedFromBalance": 300,    
+        "fixedToBalance": 600,    
+        "minBalance": 100,        
+        "maxBalance": 2000,      
         "reserved": 0          
     },
 
@@ -20,8 +20,8 @@
         {
             "id": 1,
             "name": "BTC",
-            "addr": "",
-            "vaultToken": "",
+            "addr": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB",
+            "vaultToken": "0x77852E4c5C56b8C8335259aEC6f85e6DE6f028f2",
             "chainWeights": [
                 {
                     "chainId": 56,
@@ -29,10 +29,6 @@
                 },
                 {
                     "chainId": 22776,
-                    "weight": 100
-                },
-                {
-                    "chainId": 1,
                     "weight": 100
                 },
                 {
@@ -43,9 +39,9 @@
         },
         {
             "id": 2,
-            "name": "ETH",
-            "addr": "",
-            "vaultToken": "",
+            "name": "USDT",
+            "addr": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
+            "vaultToken": "0xF3AA3cE44624c18759C2BCA07bB983f32C9b11E0",
             "chainWeights": [
                 {
                     "chainId": 56,
@@ -53,30 +49,6 @@
                 },
                 {
                     "chainId": 22776,
-                    "weight": 100
-                },
-                {
-                    "chainId": 1,
-                    "weight": 100
-                }
-            ]
-        },
-        {
-            "id": 3,
-            "name": "BNB",
-            "addr": "",
-            "vaultToken": "",
-            "chainWeights": [
-                {
-                    "chainId": 56,
-                    "weight": 100
-                },
-                {
-                    "chainId": 22776,
-                    "weight": 100
-                },
-                {
-                    "chainId": 1,
                     "weight": 100
                 }
             ]

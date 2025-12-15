@@ -132,7 +132,8 @@ task("gateway:updateTokens", "update Tokens")
                 const element = tokens[index];
                 let feature = 0;
                 if(element.bridgeAble) feature = feature | 1;
-                if(element.mintAble) feature = feature | 2
+                if(element.mintAble) feature = feature | 2;
+                if(element.burnFrom) feature = feature | 4;
                 let pre = await c.tokenFeatureList(element.addr).call();
                 console.log(`${element.name} pre tokenFeature`, pre);
                 if(pre !==  BigInt(feature)) {
@@ -149,7 +150,8 @@ task("gateway:updateTokens", "update Tokens")
                 const element = tokens[index];
                 let feature = 0;
                 if(element.bridgeAble) feature = feature | 1;
-                if(element.mintAble) feature = feature | 2
+                if(element.mintAble) feature = feature | 2;
+                if(element.burnFrom) feature = feature | 4;
                 let pre = await gateway.tokenFeatureList(element.addr);
                 console.log(`${element.name} pre tokenFeature`, pre);
                 if(pre !==  BigInt(feature)) {

@@ -576,7 +576,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
         vaultToken.deposit(txItem.amount, to);
     }
 
-    function redeem(address _vaultToken, uint256 _share, address _owner, address _receiver) external override onlyRelay  returns (uint256)  {
+    function redeem(address _vaultToken, uint256 _share, address _owner, address _receiver) external override onlyRelay  returns (address, uint256)  {
         IVaultToken vaultToken = IVaultToken(_vaultToken);
         address redeemToken = vaultToken.asset();
         uint256 redeemAmount = vaultToken.redeem(_share, _receiver, _owner);
@@ -585,7 +585,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
         // _updateToVaultPending(activeVaultKey, ChainType.CONTRACT,  selfChainId,  redeemToken, uint128(outAmount), false);
 
-        return outAmount;
+        return (redeemToken, outAmount);
     }
 
     // tx out, remove liquidity or swap out

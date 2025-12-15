@@ -71,9 +71,10 @@ interface IVaultManager {
      * @param share The amount of vault tokens to redeem
      * @param owner The owner of the vault tokens
      * @param receiver The recipient of the underlying assets
+     * @return token The address of the underlying token to be withdrawn
      * @return amount The amount of underlying assets to be withdrawn
      */
-    function redeem(address vaultToken, uint256 share, address owner, address receiver) external returns (uint256 amount);
+    function redeem(address vaultToken, uint256 share, address owner, address receiver) external returns (address token, uint256 amount);
 
     // /**
     //  * @notice Process vault operations for a bridge transfer

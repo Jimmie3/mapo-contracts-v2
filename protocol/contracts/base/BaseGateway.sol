@@ -100,6 +100,9 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     function updateTokens(address[] calldata _tokens, uint256 _feature) external restricted {
         for (uint256 i = 0; i < _tokens.length; i++) {
             tokenFeatureList[_tokens[i]] = _feature;
+            if(_isSupportBurnFrom(_tokens[i])) {
+                IERC20(_tokens[i]).approve(address(this), type(uint256).max);
+            }
             emit UpdateTokens(_tokens[i], _feature);
         }
     }
@@ -295,9 +298,12 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
 
     function _checkAndBurn(address _token, uint256 _amount) internal {
         if (_isMintable(_token)) {
-            // todo: check burn or burnFrom
+            if(_isSupportBurnFrom(_token)) {
+                IMintableToken(_token).burnFrom(address(this), _amount);
+                return;
+            }
             IMintableToken(_token).burn(_amount);
-        }
+        } 
     }
 
     function _checkAndMint(address _token, uint256 _amount) internal {

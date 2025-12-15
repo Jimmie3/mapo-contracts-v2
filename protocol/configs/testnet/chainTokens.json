@@ -13,21 +13,24 @@
                     "addr": "0xE85C9Bc2Aef9374EAe55E844f1B6d8cB2cFA5A89",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": true
+                    "mintAble": true,
+                    "burnFrom": true
                 },
                 {
                     "name": "ETH",
                     "addr": "0x71239b11Ad68e27609e42cA6723645172FDB02c7",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": true
+                    "mintAble": true,
+                    "burnFrom": false
                 },
                 {
                     "name": "BNB",
                     "addr": "0x4f2E7AE1B0b36da92F44903b3b5631f97F2CD52d",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": true
+                    "mintAble": true,
+                    "burnFrom": false
                 }
             ]
         },
@@ -45,21 +48,24 @@
                     "addr": "0x1984dCbb37dB63872723bD123c1de3Db3976625F",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 },
                 {
                     "name": "ETH",
                     "addr": "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 },
                 {
                     "name": "BNB",
                     "addr": "0xa6cfEe93bbC949B568b020Ee4942F342069846e2",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 }
             ]
         },
@@ -77,21 +83,24 @@
                     "addr": "0x2BAd3A39a4a793a8abc466850e103B524ff68EEc",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 },
                 {
                     "name": "ETH",
                     "addr": "0x13a2EE0d56Cd8A5299268830eacfb257522651eF",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 },
                 {
                     "name": "BNB",
                     "addr": "0xae13d989dac2f0debff460ac112a837c89baa7cd",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 }
             ]
         },
@@ -109,7 +118,8 @@
                     "addr": "0x425443",
                     "decimals": 8,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 }
             ]
         }

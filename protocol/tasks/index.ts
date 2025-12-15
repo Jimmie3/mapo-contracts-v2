@@ -9,7 +9,7 @@ import "./subs/swapManager";
 
 
 import { task } from "hardhat/config";
-import { getDeploymentByKey } from "./utils/utils"
+import { getDeploymentByKey, verify } from "./utils/utils"
 
 
 task("upgrade", "upgrade contract")
@@ -28,6 +28,13 @@ task("upgrade", "upgrade contract")
       console.log(`pre impl `, await c.getImplementation());
       await(await c.upgradeToAndCall(await impl.getAddress(), "0x")).wait();
       console.log(`after impl `, await c.getImplementation());
+      let code;
+      if(taskArgs.contract === 'FlashSwapManager' || taskArgs.contract === 'ViewController') {
+         code = `/contracts/len/${taskArgs.contract}.sol:${taskArgs.contract}`
+      } else {
+         code = `/contracts/${taskArgs.contract}.sol:${taskArgs.contract}` 
+      }
+      await verify(hre, await impl.getAddress(), [], code);
   })
 
 // steps
@@ -44,3 +51,4 @@ task("upgrade", "upgrade contract")
 // 11. registry -> registry:setAllTokenNickname
 // 12. relay -> relay:addAllChain
 // 13. vaultManager -> vaultManager:updateAllTokenWeights
+// 14. protocolFee ->  protocolFee:updateProtocolFee

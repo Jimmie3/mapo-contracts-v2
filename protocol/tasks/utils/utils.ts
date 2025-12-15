@@ -62,8 +62,9 @@ type Token = {
     name: string,
     addr: string,
     decimals: string,
-    bridgeAble: string,
-    mintAble: string
+    bridgeAble: boolean,
+    mintAble: boolean,
+    burnFrom: boolean
 }
 
 type ChainToken = {

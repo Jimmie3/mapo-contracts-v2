@@ -145,7 +145,8 @@ contract Relay is BaseGateway, IRelay {
     function redeem(address _vaultToken, uint256 _vaultShare, address receiver) external whenNotPaused {
         address user = msg.sender;
 
-        uint256 amount = vaultManager.redeem(_vaultToken, _vaultShare, user, receiver);
+        (address asset, uint256 amount) = vaultManager.redeem(_vaultToken, _vaultShare, user, receiver);
+        if(amount > 0) _sendToken(asset, amount, receiver, false);
 
         emit Withdraw(_vaultToken, user, _vaultShare, amount);
     }

@@ -52,6 +52,27 @@
                     "weight": 100
                 }
             ]
+        },
+
+        {
+            "id": 3,
+            "name": "ETH",
+            "addr": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec",
+            "vaultToken": "",
+            "chainWeights": [
+
+            ]
+        },
+
+        {
+            "id": 4,
+            "name": "BNB",
+            "addr": "0xc478A25240d9C072ebEC5109b417E0A78A41667c",
+            "vaultToken": "",
+            "chainWeights": [
+
+            ]
         }
+
     ]
 }

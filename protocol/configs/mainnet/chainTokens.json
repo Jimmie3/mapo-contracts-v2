@@ -5,7 +5,7 @@
             "lastScanBlock": 21344539,
             "chainType": "contract",
             "gasToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23", 
-            "baseFeeToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23",
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
             "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
             "tokens": [
                 {
@@ -48,7 +48,7 @@
             "lastScanBlock": 70547507,
             "chainType": "contract",
             "gasToken": "0xc478A25240d9C072ebEC5109b417E0A78A41667c", 
-            "baseFeeToken": "0xc478A25240d9C072ebEC5109b417E0A78A41667c",
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
             "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
             "tokens": [
                 {

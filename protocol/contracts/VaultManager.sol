@@ -326,27 +326,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
     // ------------------------------------------- public view --------------------------------------------
 
-    function checkMigration() external view override returns (bool completed, uint256 toMigrateChain) {
-        // check the retiring vault first
-        if (retiringVaultKey == NON_VAULT_KEY) {
-            // no retiring vault, no need migration
-            return (true, 0);
-        }
-
-        Vault storage v = vaultList[retiringVaultKey];
-        uint256 length = v.chains.length();
-        for (uint256 i = 0; i < length; i++) {
-            uint256 chain = v.chains.at(i);
-            if (v.migrationStatus[chain] != MigrationStatus.NOT_STARTED) {
-                // migrating, continue to other chain migration
-                continue;
-            }
-            return (false, chain);
-        }
-        if (v.chains.length() > 0) {
-            return (false, 0);
-        }
-        return (true, 0);
+    function checkMigration() external view override returns (bool completed) {
+       completed = (retiringVaultKey == NON_VAULT_KEY);
     }
 
     function checkVault(TxItem calldata txItem) external view returns (bool) {
@@ -428,13 +409,10 @@ contract VaultManager is BaseImplementation, IVaultManager {
             return (true, txItem, gasInfo, bytes(""), bytes(""));
         }
 
-        if (vaultList[retiringVaultKey].chains.length() == 0) {
-            // all chains have been migrated
-            return (true, txItem, gasInfo, bytes(""), bytes(""));
-        }
-
         Vault storage v = vaultList[retiringVaultKey];
         uint256[] memory chains = v.chains.values();
+        
+        completed = true;
         for (uint256 i = 0; i < chains.length; i++) {
             uint256 chain = chains[i];
             if (chain == selfChainId) {
@@ -444,6 +422,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
             }
 
             if (v.migrationStatus[chain] == MigrationStatus.MIGRATING) {
+                completed = false;
                 // migrating, continue to other chain migration
                 continue;
             } else if (v.migrationStatus[chain] == MigrationStatus.MIGRATED) {
@@ -457,18 +436,20 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
             bool chainCompleted;
             (chainCompleted, txItem, gasInfo) = _migrate(chain);
-            if (chainCompleted) {
-                _removeChainFromVault(retiringVaultKey, chain);
-                continue;
-            }
+            if (chainCompleted || (txItem.amount == 0 && txItem.chainType != ChainType.CONTRACT)) {
 
+                if(chainCompleted) _removeChainFromVault(retiringVaultKey, chain);
+                else completed = false;
+
+                continue;
+            } 
             return (false, txItem, gasInfo, vaultList[retiringVaultKey].pubkey, vaultList[activeVaultKey].pubkey);
         }
 
         txItem.chain = 0;
         txItem.amount = 0;
-        retiringVaultKey == NON_VAULT_KEY;
-        return (true, txItem, gasInfo, bytes(""), bytes(""));
+        if(completed) retiringVaultKey = NON_VAULT_KEY;
+        return (completed, txItem, gasInfo, bytes(""), bytes(""));
     }
 
 
@@ -618,7 +599,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
         vaultList[txItem.vaultKey].migrationStatus[txItem.chain] = MigrationStatus.MIGRATED;
         if (txItem.chainType == ChainType.CONTRACT) {
-            reimbursedGas = estimatedGas;
+            reimbursedGas = registry.getMigrateGasFee(txItem.chain, txItem.token, estimatedGas);
         } else {
             _updateToVaultComplete(txItem.vaultKey, txItem, usedGas, estimatedGas, true);
             _updateFromVault(targetVaultKey, txItem, true);
@@ -722,7 +703,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
             uint128 minAmount = tokenStates[token].chainStates[_chain].minAmount;
             if (minAmount < gasInfo.estimateGas) { minAmount = gasInfo.estimateGas;}
             uint128 available = tokenBalance.balance - tokenBalance.pendingOut;
-            if (available <= minAmount) {
+            if (available <= minAmount || (MAX_MIGRATION_AMOUNT - tokenBalance.migrationIndex == 0)) {
                 // no need migration
                 if (tokenBalance.pendingOut > 0) {
                     // waiting pending out tx
@@ -749,9 +730,6 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
             return (false, token, migrationAmount - gasInfo.estimateGas);
         }
-
-        // token length == 0
-        _removeChainFromVault(retiringVaultKey, _chain);
 
         // todo: emit event
         return (true, token, 0);

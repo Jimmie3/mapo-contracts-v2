@@ -18,7 +18,7 @@ interface IVaultManager {
     view
     returns (bool, uint256);
 
-    function checkMigration() external view returns (bool completed, uint256 toMigrateChain);
+    function checkMigration() external view returns (bool completed);
 
     function checkVault(TxItem calldata txItem) external view returns (bool);
 

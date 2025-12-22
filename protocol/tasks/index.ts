@@ -30,9 +30,9 @@ task("upgrade", "upgrade contract")
       console.log(`after impl `, await c.getImplementation());
       let code;
       if(taskArgs.contract === 'FlashSwapManager' || taskArgs.contract === 'ViewController') {
-         code = `/contracts/len/${taskArgs.contract}.sol:${taskArgs.contract}`
+         code = `contracts/len/${taskArgs.contract}.sol:${taskArgs.contract}`
       } else {
-         code = `/contracts/${taskArgs.contract}.sol:${taskArgs.contract}` 
+         code = `contracts/${taskArgs.contract}.sol:${taskArgs.contract}` 
       }
       await verify(hre, await impl.getAddress(), [], code);
   })

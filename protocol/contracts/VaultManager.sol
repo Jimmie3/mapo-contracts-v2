@@ -436,11 +436,14 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
             bool chainCompleted;
             (chainCompleted, txItem, gasInfo) = _migrate(chain);
-            if (chainCompleted || (txItem.amount == 0 && txItem.chainType != ChainType.CONTRACT)) {
-
-                if(chainCompleted) _removeChainFromVault(retiringVaultKey, chain);
-                else completed = false;
-
+            // migration Completed remove the chain from retiring vault and continue
+            if(chainCompleted) {
+                _removeChainFromVault(retiringVaultKey, chain);
+                continue;
+            }
+            // no contract chain and pendingOut != 0, not completed, set completed to false and continue
+            if (txItem.amount == 0 && txItem.chainType != ChainType.CONTRACT) {
+                completed = false;
                 continue;
             } 
             return (false, txItem, gasInfo, vaultList[retiringVaultKey].pubkey, vaultList[activeVaultKey].pubkey);
@@ -703,7 +706,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
             uint128 minAmount = tokenStates[token].chainStates[_chain].minAmount;
             if (minAmount < gasInfo.estimateGas) { minAmount = gasInfo.estimateGas;}
             uint128 available = tokenBalance.balance - tokenBalance.pendingOut;
-            if (available <= minAmount || (MAX_MIGRATION_AMOUNT - tokenBalance.migrationIndex == 0)) {
+            if (available <= minAmount) {
                 // no need migration
                 if (tokenBalance.pendingOut > 0) {
                     // waiting pending out tx
@@ -725,7 +728,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
                 migrationAmount = available;
             }
             migrationAmount = uint128(_truncation(migrationAmount));
-            tokenBalance.migrationIndex++;
+            // keep (MAX_MIGRATION_AMOUNT - tokenBalance.migrationIndex) != 0 for next migration
+            if(MAX_MIGRATION_AMOUNT - tokenBalance.migrationIndex > 1) tokenBalance.migrationIndex++;
             _updateToVaultPending(retiringVaultKey, ChainType.NATIVE, _chain, token, migrationAmount,  true);
 
             return (false, token, migrationAmount - gasInfo.estimateGas);

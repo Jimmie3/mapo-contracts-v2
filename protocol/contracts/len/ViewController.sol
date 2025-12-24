@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {ChainType, GasInfo} from "../libs/Types.sol";
+import {ChainType} from "../libs/Types.sol";
 import {IGasService} from "../interfaces/IGasService.sol";
 import {IVaultManager} from "../interfaces/IVaultManager.sol";
 import {IRelay} from "../interfaces/IRelay.sol";
+import {IAffiliateFeeManager} from "../interfaces/affiliate/IAffiliateFeeManager.sol";
 import {IRegistry, ContractType, ChainType, GasInfo} from "../interfaces/IRegistry.sol";
 import {ITSSManager} from "../interfaces/ITSSManager.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
 contract ViewController is BaseImplementation {
     uint256 public immutable selfChainId = block.chainid;
+    uint256 constant MAX_RATE_UNIT = 1_000_000;         // unit is 0.01 bps
 
     IRegistry public registry;
 
@@ -165,6 +167,131 @@ contract ViewController is BaseImplementation {
                 }
             }
         }
+    }
+
+    struct QuoteResult {
+        uint256 affiliateFee;
+        uint256 protocolFee;
+        uint256 fromVaultFee;
+        uint256 toVaultFee;
+        int256 inTokenBalanceFee;
+        int256 outTokenBalanceFee;
+        uint256 ammFee;
+        uint256 gaseFee;
+        uint256 amountOut;
+    }
+
+    function quote(
+        uint256 _fromChain,
+        uint256 _toChain,
+        address _bridgeInToken,
+        address _bridgeOutToken,
+        uint256 _bridgeAmount,
+        bool _withCall,
+        bytes calldata _affiliateFee
+    ) external view returns (QuoteResult memory result) {
+        if(_bridgeAmount == 0) return result;
+        // affiliateFee
+        if(_affiliateFee.length > 0) {
+            IAffiliateFeeManager afm = IAffiliateFeeManager(registry.getContractAddress(ContractType.AFFILIATE));
+            result.affiliateFee = afm.getAffiliatesFee(_bridgeAmount, _affiliateFee);
+            if(result.affiliateFee >= _bridgeAmount) return result;
+            _bridgeAmount -= result.affiliateFee;
+        }
+
+        // protocolFee
+        (, result.protocolFee) = registry.getProtocolFee(_bridgeInToken, _bridgeAmount);
+        if (result.protocolFee >= _bridgeAmount) return result;
+        _bridgeAmount -= result.protocolFee;
+
+        // VaultFee & balanceFee
+        IVaultManager vm = _getVaultManager();
+        (, uint32 fromVault, uint32 toVault) = vm.getVaultFeeRate();
+        if(_bridgeInToken == _bridgeOutToken) {
+            // vaultFee
+            result.fromVaultFee = _getFee(_bridgeAmount, (fromVault + toVault));
+            // balanceFee
+            {
+                (bool incentive, uint256 fee) = vm.getBalanceFee(_fromChain, _toChain, _bridgeInToken, _bridgeAmount);
+                if(incentive) {
+                    result.inTokenBalanceFee = -int256(fee);
+                    _bridgeAmount += fee;
+                } else {
+                    result.inTokenBalanceFee = int256(fee);
+                    if(fee >= _bridgeAmount) return result;
+                    _bridgeAmount = _bridgeAmount - fee;
+                }
+            }
+
+            if(result.fromVaultFee >= _bridgeAmount) return result;
+            _bridgeAmount = _bridgeAmount - result.fromVaultFee;
+
+            // gasFee
+            GasInfo memory gasInfo = registry.getNetworkFeeInfoWithToken(_bridgeInToken, _toChain, _withCall);
+            result.gaseFee = gasInfo.estimateGas;
+
+            // amountOut
+            if(gasInfo.estimateGas > _bridgeAmount) {
+                result.amountOut = 0;
+            } else {
+                result.amountOut = _bridgeAmount - gasInfo.estimateGas;
+            }
+            return result;
+        } else {
+            // fromVaultFee
+            result.fromVaultFee = _getFee(_bridgeAmount, fromVault);
+            // inTokenBalanceFee
+            {
+                (bool incentive, uint256 fee) = vm.getBalanceFee(_fromChain, selfChainId, _bridgeInToken, _bridgeAmount);
+                if(incentive) {
+                    result.inTokenBalanceFee = -int256(fee);
+                    _bridgeAmount += fee;
+                } else {
+                    result.inTokenBalanceFee = int256(fee);
+                    if(fee >= _bridgeAmount) return result;
+                    _bridgeAmount = _bridgeAmount - fee;
+                }
+            }
+
+            if(result.fromVaultFee >= _bridgeAmount) return result;
+            _bridgeAmount = _bridgeAmount - result.fromVaultFee;
+            _bridgeAmount = registry.getAmountOut(_bridgeInToken, _bridgeOutToken, _bridgeAmount);
+            
+            // toVaultFee
+            result.toVaultFee = _getFee(_bridgeAmount, toVault);
+            // outTokenBalanceFee
+            {
+                (bool incentive, uint256 fee) = vm.getBalanceFee(selfChainId, _toChain, _bridgeOutToken, _bridgeAmount);
+                    if(incentive) {
+                    result.outTokenBalanceFee = -int256(fee);
+                    _bridgeAmount += fee;
+                } else {
+                    result.outTokenBalanceFee = int256(fee);
+                    if(fee >= _bridgeAmount) return result;
+                    _bridgeAmount = _bridgeAmount - fee;
+                }
+            }
+            if(result.fromVaultFee >= _bridgeAmount) return result;
+            _bridgeAmount = _bridgeAmount - result.fromVaultFee;
+            // gasFee
+            GasInfo memory gasInfo = registry.getNetworkFeeInfoWithToken(_bridgeOutToken, _toChain, _withCall);
+            result.gaseFee = gasInfo.estimateGas;
+            // amountOut
+            if(gasInfo.estimateGas > _bridgeAmount) {
+                result.amountOut = 0;
+            } else {
+                result.amountOut = _bridgeAmount - gasInfo.estimateGas;
+            }
+            return result;
+        }
+
+    }
+
+    function _getFee(uint256 amount, uint256 feeRate) internal pure returns (uint256 fee) {
+        if (feeRate == 0) {
+            return 0;
+        }
+        fee = amount * feeRate / MAX_RATE_UNIT;
     }
 
     function _getMembers(bytes calldata pubkey) internal view returns(address[] memory) {

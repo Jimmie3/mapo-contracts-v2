@@ -18,6 +18,8 @@ interface IVaultManager {
     view
     returns (bool, uint256);
 
+    function getVaultFeeRate() external view returns (uint32 ammVault, uint32 fromVault, uint32 toVault); 
+
     function checkMigration() external view returns (bool completed);
 
     function checkVault(TxItem calldata txItem) external view returns (bool);

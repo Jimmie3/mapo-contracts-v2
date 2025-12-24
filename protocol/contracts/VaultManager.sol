@@ -364,6 +364,13 @@ contract VaultManager is BaseImplementation, IVaultManager {
         return tokenList.keys();
     }
 
+    function getVaultFeeRate() external view returns (uint32 ammVault, uint32 fromVault, uint32 toVault) {
+        VaultFeeRate memory rate = vaultFeeRate;
+        ammVault = rate.ammVault;
+        fromVault = rate.fromVault;
+        toVault = rate.toVault;
+    }
+
    function getVaultTokenBalance(bytes calldata vault, uint256 chain, address token) external view returns(int256 balance, uint256 pendingOut) {
        bytes32 vaultKey = Utils.getVaultKey(vault);
        ChainType chainType = registry.getChainType(chain);

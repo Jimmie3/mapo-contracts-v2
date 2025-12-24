@@ -86,6 +86,33 @@
             ]
         },
 
+
+        "Base": {
+            "chainId": 8453, 
+            "lastScanBlock": 39885832,
+            "chainType": "contract",
+            "gasToken": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec", 
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
+            "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
+            "tokens": [
+                {
+                    "name": "ETH",
+                    "addr": "0x4200000000000000000000000000000000000006",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "USDT",
+                    "addr": "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
         "Btc": {
             "chainId": 1360095883558913, 
             "lastScanBlock": 926495,

@@ -19,6 +19,7 @@ import {Utils} from "../libs/Utils.sol";
 abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUpgradeable {
     address internal constant ZERO_ADDRESS = address(0);
     uint256 internal constant MIN_GAS_FOR_LOG = 20_000;
+    uint256 internal constant MIN_GAS_FOR_ON_RECEIVED = 300_000;
 
     bytes32 internal constant ORDER_NOT_EXIST = bytes32(0);
     bytes32 internal constant ORDER_EXECUTED = bytes32(uint256(1));
@@ -84,6 +85,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     error invalid_refund_address();
     error not_bridge_able();
     error expired();
+    error call_on_received_gas_too_low();
 
     modifier ensure(uint deadline) {
         if(deadline < block.timestamp) revert expired();
@@ -100,6 +102,9 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     function updateTokens(address[] calldata _tokens, uint256 _feature) external restricted {
         for (uint256 i = 0; i < _tokens.length; i++) {
             tokenFeatureList[_tokens[i]] = _feature;
+            if(_isSupportBurnFrom(_tokens[i])) {
+                IERC20(_tokens[i]).approve(address(this), type(uint256).max);
+            }
             emit UpdateTokens(_tokens[i], _feature);
         }
     }
@@ -210,6 +215,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
                     if(needCall) {
                         uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
                         uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
+                        if(gasForCall < MIN_GAS_FOR_ON_RECEIVED) revert call_on_received_gas_too_low();
                         try IReceiver(to).onReceived{gas: gasForCall}(
                             txItem.orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
                         ) {} catch {}
@@ -295,9 +301,12 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
 
     function _checkAndBurn(address _token, uint256 _amount) internal {
         if (_isMintable(_token)) {
-            // todo: check burn or burnFrom
+            if(_isSupportBurnFrom(_token)) {
+                IMintableToken(_token).burnFrom(address(this), _amount);
+                return;
+            }
             IMintableToken(_token).burn(_amount);
-        }
+        } 
     }
 
     function _checkAndMint(address _token, uint256 _amount) internal {

@@ -78,5 +78,6 @@ interface IRegistry {
     external
     view
     returns (GasInfo memory);
-
+    
+    function getMigrateGasFee(uint256 chain, address feePaidToken, uint256 estimateGas) external view returns (uint256 amount);
 }

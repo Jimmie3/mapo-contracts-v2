@@ -88,6 +88,7 @@ abstract contract BaseScript is Script {
         if(chainId == 11155111) return "eth_test";
         if(chainId == 56) return "Bsc";
         if(chainId == 97) return "bsc_test";
+        if(chainId == 8453) return "Base";
         revert("unknown");
     }
 }

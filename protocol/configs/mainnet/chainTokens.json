@@ -5,7 +5,7 @@
             "lastScanBlock": 21344539,
             "chainType": "contract",
             "gasToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23", 
-            "baseFeeToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23",
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
             "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
             "tokens": [
                 {
@@ -13,28 +13,32 @@
                     "addr": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 },
                 {
                     "name": "ETH",
                     "addr": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec",
                     "decimals": 18,
                     "bridgeAble": false,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 },
                 {
                     "name": "BNB",
                     "addr": "0xc478A25240d9C072ebEC5109b417E0A78A41667c",
                     "decimals": 18,
                     "bridgeAble": false,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 },
                 {
                     "name": "USDT",
                     "addr": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 }
             ]
         },
@@ -44,7 +48,7 @@
             "lastScanBlock": 70547507,
             "chainType": "contract",
             "gasToken": "0xc478A25240d9C072ebEC5109b417E0A78A41667c", 
-            "baseFeeToken": "0xc478A25240d9C072ebEC5109b417E0A78A41667c",
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
             "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
             "tokens": [
                 {
@@ -52,32 +56,63 @@
                     "addr": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 },
                 {
                     "name": "ETH",
                     "addr": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
                     "decimals": 18,
                     "bridgeAble": false,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 },
                 {
                     "name": "BNB",
                     "addr": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
                     "decimals": 18,
                     "bridgeAble": false,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 },
                 {
                     "name": "USDT",
                     "addr": "0x55d398326f99059fF775485246999027B3197955",
                     "decimals": 18,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 }
             ]
         },
 
+
+        "Base": {
+            "chainId": 8453, 
+            "lastScanBlock": 39885832,
+            "chainType": "contract",
+            "gasToken": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec", 
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
+            "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
+            "tokens": [
+                {
+                    "name": "ETH",
+                    "addr": "0x4200000000000000000000000000000000000006",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "USDT",
+                    "addr": "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
         "Btc": {
             "chainId": 1360095883558913, 
             "lastScanBlock": 926495,
@@ -91,7 +126,8 @@
                     "addr": "0x425443",
                     "decimals": 8,
                     "bridgeAble": true,
-                    "mintAble": false
+                    "mintAble": false,
+                    "burnFrom": false
                 }
             ]
         }

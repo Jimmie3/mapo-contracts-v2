@@ -125,7 +125,7 @@ contract Relay is BaseGateway, IRelay {
 
     function removeChain(uint256 _chain) external restricted {
         // check vault migration
-        (bool completed,) = vaultManager.checkMigration();
+        bool completed = vaultManager.checkMigration();
         if (!completed) revert Errs.migration_not_completed();
         vaultManager.removeChain(_chain);
 
@@ -145,7 +145,8 @@ contract Relay is BaseGateway, IRelay {
     function redeem(address _vaultToken, uint256 _vaultShare, address receiver) external whenNotPaused {
         address user = msg.sender;
 
-        uint256 amount = vaultManager.redeem(_vaultToken, _vaultShare, user, receiver);
+        (address asset, uint256 amount) = vaultManager.redeem(_vaultToken, _vaultShare, user, receiver);
+        if(amount > 0) _sendToken(asset, amount, receiver, false);
 
         emit Withdraw(_vaultToken, user, _vaultShare, amount);
     }
@@ -620,18 +621,20 @@ contract Relay is BaseGateway, IRelay {
 
     function _getTxItem(bytes32 orderId, BridgeItem calldata bridgeItem, uint256 chain) internal view returns (TxItem memory) {
         TxItem memory txItem;
-
+        txItem.chain = chain;
+        txItem.chainType = registry.getChainType(chain);
+        txItem.orderId = orderId;
+        txItem.vaultKey = Utils.getVaultKey(bridgeItem.vault);
+        if(bridgeItem.txType == TxType.MIGRATE && txItem.chainType == ChainType.CONTRACT) {
+           txItem.token = registry.getChainBaseToken(chain);
+           return txItem;
+        }
+        
         txItem.token = registry.getRelayChainToken(chain, bridgeItem.token);
         if (txItem.token == ZERO_ADDRESS) revert Errs.token_not_registered();
 
         txItem.amount = registry.getRelayChainAmount(bridgeItem.token, chain, bridgeItem.amount);
         if (bridgeItem.amount > 0 && txItem.amount == 0) revert Errs.token_not_registered();
-
-        txItem.chain = chain;
-        txItem.chainType = registry.getChainType(chain);
-
-        txItem.orderId = orderId;
-        txItem.vaultKey = Utils.getVaultKey(bridgeItem.vault);
 
         return txItem;
     }

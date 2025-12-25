@@ -367,6 +367,14 @@ contract Registry is BaseImplementation, IRegistry {
         return _getAmountOut(tokenIn, tokenOut, amountIn);
     }
 
+    function getMigrateGasFee(uint256 chain, address feePaidToken, uint256 estimateGas) external view override returns (uint256 amount) {
+        ChainInfo storage info  = chainInfos[chain];
+        amount = estimateGas;
+        if(info.gasToken != feePaidToken) {
+            amount = _getAmountOut(info.gasToken, feePaidToken, estimateGas);
+        }
+    }
+
     function getNetworkFeeInfoWithToken(address token, uint256 chain, bool withCall)
     external
     view

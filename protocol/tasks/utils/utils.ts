@@ -24,7 +24,8 @@ type Deployment = {
 };
 
 export async function getDeploymentByKey(network:string, key:string) {
-    let deployment = await readDeploymentFromFile(getNetworkName(network));
+    network = getNetworkName(network)
+    let deployment = await readDeploymentFromFile(network);
     let deployAddress = deployment[network][key];
     if (!deployAddress) throw `no ${key} deployment in ${network}`;
     deployAddress = deployment[network][key];
@@ -53,7 +54,8 @@ async function readDeploymentFromFile(network: string): Promise<Deployment> {
 
 
 export async function saveDeployment(network:string, key:string, addr:string) {
-  let deployment = await readDeploymentFromFile(getNetworkName(network));
+  network = getNetworkName(network)
+  let deployment = await readDeploymentFromFile(network);
 
   deployment[network][key] = addr;
   let p = path.join(__dirname, "../../deployments/deploy.json");

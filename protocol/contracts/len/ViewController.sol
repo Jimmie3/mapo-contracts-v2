@@ -5,6 +5,7 @@ import {ChainType} from "../libs/Types.sol";
 import {IGasService} from "../interfaces/IGasService.sol";
 import {IVaultManager} from "../interfaces/IVaultManager.sol";
 import {IRelay} from "../interfaces/IRelay.sol";
+import {IMintAbleChecker} from "../interfaces/IMintAbleChecker.sol";
 import {IAffiliateFeeManager} from "../interfaces/affiliate/IAffiliateFeeManager.sol";
 import {IRegistry, ContractType, ChainType, GasInfo} from "../interfaces/IRegistry.sol";
 import {ITSSManager} from "../interfaces/ITSSManager.sol";
@@ -177,8 +178,9 @@ contract ViewController is BaseImplementation {
         int256 inTokenBalanceFee;
         int256 outTokenBalanceFee;
         uint256 ammFee;
-        uint256 gaseFee;
+        uint256 gasFee;
         uint256 amountOut;
+        uint256 vaultBalance;
     }
 
     function quote(
@@ -228,7 +230,7 @@ contract ViewController is BaseImplementation {
 
             // gasFee
             GasInfo memory gasInfo = registry.getNetworkFeeInfoWithToken(_bridgeInToken, _toChain, _withCall);
-            result.gaseFee = gasInfo.estimateGas;
+            result.gasFee = gasInfo.estimateGas;
 
             // amountOut
             if(gasInfo.estimateGas > _bridgeAmount) {
@@ -236,6 +238,8 @@ contract ViewController is BaseImplementation {
             } else {
                 result.amountOut = _bridgeAmount - gasInfo.estimateGas;
             }
+            result.vaultBalance = _getVaultBalance(vm, _fromChain, _bridgeInToken);
+            if(result.vaultBalance < result.amountOut) result.amountOut = 0;
             return result;
         } else {
             // fromVaultFee
@@ -275,16 +279,42 @@ contract ViewController is BaseImplementation {
             _bridgeAmount = _bridgeAmount - result.fromVaultFee;
             // gasFee
             GasInfo memory gasInfo = registry.getNetworkFeeInfoWithToken(_bridgeOutToken, _toChain, _withCall);
-            result.gaseFee = gasInfo.estimateGas;
+            result.gasFee = gasInfo.estimateGas;
             // amountOut
             if(gasInfo.estimateGas > _bridgeAmount) {
                 result.amountOut = 0;
             } else {
                 result.amountOut = _bridgeAmount - gasInfo.estimateGas;
             }
+            result.vaultBalance = _getVaultBalance(vm, _fromChain, _bridgeOutToken);
+            if(result.vaultBalance < result.amountOut) result.amountOut = 0;
             return result;
         }
 
+    }
+
+    function _getVaultBalance(IVaultManager vm, uint256 chain, address token) internal view returns (uint256 balance) {
+        if(chain == selfChainId) {
+             // minted token has infinite balance
+            if(IMintAbleChecker(registry.getContractAddress(ContractType.RELAY)).isMintable(token)) {
+                return type(uint256).max;
+            }
+        }
+        bytes memory active = vm.getActiveVault();
+        bytes memory retiring = vm.getRetiringVault();
+        (int256 bal, ) = vm.getVaultTokenBalance(active, chain, token);
+        // unsupported minted token on other chain
+        if(bal < 0) {
+            balance = 0;
+        } else {
+            balance = uint256(bal);
+        }
+        if(retiring.length > 0) {
+            (int256 balRetir, ) = vm.getVaultTokenBalance(retiring, chain, token);
+            if(balRetir > 0 && uint256(balRetir) > balance) {
+                balance = uint256(balRetir);
+            }
+        }
     }
 
     function _getFee(uint256 amount, uint256 feeRate) internal pure returns (uint256 fee) {

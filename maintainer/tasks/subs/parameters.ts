@@ -28,7 +28,7 @@ task("Parameters:upgrade", "upgrade Parameters")
         let addr = await getDeployment(network.name, "Parameters");
         let p = await ethers.getContractAt("Parameters", addr, deployer) as Parameters;
         await(await p.upgradeToAndCall(await i.getAddress(), "0x")).wait();
-        await verify(hre, await p.getAddress(), [], "contracts/Parameters.sol:Parameters")
+        await verify(hre, await i.getAddress(), [], "contracts/Parameters.sol:Parameters")
 });
 
 

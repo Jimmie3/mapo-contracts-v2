@@ -29,7 +29,7 @@ task("TSSManager:upgrade", "upgrade TSSManager")
         let addr = await getDeployment(network.name, "TSSManager");
         let t = await ethers.getContractAt("TSSManager", addr, deployer) as TSSManager;
         await(await t.upgradeToAndCall(await i.getAddress(), "0x")).wait();
-        await verify(hre, await t.getAddress(), [], "contracts/TSSManager.sol:TSSManager")
+        await verify(hre, await i.getAddress(), [], "contracts/TSSManager.sol:TSSManager")
 });
 
 

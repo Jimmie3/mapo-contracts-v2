@@ -28,7 +28,7 @@ task("Maintainers:upgrade", "upgrade Maintainers")
         let addr = await getDeployment(network.name, "Maintainers");
         let m = await ethers.getContractAt("Maintainers", addr, deployer) as Maintainers;
         await(await m.upgradeToAndCall(await i.getAddress(), "0x")).wait();
-        await verify(hre, await m.getAddress(), [], "contracts/Maintainers.sol:Maintainers")
+        await verify(hre, await i.getAddress(), [], "contracts/Maintainers.sol:Maintainers")
 });
 
 task("Maintainers:set", "Maintainers set")

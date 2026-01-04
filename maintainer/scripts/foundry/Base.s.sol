@@ -71,9 +71,15 @@ abstract contract BaseScript is Script {
         uint256 chainId = block.chainid;
         string memory suffix = vm.envOr("NETWORK_SUFFIX", string(""));
         if(chainId == 212) {
-            return string(abi.encodePacked("Mapo", "_", suffix));
-        } else {
             return "Mapo_test";
+        } else {
+            bool isMain = keccak256(bytes(suffix)) == keccak256(bytes("main"));
+            if(isMain) {
+                return "Mapo_main";
+            } else {
+                return "Mapo_prod";
+            }
+           
         }
     }
 }

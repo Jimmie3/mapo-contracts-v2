@@ -27,7 +27,7 @@ const config: HardhatUserConfig = {
       url: "http://127.0.0.1:8545",
     },
 
-    Makalu: {
+    Mapo_test: {
       chainId: 212,
       url: "https://testnet-rpc.maplabs.io",
       accounts: process.env.TESTNET_PRIVATE_KEY !== undefined ? [process.env.TESTNET_PRIVATE_KEY] : [],
@@ -37,6 +37,12 @@ const config: HardhatUserConfig = {
       chainId: 22776,
       url: "https://rpc.maplabs.io",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+
+    Map_dev: {
+      chainId: 213,
+      url: "http://43.134.183.62:7445",
+      accounts: process.env.TESTNET_PRIVATE_KEY !== undefined ? [process.env.TESTNET_PRIVATE_KEY] : [],
     },
   },
   gasReporter: {

@@ -69,8 +69,17 @@ abstract contract BaseScript is Script {
 
     function getNetworkName() internal view returns (string memory) {
         uint256 chainId = block.chainid;
-        if(chainId == 212) return "Makalu";
-        if(chainId == 22776) return "Mapo";
-        revert("unknown");
+        string memory suffix = vm.envOr("NETWORK_SUFFIX", string(""));
+        if(chainId == 212) {
+            return "Mapo_test";
+        } else {
+            bool isMain = keccak256(bytes(suffix)) == keccak256(bytes("main"));
+            if(isMain) {
+                return "Mapo_main";
+            } else {
+                return "Mapo_prod";
+            }
+           
+        }
     }
 }

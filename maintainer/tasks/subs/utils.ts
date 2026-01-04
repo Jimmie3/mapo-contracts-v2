@@ -13,6 +13,16 @@ type Deployment = {
     };
 };
 
+export function getNetworkName(network:string) {
+    if(network.indexOf("test") > 0) return network;
+    let suffix = process.env.NETWORK_SUFFIX;
+    if(suffix === "main") {
+        return network + '_' + "main";
+    } else {
+        return network + '_' + "prod";
+    }
+}
+
 export async function verify(hre: HardhatRuntimeEnvironment, addr:string, args: any[], code:string) {
     console.log(args);
     const verifyArgs = args.map((arg) => (typeof arg == "string" ? `'${arg}'` : arg)).join(" ");
@@ -45,6 +55,7 @@ export async function deployProxy(hre: HardhatRuntimeEnvironment, impl:string, a
 
 
 export async function saveDeployment(network:string, key:string, addr:string) {
+    network = getNetworkName(network)
     let deployment = await readFromFile(network);
 
     if (!deployment[network][key]) {
@@ -57,6 +68,7 @@ export async function saveDeployment(network:string, key:string, addr:string) {
 }
 
 export async function getDeployment(network:string, key:string) {
+    network = getNetworkName(network)
     let deployment = await readFromFile(network);
     let deployAddress = deployment[network][key];
     if (!deployAddress) throw `no ${key} deployment in ${network}`;

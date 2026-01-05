@@ -98,6 +98,50 @@ task("vaultManager:updateAllTokenWeights", "update Token Weights")
         }
 });
 
+task("vaultManager:setMinAmount", "update Token Weights by token name")
+    .addParam("token", "token name")
+    .setAction(async (taskArgs, hre) => {
+        const { network, ethers } = hre;
+        const [deployer] = await ethers.getSigners();
+        console.log("deployer address:", await deployer.getAddress())
+        const VaultManagerFactory = await ethers.getContractFactory("VaultManager");
+        let addr = await getDeploymentByKey(network.name, "VaultManager");
+        const vaultManager = VaultManagerFactory.attach(addr) as VaultManager;
+        let tokenRegister = await getTokenRegsterByTokenName(network.name, taskArgs.token);
+        if(!tokenRegister) throw("token not exsit");
+        if(!tokenRegister.relayOutMinAmounts || tokenRegister.relayOutMinAmounts.length === 0) throw("not relayOutMinAmounts");
+
+        for (let index = 0; index < tokenRegister.relayOutMinAmounts.length; index++) {
+            const element = tokenRegister.relayOutMinAmounts[index];
+
+            console.log(`setMinAmount token(${taskArgs.token}), chain(${element.chainId}), minAmount(${element.minAmount})`)
+            await(await vaultManager.setMinAmount(tokenRegister.addr, element.chainId, element.minAmount)).wait()
+            
+        }
+
+});
+
+task("vaultManager:setAllMinAmount", "update Token Weights")
+    .setAction(async (taskArgs, hre) => {
+        const { network, ethers } = hre;
+        const [deployer] = await ethers.getSigners();
+        console.log("deployer address:", await deployer.getAddress())
+        const VaultManagerFactory = await ethers.getContractFactory("VaultManager");
+        let addr = await getDeploymentByKey(network.name, "VaultManager");
+        const vaultManager = VaultManagerFactory.attach(addr) as VaultManager;
+        let tokenRegisters = await getAllTokenRegster(network.name);
+        if(!tokenRegisters || tokenRegisters.length === 0 ) throw("no token to register");
+        for (let index = 0; index < tokenRegisters.length; index++) {
+            const element = tokenRegisters[index];
+            if(!element.relayOutMinAmounts || element.relayOutMinAmounts.length === 0) continue;
+            for (let j = 0; j < element.relayOutMinAmounts.length; j++) {
+                const r = element.relayOutMinAmounts[j];
+                console.log(`setMinAmount token(${element.name}), chain(${r.chainId}), minAmount(${r.minAmount})`)
+                await(await vaultManager.setMinAmount(element.addr, r.chainId, r.minAmount)).wait()
+            }
+        }
+});
+
 task("vaultManager:registerToken", "register Token")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;

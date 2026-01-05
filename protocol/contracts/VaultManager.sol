@@ -153,7 +153,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     // not used for mintable token
     struct TokenChainState {
         uint32 weight;              // chain weight for target balance
-        uint128 minAmount;          // minimum migration amount
+        uint128 minAmount;          // minimum out amount
         uint128 reserved;           // reserved for transfer out
         uint128 maxCredit;          // reserved
         int128 balance;             // token balance, might be negative value when token is minted
@@ -208,6 +208,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
     event UpdateVaultFeeRate(VaultFeeRate _vaultFeeRate);
 
     event UpdateBalanceFeeRate(Rebalance.BalanceFeeRate _vaultFeeRate);
+
+    event SetMinAmount(address indexed token, uint256 indexed chain, uint128 minAmount);
 
     modifier onlyRelay() {
         if (msg.sender != address(relay)) revert Errs.no_access();
@@ -324,6 +326,12 @@ contract VaultManager is BaseImplementation, IVaultManager {
         // todo: emit event
     }
 
+    function setMinAmount(address token, uint256 chain, uint128 minAmount) external restricted {
+        TokenChainState storage state = tokenStates[token].chainStates[chain];
+        state.minAmount = minAmount;
+        emit SetMinAmount(token, chain, minAmount);
+    }
+
     // ------------------------------------------- public view --------------------------------------------
 
     function checkMigration() external view override returns (bool completed) {
@@ -369,6 +377,10 @@ contract VaultManager is BaseImplementation, IVaultManager {
         ammVault = rate.ammVault;
         fromVault = rate.fromVault;
         toVault = rate.toVault;
+    }
+
+    function getRelayOutMinAmount(address token, uint256 toChain) external view override returns (uint128) {
+        return _getRelayOutMinAmount(token, toChain);
     }
 
    function getVaultTokenBalance(bytes calldata vault, uint256 chain, address token) external view returns(int256 balance, uint256 pendingOut) {
@@ -527,9 +539,10 @@ contract VaultManager is BaseImplementation, IVaultManager {
     returns (uint256, GasInfo memory)
     {
         GasInfo memory gasInfo = registry.getNetworkFeeInfoWithToken(txItem.token, txItem.chain,false);
+        uint128 minAmount = gasInfo.estimateGas + _getRelayOutMinAmount(txItem.token, selfChainId);
         if (fromRetiredVault) {
             // no vault balance update for retired vault
-            if (txItem.amount <= gasInfo.estimateGas) {
+            if (txItem.amount <= minAmount) {
                 return (0, gasInfo);
             }
             // the native chain vault, keep gas for the refund tx
@@ -538,7 +551,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
         uint256 outAmount = _collectFee(txItem.orderId, selfChainId, txItem.chain,  txItem.token, txItem.amount, false, true);
         outAmount = _truncation(outAmount);
-        if (outAmount <= gasInfo.estimateGas) {
+        if (outAmount <= minAmount) {
             // out of gas, save as reserved fee and return
             reservedFees[txItem.token] += outAmount;
             return (0, gasInfo);
@@ -710,8 +723,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
             }
 
             ChainTokenVault storage tokenBalance = v.tokenVaults[token];
-            uint128 minAmount = tokenStates[token].chainStates[_chain].minAmount;
-            if (minAmount < gasInfo.estimateGas) { minAmount = gasInfo.estimateGas;}
+            uint128 minAmount = _getRelayOutMinAmount(token, _chain) + gasInfo.estimateGas;
             uint128 available = tokenBalance.balance - tokenBalance.pendingOut;
             if (available <= minAmount) {
                 // no need migration
@@ -760,14 +772,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
         }
 
         if (feeInfo.incentive) {
-            if (feeInfo.balanceFee >= balanceFees[token]) {
-                balanceFee = balanceFees[token];
-                outAmount = amount + balanceFee - feeInfo.vaultFee;
-                balanceFees[token] = 0;
-            } else {
-                balanceFees[token] -= feeInfo.balanceFee;
-                outAmount = amount + balanceFee - feeInfo.vaultFee;
-            }
+            balanceFees[token] -= feeInfo.balanceFee;
+            outAmount = amount + balanceFee - feeInfo.vaultFee;
         } else {
             balanceFees[token] += feeInfo.balanceFee;
             outAmount = amount - feeInfo.balanceFee - feeInfo.vaultFee;
@@ -927,7 +933,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
         //      get gas for gas token
         gasInfo = registry.getNetworkFeeInfoWithToken(txItem.token, txItem.chain,withCall);
         txItem.amount = _truncation(txItem.amount);
-        if (txItem.amount <= gasInfo.estimateGas) {
+        uint256 minAmount = gasInfo.estimateGas + _getRelayOutMinAmount(txItem.token, txItem.chain);
+        if (txItem.amount <= minAmount) {
             return (NON_VAULT_KEY, 0, 0, gasInfo);
         }
 
@@ -976,7 +983,8 @@ contract VaultManager is BaseImplementation, IVaultManager {
     internal
     view
     returns (bool incentive, uint256 fee)
-    {
+    {   
+        if(fromChain == toChain) return (false, 0);
         Rebalance.BalanceInfo memory info;
         info.a = int256(amount);
         info.vt = int256(int128(tokenStates[token].balance));
@@ -992,6 +1000,19 @@ contract VaultManager is BaseImplementation, IVaultManager {
         incentive = (rate < 0);
         uint256 feeRate = incentive ? uint256(int256(-rate)) : uint256(int256(rate));
         fee = _getFee(amount, feeRate);
+
+        if(incentive) {
+            // max incentive is balance fee
+            uint256 maxIncentive = balanceFees[token];
+            if(fee > maxIncentive) {
+                fee = maxIncentive;
+            }
+        }
+    }
+
+
+    function _getRelayOutMinAmount(address token, uint256 toChain) internal view returns (uint128) {
+        return tokenStates[token].chainStates[toChain].minAmount;
     }
 
 

@@ -52,3 +52,4 @@ task("upgrade", "upgrade contract")
 // 12. relay -> relay:addAllChain
 // 13. vaultManager -> vaultManager:updateAllTokenWeights
 // 14. protocolFee ->  protocolFee:updateProtocolFee
+// 15  vaultManager -> vaultManager:setAllMinAmount

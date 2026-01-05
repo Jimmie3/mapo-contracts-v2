@@ -128,12 +128,18 @@ type ChainWeight = {
     weight: number
 }
 
+type RelayOutMinAmount = {
+    chainId: number,
+    minAmount: string
+}
+
 type TokenInfo = {
     id: number,
     name: string,
     addr: string,
     vaultToken: string,
-    chainWeights: ChainWeight[]
+    chainWeights: ChainWeight[],
+    relayOutMinAmounts: RelayOutMinAmount[]
 }
 
 type VaultFeeRate = {

@@ -39,6 +39,12 @@
                     "chainId": 1360095883558914,
                     "weight": 100
                 }
+            ],
+            "relayOutMinAmounts":[
+                {
+                    "chainId": 1360095883558914,
+                    "minAmount": "500000000000000"
+                }
             ]
         },
         {

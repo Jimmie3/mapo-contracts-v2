@@ -5,6 +5,8 @@ import {TxItem, GasInfo} from "../libs/Types.sol";
 
 interface IVaultManager {
 
+    function getRelayOutMinAmount(address token, uint256 toChain) external view returns (uint128);
+
     function getBridgeChains() external view returns(uint256[] memory);
 
     function getBridgeTokens() external view returns (address[] memory);

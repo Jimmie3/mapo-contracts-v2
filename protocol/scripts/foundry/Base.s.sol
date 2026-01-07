@@ -119,6 +119,14 @@ abstract contract BaseScript is Script {
                 return "Base_prod";
             }
         }
+
+        if(chainId == 42161){
+            if(isMain) {
+                return "Arb_main";
+            } else {
+                return "Arb_prod";
+            }
+        }
         revert("unknown");
     }
 }

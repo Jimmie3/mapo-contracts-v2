@@ -539,7 +539,7 @@ contract VaultManager is BaseImplementation, IVaultManager {
     returns (uint256, GasInfo memory)
     {
         GasInfo memory gasInfo = registry.getNetworkFeeInfoWithToken(txItem.token, txItem.chain,false);
-        uint128 minAmount = gasInfo.estimateGas + _getRelayOutMinAmount(txItem.token, selfChainId);
+        uint128 minAmount = gasInfo.estimateGas + _getRelayOutMinAmount(txItem.token, txItem.chain);
         if (fromRetiredVault) {
             // no vault balance update for retired vault
             if (txItem.amount <= minAmount) {

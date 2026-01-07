@@ -19,7 +19,6 @@ import {Utils} from "../libs/Utils.sol";
 abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUpgradeable {
     address internal constant ZERO_ADDRESS = address(0);
     uint256 internal constant MIN_GAS_FOR_LOG = 20_000;
-    uint256 internal constant MIN_GAS_FOR_ON_RECEIVED = 300_000;
 
     bytes32 internal constant ORDER_NOT_EXIST = bytes32(0);
     bytes32 internal constant ORDER_EXECUTED = bytes32(uint256(1));
@@ -75,6 +74,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         address to,
         bytes data      // migration: new vault
     );
+    event UpdateMinGasCallOnReceive(uint256 _value);
     event SetTransferFailedReceiver(address _transferFailedReceiver);
     event BridgeFailed(bytes32 indexed orderId, address token, uint256 amount, bytes data, bytes reason);
 
@@ -204,7 +204,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
         bytes memory payload
     ) internal virtual {}
 
-    function _bridgeTokenIn(bytes32 hash, BridgeItem memory bridgeItem, TxItem memory txItem) internal {
+    function _bridgeTokenIn(bytes32 hash, BridgeItem memory bridgeItem, TxItem memory txItem, uint256 minGas) internal {
         
         if(bridgeItem.to.length == 20) {
             address to = Utils.fromBytes(bridgeItem.to);
@@ -215,7 +215,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
                     if(needCall) {
                         uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
                         uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
-                        if(gasForCall < MIN_GAS_FOR_ON_RECEIVED) revert call_on_received_gas_too_low();
+                        if(gasForCall < minGas) revert call_on_received_gas_too_low();
                         try IReceiver(to).onReceived{gas: gasForCall}(
                             txItem.orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
                         ) {} catch {}

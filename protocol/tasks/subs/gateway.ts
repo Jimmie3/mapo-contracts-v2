@@ -111,6 +111,35 @@ task("gateway:setTransferFailedReceiver", "set Transfer Failed Receiver")
 
 });
 
+task("gateway:updateMinGasCallOnReceive", "update MinGas CallOnReceive")
+    .setAction(async (taskArgs, hre) => {
+        const { network, ethers } = hre;
+
+        let addr;
+        if(isRelayChain(network.name)) {
+            addr = await getDeploymentByKey(network.name, "Relay");
+        } else {
+            addr = await getDeploymentByKey(network.name, "Gateway");
+        }
+        let minGasCallOnReceive = (await getChainTokenByNetwork(network.name)).minGasCallOnReceive
+        if(!minGasCallOnReceive || minGasCallOnReceive === 0) return;
+
+        if(isTronNetwork(network.name)) {
+            let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
+            console.log(`pre minGasCallOnReceive is: `, await c.minGasCallOnReceive().call())
+            await c.updateMinGasCallOnReceive(minGasCallOnReceive).send();
+            console.log(`after minGasCallOnReceive is: `, await c.minGasCallOnReceive().call())
+        } else {
+            const [deployer] = await ethers.getSigners();
+            console.log("deployer address:", await deployer.getAddress())
+            const GatewayFactory = await ethers.getContractFactory("Gateway");
+            const gateway = GatewayFactory.attach(addr) as Gateway;
+            await(await gateway.updateMinGasCallOnReceive(minGasCallOnReceive)).wait();
+            console.log(`${network.name} minGasCallOnReceive is:`, await gateway.minGasCallOnReceive());
+        }
+
+});
+
 
 task("gateway:updateTokens", "update Tokens")
     .setAction(async (taskArgs, hre) => {

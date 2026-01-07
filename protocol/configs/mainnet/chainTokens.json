@@ -5,6 +5,7 @@
             "lastScanBlock": 21344539,
             "updateGasFeeGap": 0,
             "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
             "chainType": "contract",
             "gasToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23", 
             "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
@@ -50,6 +51,7 @@
             "lastScanBlock": 70547507,
             "updateGasFeeGap": 3,
             "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
             "chainType": "contract",
             "gasToken": "0xc478A25240d9C072ebEC5109b417E0A78A41667c", 
             "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
@@ -96,6 +98,7 @@
             "lastScanBlock": 39885832,
             "updateGasFeeGap": 3,
             "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
             "chainType": "contract",
             "gasToken": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec", 
             "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
@@ -119,11 +122,42 @@
                 }
             ]
         },
+
+        "Arb": {
+            "chainId": 42161, 
+            "lastScanBlock": 418464438,
+            "updateGasFeeGap": 3,
+            "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
+            "chainType": "contract",
+            "gasToken": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec", 
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
+            "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
+            "tokens": [
+                {
+                    "name": "ETH",
+                    "addr": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "USDT",
+                    "addr": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
         "Btc": {
             "chainId": 1360095883558913, 
             "lastScanBlock": 926495,
             "updateGasFeeGap": 0,
             "confirmCount": 2,
+            "minGasCallOnReceive": 0,
             "chainType": "no-contract",
             "gasToken": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB", 
             "baseFeeToken": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB",

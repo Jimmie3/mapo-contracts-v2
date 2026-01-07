@@ -27,7 +27,6 @@
     "Gateway": "TFgVqNsHTtL8xcuvfoT6FrtojpGNnEoowu",
     "wToken": "TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a"
   },
-
   "Mapo_main": {
     "TSSManager": "0x062B3Bd0B1A0c9d3cE35dC59D8F5E929314a8706",
     "Authority": "0xC28459DfF1288992EB81e1C1d1b51a7B4D8b5a13",
@@ -41,25 +40,26 @@
     "ProtocolFee": "0x52373c5350fd45b3A096Ab7A47E2cc9008f04507",
     "wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
   },
-
   "Eth_main": {
     "Authority": " ",
     "Gateway": " ",
     "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
   },
-
   "Bsc_main": {
     "Authority": "0x718110E1c08Ef66b1B199B4797C754A9a9ff1084",
     "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
     "wToken": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
   },
-
   "Base_main": {
     "Authority": "0x52cbbB1A8BfEcdD4Afa04fc74f0A6Dafe58B4c1B",
     "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
     "wToken": "0x4200000000000000000000000000000000000006"
   },
-
+  "Arb_main": {
+    "Authority": "0x3fb9ac7adea828d11fb8ae7df5c81f6542fa4c68",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+  },
   "Mapo_prod": {
     "TSSManager": "",
     "Authority": "",
@@ -73,23 +73,24 @@
     "ProtocolFee": "",
     "wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
   },
-
   "Eth_prod": {
     "Authority": " ",
     "Gateway": " ",
     "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
   },
-
   "Bsc_prod": {
     "Authority": "",
     "Gateway": "",
     "wToken": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
   },
-
   "Base_prod": {
     "Authority": "",
     "Gateway": "",
     "wToken": "0x4200000000000000000000000000000000000006"
+  },
+  "Arb_prod": {
+    "Authority": "",
+    "Gateway": "",
+    "wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
   }
-
 }

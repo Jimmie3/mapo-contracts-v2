@@ -88,6 +88,7 @@ type ChainToken = {
         lastScanBlock: number,
         updateGasFeeGap: number,
         confirmCount: number,
+        minGasCallOnReceive: number,
         chainType: string,
         gasToken: string,
         baseFeeToken:string,

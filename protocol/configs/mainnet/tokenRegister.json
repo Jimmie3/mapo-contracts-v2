@@ -60,6 +60,10 @@
                 {
                     "chainId": 8453,
                     "weight": 100
+                },
+                {
+                    "chainId": 42161,
+                    "weight": 100
                 }
             ]
         },

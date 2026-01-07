@@ -39,6 +39,8 @@ contract Relay is BaseGateway, IRelay {
 
     mapping(bytes32 => OrderInfo) public orderInfos;
 
+    uint256 public minGasCallOnReceive;
+
     event SetRegistry(address _registry);
     event SetVaultManager(address _vaultManager);
     event SetAffiliateFeeManager(address _affiliateFeeManager);
@@ -109,6 +111,11 @@ contract Relay is BaseGateway, IRelay {
         require(_registry != address(0));
         registry = IRegistry(_registry);
         emit SetRegistry(_registry);
+    }
+
+    function updateMinGasCallOnReceive(uint256 _value) external restricted {
+        minGasCallOnReceive = _value;
+        emit UpdateMinGasCallOnReceive(_value);
     }
 
     function addChain(
@@ -451,7 +458,7 @@ contract Relay is BaseGateway, IRelay {
             to,
             bridgeItem.payload
         );
-        _bridgeTokenIn(bytes32(0x00), bridgeItem, txItem);
+        _bridgeTokenIn(bytes32(0x00), bridgeItem, txItem, minGasCallOnReceive);
     }
 
     function _getActiveVault() internal view override returns (bytes memory vault) {

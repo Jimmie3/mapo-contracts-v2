@@ -14,7 +14,7 @@ contract Gateway is BaseGateway {
     bytes public activeTss;
     bytes public retireTss;
     uint256 public retireSequence;
-
+    uint256 public minGasCallOnReceive;
     event UpdateTSS(bytes32 orderId, bytes fromTss, bytes toTss);
 
     error order_executed();
@@ -34,6 +34,11 @@ contract Gateway is BaseGateway {
         activeTss = _tss;
         activeTssAddress = Utils.getAddressFromPublicKey(_tss);
         emit UpdateTSS(bytes32(0), bytes(""), _tss);
+    }
+
+    function updateMinGasCallOnReceive(uint256 _value) external restricted {
+        minGasCallOnReceive = _value;
+        emit UpdateMinGasCallOnReceive(_value);
     }
 
     function _deposit(bytes32 orderId, address outToken, uint256 amount, address from, address to, address refundAddr)
@@ -95,7 +100,7 @@ contract Gateway is BaseGateway {
             _updateTSS(txItem.orderId, bridgeItem.sequence, bridgeItem.payload);
         } else if (bridgeItem.txType == TxType.TRANSFER || bridgeItem.txType == TxType.REFUND) {
             _checkAndMint(txItem.token, txItem.amount);
-            _bridgeTokenIn(hash,bridgeItem, txItem);
+            _bridgeTokenIn(hash,bridgeItem, txItem, minGasCallOnReceive);
         } else {
             revert invalid_in_tx_type();
         }

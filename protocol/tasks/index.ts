@@ -53,3 +53,4 @@ task("upgrade", "upgrade contract")
 // 13. vaultManager -> vaultManager:updateAllTokenWeights
 // 14. protocolFee ->  protocolFee:updateProtocolFee
 // 15  vaultManager -> vaultManager:setAllMinAmount
+// 16  gateway -> gateway:updateMinGasCallOnReceive

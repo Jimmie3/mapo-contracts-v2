@@ -60,8 +60,8 @@ contract Maintainers is BaseImplementation, IMaintainers {
     event Deregister(address user);
     event Set(address _manager, address _parameter);
     event UpdateMaintainerLimit(uint256 limit);
-    event Preparation(address validator, address maintainer);
-    event CancelPreparation(address validator, address maintainer);
+    event Activate(address validator, address maintainer);
+    event Revoke(address validator, address maintainer);
     event ReleaseFromJail(address m);
     event AddToJail(address m, uint256 jailBlock);
     event DistributeReward(uint256 epoch, address m, uint256 value);
@@ -95,7 +95,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
 
     function register(address maintainerAddr, bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress)
         external
-    {   
+    {
         require(maintainerAddr != address(0));
         require(maintainerToValidator[maintainerAddr] == address(0));
         address validator = msg.sender;
@@ -112,16 +112,28 @@ contract Maintainers is BaseImplementation, IMaintainers {
         emit Register(validator, maintainerAddr, secp256Pubkey, ed25519PubKey, p2pAddress);
     }
 
-    function preparation() external {
+    function deregister() external {
+        address validator = msg.sender;
+        MaintainerInfo storage info = maintainerInfos[validator];
+        require(info.status == MaintainerStatus.REGISTERED);
+        require(info.lastActiveEpoch == 0 || (info.lastActiveEpoch + 1) < currentEpoch);
+        delete maintainerToValidator[info.account];
+        delete maintainerInfos[validator];
+
+        emit Deregister(validator);
+    }
+
+    function activate() external {
         address maintainerAddr = msg.sender;
         address validator = maintainerToValidator[maintainerAddr];
         MaintainerInfo storage info = maintainerInfos[validator];
         require(info.status == MaintainerStatus.REGISTERED);
         info.status = MaintainerStatus.STANDBY;
-        emit Preparation(validator, maintainerAddr);
+        emit Activate(validator, maintainerAddr);
     }
 
-    function cancelPreparation() external {
+
+    function revoke() external {
         address maintainerAddr = msg.sender;
         address validator = maintainerToValidator[maintainerAddr];
         MaintainerInfo storage info = maintainerInfos[validator];
@@ -129,9 +141,8 @@ contract Maintainers is BaseImplementation, IMaintainers {
             info.status == MaintainerStatus.STANDBY || info.status == MaintainerStatus.READY || info.status == MaintainerStatus.ACTIVE
         );
         info.status = MaintainerStatus.REGISTERED;
-        emit CancelPreparation(validator, maintainerAddr);
+        emit Revoke(validator, maintainerAddr);
     }
-
 
     function update(address maintainerAddr, bytes calldata secp256Pubkey, bytes calldata ed25519PubKey, string calldata p2pAddress) external {
         require(maintainerAddr != address(0));
@@ -157,21 +168,6 @@ contract Maintainers is BaseImplementation, IMaintainers {
         emit Heartbeat(msg.sender);
     }
 
-    // will not participate tss
-    function revoke() external {
-        // todo
-    }
-
-    function deregister() external {
-        address validator = msg.sender;
-        MaintainerInfo storage info = maintainerInfos[validator];
-        require(info.status == MaintainerStatus.REGISTERED);
-        require(info.lastActiveEpoch == 0 || (info.lastActiveEpoch + 1) < currentEpoch);
-        delete maintainerToValidator[info.account];
-        delete maintainerInfos[validator];
-
-        emit Deregister(validator);
-    }
 
     function getMaintainerInfos(address[] calldata ms) external view returns(MaintainerInfo[] memory infos) {
         uint256 len = ms.length;
@@ -395,7 +391,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         for (uint256 i = 0; i < length;) {
             MaintainerInfo storage info = maintainerInfos[validators[i]];
             // todo: check and sort by stake amount
-            if (_checkCandidacy(m, e, info.account, info.status)) {
+            if (_validateCandidate(m, e, info.account, info.status)) {
                 maintainers[selectedCount] = info.account;
                 selectedCount++;
 
@@ -426,8 +422,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
             );
     }
 
-    function _checkCandidacy(ITSSManager m, uint256 epochId, address maintainerAddr, MaintainerStatus status) internal view returns (bool) {
-    
+    function _validateCandidate(ITSSManager m, uint256 epochId, address maintainerAddr, MaintainerStatus status) internal view returns (bool) {
         if (status != MaintainerStatus.STANDBY && status != MaintainerStatus.ACTIVE && status != MaintainerStatus.READY) {
             return false;
         }
@@ -452,7 +447,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         if(_getAddressFromPublicKey(secp256Pubkey) != maintainerAddr) revert invalid_pubkey();
     }
 
-    function _getAddressFromPublicKey(bytes memory publicKey) internal pure returns (address) {
+    function _getAddressFromPublicKey(bytes calldata publicKey) internal pure returns (address) {
         return address(uint160(uint256(keccak256(publicKey))));
     }
 
@@ -462,7 +457,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         uint256 len = signers.length;
         validators = new address[](len);
         for (uint i = 0; i < len;) {
-            validators[i] = account.signerToAccount(signers[i]);
+            validators[i] = account.validatorSignerToAccount(signers[i]);
             unchecked {
                ++i;
             }
@@ -470,7 +465,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
     }
 
     function _isValidator(address _user) internal view returns (bool) {
-        address account = IAccounts(ACCOUNTS_ADDRESS).signerToAccount(_user);
+        address account = IAccounts(ACCOUNTS_ADDRESS).validatorSignerToAccount(_user);
         return IValidators(VALIDATORS_ADDRESS).isValidator(account);
     }
 

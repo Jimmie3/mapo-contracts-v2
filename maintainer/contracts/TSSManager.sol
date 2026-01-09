@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Utils} from "./libs/Utils.sol";
-import {Constant} from "./libs/Constant.sol";
+import {Constants} from "./libs/Constants.sol";
 import {IParameters} from "./interfaces/IParameters.sol";
 import {ITSSManager} from "./interfaces/ITSSManager.sol";
 import {IRelay} from "./interfaces/IRelay.sol";
@@ -78,7 +78,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
     error already_propose();
     error invalid_status();
 
-    modifier onlyMaintainers() {
+    modifier onlyMaintainer() {
         if (msg.sender != address(maintainerManager)) revert no_access();
         _;
     }
@@ -116,7 +116,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
     function elect(uint256 _epochId, address[] calldata _maintainers)
         external
         override
-        onlyMaintainers
+    onlyMaintainer
         returns (bool)
     {
         // todo: check status
@@ -155,7 +155,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         return true;
     }
 
-    function rotate(uint256 currentId, uint256 nextId) external override onlyMaintainers {
+    function rotate(uint256 currentId, uint256 nextId) external override onlyMaintainer {
         currentEpoch = nextId;
 
         retirePubkey = epochKeys[currentId];
@@ -174,7 +174,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         emit Rotate(currentId, nextId);
     }
 
-    function retire(uint256 retireEpochId, uint256 activeEpochId) external override onlyMaintainers {
+    function retire(uint256 retireEpochId, uint256 activeEpochId) external override onlyMaintainer {
         retirePubkey = epochKeys[retireEpochId];
         activePubkey = epochKeys[activeEpochId];
 
@@ -187,7 +187,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         emit Retire(retireEpochId, activeEpochId);
     }
 
-    function migrate() external override onlyMaintainers {
+    function migrate() external override onlyMaintainer {
         bool completed = _getRelay().migrate();
 
         if (completed) {
@@ -231,10 +231,10 @@ contract TSSManager is BaseImplementation, ITSSManager {
         if (keyGen) {
             // KEY_GEN_DELAY_SLASH_POINT must gt MAX_SLASH_POINT_FOR_ELECT
             // It means that if there is a KEY_GEN_DELAY, they cannot be elected in the next election.
-            delaySlashPoint = _getParameter(Constant.KEY_GEN_DELAY_SLASH_POINT);
+            delaySlashPoint = _getParameter(Constants.KEY_GEN_DELAY_SLASH_POINT);
         } else {
             // keyGen failed
-            delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
+            delaySlashPoint = _getParameter(Constants.OBSERVE_DELAY_SLASH_POINT);
         }
         bool hasErr = _beforePropose(delaySlashPoint, user, p, e);
         if(hasErr) return;
@@ -303,7 +303,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         address user = msg.sender;
         TSSInfo storage e = tssInfos[activePubkey];
         Proposal storage p = proposals[hash];
-        uint256 delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
+        uint256 delaySlashPoint = _getParameter(Constants.OBSERVE_DELAY_SLASH_POINT);
         bool hasErr = _beforePropose(delaySlashPoint, user, p, e);
         if(hasErr) return;
         if (_consensus(p, e.maintainers.length())) {
@@ -333,7 +333,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         bytes32 tssKey = keccak256(txInItem.bridgeItem.vault);
         TSSInfo storage e = tssInfos[tssKey];
         Proposal storage p = proposals[hash];
-        uint256 delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
+        uint256 delaySlashPoint = _getParameter(Constants.OBSERVE_DELAY_SLASH_POINT);
         bool hasErr = _beforePropose(delaySlashPoint, user, p, e);
         if(hasErr) return;
         if (_consensus(p, e.maintainers.length())) {
@@ -366,9 +366,9 @@ contract TSSManager is BaseImplementation, ITSSManager {
         Proposal storage p = proposals[hash];
         uint256 delaySlashPoint;
         if (txOutItem.bridgeItem.txType == TxType.MIGRATE) {
-            delaySlashPoint = _getParameter(Constant.MIGRATION_DELAY_SLASH_POINT);
+            delaySlashPoint = _getParameter(Constants.MIGRATION_DELAY_SLASH_POINT);
         } else {
-            delaySlashPoint = _getParameter(Constant.OBSERVE_DELAY_SLASH_POINT);
+            delaySlashPoint = _getParameter(Constants.OBSERVE_DELAY_SLASH_POINT);
         }
         bool hasErr = _beforePropose(delaySlashPoint, user, p, e);
         if(hasErr) return;
@@ -430,9 +430,9 @@ contract TSSManager is BaseImplementation, ITSSManager {
         p.count += 1;
         if (p.consensusBlock == 0) {
             // apply OBSERVE_SLASH_POINT before Consensus.
-            _addSlashPoint(e.epochId, maintainer, _getParameter(Constant.OBSERVE_SLASH_POINT));
+            _addSlashPoint(e.epochId, maintainer, _getParameter(Constants.OBSERVE_SLASH_POINT));
         } else {
-            if ((_getParameter(Constant.OBSERVE_MAX_DELAY_BLOCK) + p.consensusBlock) > _getBlock()) {
+            if ((_getParameter(Constants.OBSERVE_MAX_DELAY_BLOCK) + p.consensusBlock) > _getBlock()) {
                 // non-participants submit within the specified block range,
                 // reverted the DELAY_SLASH_POINT applied after consensus.
                 _subSlashPoint(e.epochId, maintainer, delayRecoverPoint);
@@ -467,7 +467,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
             }
         }
         // revert the OBSERVE_SLASH_POINT applied before consensus was reached
-        _batchSubSlashPoint(epochId, subs, _getParameter(Constant.OBSERVE_SLASH_POINT));
+        _batchSubSlashPoint(epochId, subs, _getParameter(Constants.OBSERVE_SLASH_POINT));
         // non-participants apply DELAY_SLASH_POINT.
         _batchAddSlashPoint(epochId, adds, delaySlashPoint);
     }
@@ -576,7 +576,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
     }
 
     function _checkTssPoolStatus(TSSInfo storage e) internal view returns(bool) {
-        return e.status == TSSStatus.KEYGEN_PENDING || (e.status == TSSStatus.KEYGEN_CONSENSUS && (e.electBlock + _getParameter(Constant.MAX_BLOCKS_FOR_UPDATE_TSS)) >= _getBlock());
+        return e.status == TSSStatus.KEYGEN_PENDING || (e.status == TSSStatus.KEYGEN_CONSENSUS && (e.electBlock + _getParameter(Constants.MAX_BLOCKS_FOR_UPDATE_TSS)) >= _getBlock());
     }
 
     function _getParameter(bytes32 hash) internal view returns (uint256) {

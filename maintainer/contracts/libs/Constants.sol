@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-library Constant {
+library Constants {
 
     bytes32 internal constant OBSERVE_MAX_DELAY_BLOCK = keccak256(bytes("OBSERVE_MAX_DELAY_BLOCK"));
     bytes32 internal constant OBSERVE_SLASH_POINT = keccak256(bytes("OBSERVE_SLASH_POINT"));

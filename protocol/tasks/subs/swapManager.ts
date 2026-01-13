@@ -40,7 +40,7 @@ task("swapManager:upgradeTo", "upgrapde vault token contract")
         let v = FlashSwapManagerFactory.attach(addr) as FlashSwapManager;
         console.log("pre impl address is:", await v.getImplementation())
         await(await v.upgradeToAndCall(await impl.getAddress(), "0x")).wait()
-        console.log("pre impl address is:", await v.getImplementation())
+        console.log("after impl address is:", await v.getImplementation())
         await verify(hre, await impl.getAddress(), [], "contracts/len/FlashSwapManager.sol:FlashSwapManager");
     })
 
@@ -54,7 +54,7 @@ task("swapManager:setFlashSwap", "upgrapde vault token contract")
         let addr = await getDeploymentByKey(network.name, "SwapManager");
         if(!addr || addr.length == 0) throw("vaultManager not deploy");
         let v = FlashSwapManagerFactory.attach(addr) as FlashSwapManager;
-        console.log("pre flash swap address is:", await v.getImplementation())
+        console.log("pre flash swap address is:", await v.flashSwap())
         await(await v.setFlashSwap(taskArgs.swap)).wait()
-        console.log("pre flash swap address is:", await v.getImplementation())
+        console.log("after flash swap address is:", await v.flashSwap())
     })

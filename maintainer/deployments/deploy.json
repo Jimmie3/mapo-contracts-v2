@@ -1,25 +1,23 @@
 {
-  "Mapo_test": {
-    "Authority": "0xA6a4F4f0da29feA73F39D641CDF57B06103B4678",
-    "Maintainers": "0x60c2e5bd5b785910424C48098292Ab410884B5ad",
-    "TSSManager": "0xeca45BE061CAa8F2Db2385e9Caa348acd55c85a2",
-    "Parameters": "0xdF9eD765065b5a1b9702272C9A3e3cBad45e43aB",
-    "Relay": "0x42D64eD9381bF456697b0C360e8acE139F176a80"
-  },
-  
-  "Mapo_main": {
-    "Authority": "0xC28459DfF1288992EB81e1C1d1b51a7B4D8b5a13",
-    "Maintainers": "0x7e22B9FC15054546028Df928eB7560AEd8F0eF48",
-    "TSSManager": "0x062B3Bd0B1A0c9d3cE35dC59D8F5E929314a8706",
-    "Parameters": "0x7871f47a3c00f12F7B7a84641C04B7B547A83Fd1",
-    "Relay": "0x42D64eD9381bF456697b0C360e8acE139F176a80"
-  },
-
-  "Mapo_prod": {
-    "Authority": "",
-    "Maintainers": "",
-    "TSSManager": "",
-    "Parameters": "",
-    "Relay": ""
-  }
+	"Mapo_test": {
+		"Authority": "0xA6a4F4f0da29feA73F39D641CDF57B06103B4678",
+		"Maintainers": "0x60c2e5bd5b785910424C48098292Ab410884B5ad",
+		"TSSManager": "0xeca45BE061CAa8F2Db2385e9Caa348acd55c85a2",
+		"Parameters": "0xdF9eD765065b5a1b9702272C9A3e3cBad45e43aB",
+		"Relay": "0x42D64eD9381bF456697b0C360e8acE139F176a80"
+	},
+	"Mapo_main": {
+		"Authority": "0xC28459DfF1288992EB81e1C1d1b51a7B4D8b5a13",
+		"Maintainers": "0x7e22B9FC15054546028Df928eB7560AEd8F0eF48",
+		"TSSManager": "0x062B3Bd0B1A0c9d3cE35dC59D8F5E929314a8706",
+		"Parameters": "0x7871f47a3c00f12F7B7a84641C04B7B547A83Fd1",
+		"Relay": "0x42D64eD9381bF456697b0C360e8acE139F176a80"
+	},
+	"Mapo_prod": {
+		"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+		"Maintainers": "0xBfb6B7d0d5Fc120703F7B57CC18157d79a50a7e5",
+		"TSSManager": "0xf3Fa35B6e3753cFe88Da86c71B2283F75EB64BE9",
+		"Parameters": "0x812Eb10fc90D6DF5d4f0037AaB8B196412f7E656",
+		"Relay": ""
+	}
 }

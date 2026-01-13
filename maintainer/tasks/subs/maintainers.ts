@@ -31,7 +31,7 @@ task("Maintainers:upgrade", "upgrade Maintainers")
         await verify(hre, await i.getAddress(), [], "contracts/Maintainers.sol:Maintainers")
 });
 
-task("Maintainers:set", "Maintainers set")
+task("Maintainers:set", "Maintainers set tssmanager and parameters")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
         const [deployer] = await ethers.getSigners();

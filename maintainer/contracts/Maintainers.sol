@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.25;
 
 import {Utils} from "./libs/Utils.sol";
 import {IParameters} from "./interfaces/IParameters.sol";

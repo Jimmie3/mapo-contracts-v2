@@ -37,7 +37,7 @@
         },
         {
             "key": "BLOCKS_PER_EPOCH",
-            "value": 10000
+            "value": 100000
         },
         {
             "key": "MAX_SLASH_POINT_FOR_ELECT",

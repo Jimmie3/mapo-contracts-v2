@@ -318,7 +318,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         uint256 _rewardEpoch = rewardEpoch + 1;
         ITSSManager.TSSStatus status = tssManager.getTSSStatus(_rewardEpoch);
         if (status == ITSSManager.TSSStatus.MIGRATED) {
-            EpochInfo storage e = epochInfos[electionEpoch];
+            EpochInfo storage e = epochInfos[_rewardEpoch];
             uint256 totalReward = (e.endBlock - e.startBlock) * _getParameter(REWARD_PER_BLOCK);
             uint256[] memory points = tssManager.batchGetSlashPoint(_rewardEpoch, e.maintainers);
             uint256 arm = _getParameter(ADDITIONAL_REWARD_MAX_SLASH_POINT);
@@ -473,7 +473,7 @@ contract Maintainers is BaseImplementation, IMaintainers {
         uint256 len = points.length;
         for (uint256 i = 0; i < len;) {
             if (arm > points[i]) {
-                mask += points[i];
+                mask += (arm - points[i]);
             }
             unchecked {
                 ++i;

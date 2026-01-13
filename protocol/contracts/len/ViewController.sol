@@ -296,7 +296,7 @@ contract ViewController is BaseImplementation {
             }
             result.vaultBalance = _getVaultBalance(vm, _toChain, _bridgeOutToken);
             if(result.vaultBalance < result.amountOut) result.amountOut = 0;
-            if(result.amountOut <= vm.getRelayOutMinAmount(_bridgeInToken, _toChain)) result.amountOut = 0;
+            if(result.amountOut <= vm.getRelayOutMinAmount(_bridgeOutToken, _toChain)) result.amountOut = 0;
             return result;
         }
 

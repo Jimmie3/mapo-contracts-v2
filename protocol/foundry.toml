@@ -26,16 +26,25 @@ fs_permissions = [{ access = "read-write", path = "./" }]
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
 [etherscan]
-Mapo = { url = "https://explorer-api.chainservice.io/api", key = " "}
-Eth = { url = "https://api.etherscan.io/api", key = " "}
-Bsc = { url = "https://api.bscscan.com/api", key = " "}
+# MAPO chains (Blockscout) - must use command line: --verifier blockscout --verifier-url <url>
+# forge script ... --verify --verifier blockscout --verifier-url https://explorer-api.chainservice.io/api
+# Mapo = { url = "https://explorer-api.chainservice.io/api", key = "", chain = 22776 }
+
+# Etherscan-compatible chains
+# Deploy with verify: forge script ... --verify
+Eth = { url = "https://api.ehterscan.org/v2/api?chainid=1", key = "${ETHERSCAN_API_KEY}", chain = 1 }
+Eth_test = { url = "https://api.ehterscan.org/v2/api?chainid=11155111", key = "${ETHERSCAN_API_KEY}", chain = 11155111 }
+Bsc = { url = "https://api.ehterscan.org/v2/api?chainid=56", key = "${ETHERSCAN_API_KEY}", chain = 56 }
+Bsc_test = { url = "https://api.ehterscan.org/v2/api?chainid=97", key = "${ETHERSCAN_API_KEY}", chain = 97 }
+Base = { url = "https://api.ehterscan.org/v2/api?chainid=8453", key = "${ETHERSCAN_API_KEY}", chain = 8453 }
+Arbitrum = { url = "https://api.ehterscan.org/v2/api?chainid=42161", key = "${ETHERSCAN_API_KEY}", chain = 42161 }
 
 [rpc_endpoints]
 Mapo = "https://rpc.maplabs.io"
 Makalu = "https://testnet-rpc.maplabs.io"
 
 Eth = "https://eth-mainnet.public.blastapi.io"
-eth_test = "https://1rpc.io/sepolia"
+Eth_test = "https://1rpc.io/sepolia"
 
 Bsc = "https://binance-smart-chain-public.nodies.app"
-bsc_test = "https://bsc-testnet.public.blastapi.io"
+Bsc_test = "https://bsc-testnet.public.blastapi.io"

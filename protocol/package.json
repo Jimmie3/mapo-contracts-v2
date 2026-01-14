@@ -51,7 +51,7 @@
   "license": "MIT",
   "dependencies": {
     "@mapprotocol/common-contracts": "^0.1.1",
-    "@openzeppelin/contracts": "^5.0.0",
-    "@openzeppelin/contracts-upgradeable": "^5.0.0"
+    "@openzeppelin/contracts": "5.4.0",
+    "@openzeppelin/contracts-upgradeable": "5.4.0"
   }
 }

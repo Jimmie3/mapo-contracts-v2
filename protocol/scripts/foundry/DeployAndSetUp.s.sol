@@ -1,6 +1,33 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/**
+ * @title DeployAndSetUp
+ * @notice Deploy protocol contracts with optional auto-verification
+ *
+ * @dev Deploy Commands:
+ *
+ * MAPO Mainnet (Blockscout - deploy first, then verify separately):
+ *   # Step 1: Deploy
+ *   forge script scripts/foundry/DeployAndSetUp.s.sol:DeployAndSetUp \
+ *     --rpc-url Mapo --broadcast
+ *
+ *   # Step 2: Verify each contract (run after deployment)
+ *   forge verify-contract <ADDRESS> <CONTRACT> \
+ *     --verifier blockscout \
+ *     --verifier-url https://explorer-api.chainservice.io/api
+ *
+ * Ethereum/BSC/Base/Arb (Etherscan - supports --verify flag):
+ *   forge script scripts/foundry/DeployAndSetUp.s.sol:DeployAndSetUp \
+ *     --rpc-url Eth --broadcast --verify
+ *
+ * Environment Variables:
+ *   PRIVATE_KEY          - Mainnet deployer private key
+ *   TESTNET_PRIVATE_KEY  - Testnet deployer private key
+ *   GATEWAY_SALT         - Salt for CREATE2 deployment
+ *   ETHERSCAN_API_KEY    - Etherscan API key
+ */
+
 import {BaseScript, console} from "./Base.s.sol";
 import {Relay} from "../../contracts/Relay.sol";
 import {VaultManager} from "../../contracts/VaultManager.sol";
@@ -12,9 +39,13 @@ import {ViewController} from "../../contracts/len/ViewController.sol";
 import {IRegistry, ContractType} from "../../contracts/interfaces/IRegistry.sol";
 
 contract DeployAndSetUp is BaseScript {
+
     function run() public virtual broadcast {
           deploy();
-          // set();
+          set();
+
+          // Print verification commands after deployment
+          printVerificationCommands();
     }
 
     function deploy() internal {
@@ -22,7 +53,7 @@ contract DeployAndSetUp is BaseScript {
         address authority = readConfigAddr(networkName, "Authority");
         console.log("Authority address:", authority);
         uint256 chainId = block.chainid;
-        if(chainId == 212 || chainId == 22776) {
+        if (chainId == 212 || chainId == 22776) {
                deployRelay(networkName, authority);
                deployGasService(networkName, authority);
                deployProtocolFee(networkName, authority);
@@ -54,7 +85,11 @@ contract DeployAndSetUp is BaseScript {
         relay = Relay(payable(r));
 
         console.log("Relay address:", r);
+        console.log("Relay implementation:", address(impl));
         saveConfig(networkName, "Relay", r);
+
+        // Record deployment for verification
+        _recordDeployment(r, address(impl), "Relay", initData);
 
         address wToken = readConfigAddr(networkName, "wToken");
         relay.setWtoken(wToken);
@@ -70,7 +105,11 @@ contract DeployAndSetUp is BaseScript {
         gateway = Gateway(payable(g));
 
         console.log("Gateway address:", g);
+        console.log("Gateway implementation:", address(impl));
         saveConfig(networkName, "Gateway", g);
+
+        // Record deployment for verification
+        _recordDeployment(g, address(impl), "Gateway", initData);
 
         address wToken = readConfigAddr(networkName, "wToken");
         gateway.setWtoken(wToken);
@@ -84,7 +123,11 @@ contract DeployAndSetUp is BaseScript {
         vaultManager = VaultManager(v);
 
         console.log("VaultManager address:", v);
+        console.log("VaultManager implementation:", address(impl));
         saveConfig(networkName, "VaultManager", v);
+
+        // Record deployment for verification
+        _recordDeployment(v, address(impl), "VaultManager", initData);
    }
 
     function deployProtocolFee(string memory networkName, address authority) internal returns(ProtocolFee protocolFee) {
@@ -94,7 +137,11 @@ contract DeployAndSetUp is BaseScript {
         protocolFee = ProtocolFee(payable(p));
 
         console.log("ProtocolFee address:", p);
+        console.log("ProtocolFee implementation:", address(impl));
         saveConfig(networkName, "ProtocolFee", p);
+
+        // Record deployment for verification
+        _recordDeployment(p, address(impl), "ProtocolFee", initData);
    }
 
 
@@ -105,7 +152,11 @@ contract DeployAndSetUp is BaseScript {
         registry = Registry(r);
 
         console.log("Registry address:", r);
+        console.log("Registry implementation:", address(impl));
         saveConfig(networkName, "Registry", r);
+
+        // Record deployment for verification
+        _recordDeployment(r, address(impl), "Registry", initData);
    }
 
    function deployGasService(string memory networkName, address authority) internal returns(GasService gasService) {
@@ -115,7 +166,11 @@ contract DeployAndSetUp is BaseScript {
         gasService = GasService(g);
 
         console.log("GasService address:", g);
+        console.log("GasService implementation:", address(impl));
         saveConfig(networkName, "GasService", g);
+
+        // Record deployment for verification
+        _recordDeployment(g, address(impl), "GasService", initData);
    }
 
     function deployViewController(string memory networkName, address authority) internal returns(ViewController viewController) {
@@ -125,7 +180,11 @@ contract DeployAndSetUp is BaseScript {
         viewController = ViewController(v);
 
         console.log("ViewController address:", v);
+        console.log("ViewController implementation:", address(impl));
         saveConfig(networkName, "ViewController", v);
+
+        // Record deployment for verification
+        _recordDeployment(v, address(impl), "len/ViewController", initData);
    }
 
    function setUp(string memory networkName) internal {

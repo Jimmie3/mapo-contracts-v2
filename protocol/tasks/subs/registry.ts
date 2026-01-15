@@ -66,6 +66,15 @@ task("registry:registerToken", "register Chain info by token name")
         const registry = RegistryFactory.attach(addr) as Registry;
         let token = await getTokenRegsterByTokenName(network.name, taskArgs.name);
         if(!token || token === null) throw("token not set");
+        // Check if token is already registered with same address
+        let existingToken = await registry.getTokenAddressById(token.id);
+        if (existingToken.toLowerCase() === token.addr.toLowerCase()) {
+            console.log(`token ${token.name} id(${token.id}) already registered with same address, skipping`);
+            return;
+        }
+        if (existingToken !== "0x0000000000000000000000000000000000000000") {
+            console.log(`token ${token.name} id(${token.id}) on-chain address: ${existingToken}, config address: ${token.addr}, updating...`);
+        }
         console.log(`registerToken ${token.name} id(${token.id}), addr(${token.addr}, vaultToken(${token.vaultToken}))`);
         await(await registry.registerToken(token.id, token.addr)).wait();
 });
@@ -82,6 +91,15 @@ task("registry:registerAllToken", "register Chain info")
         if(!tokens || tokens.length === 0) throw("token not set");
         for (let index = 0; index < tokens.length; index++) {
             const token = tokens[index];
+            // Check if token is already registered with same address
+            let existingToken = await registry.getTokenAddressById(token.id);
+            if (existingToken.toLowerCase() === token.addr.toLowerCase()) {
+                console.log(`token ${token.name} id(${token.id}) already registered with same address, skipping`);
+                continue;
+            }
+            if (existingToken !== "0x0000000000000000000000000000000000000000") {
+                console.log(`token ${token.name} id(${token.id}) on-chain address: ${existingToken}, config address: ${token.addr}, updating...`);
+            }
             console.log(`registerToken ${token.name} id(${token.id}), addr(${token.addr})`);
             await(await registry.registerToken(token.id, token.addr)).wait();
         }
@@ -186,6 +204,19 @@ task("registry:mapTokenByTokenName", "map Token by token name")
             for (let j = 0; j < tokens.length; j++) {
                 const token = tokens[j];
                 if(token.name === taskArgs.token) {
+                    // Check if token mapping already exists and matches
+                    let existingMapping = await registry.getToChainToken(relayToken.addr, element.chainId);
+                    let existingDecimals = await registry.getTokenDecimals(element.chainId, token.addr);
+                    let configTokenBytes = token.addr.toLowerCase();
+                    let existingMappingHex = existingMapping.toLowerCase();
+                    if (existingMappingHex === configTokenBytes && Number(existingDecimals) === token.decimals) {
+                        console.log(`token ${token.name} on chain(${element.chainId}) already mapped with same values, skipping`);
+                        continue;
+                    }
+                    if (existingMapping && existingMapping !== "0x") {
+                        console.log(`token ${token.name} on chain(${element.chainId}) on-chain mapping: ${existingMapping}, decimals: ${existingDecimals}`);
+                        console.log(`config mapping: ${token.addr}, decimals: ${token.decimals}, updating...`);
+                    }
                     console.log(`map token ${token.name}: ${relayToken.addr}, chain(${element.chainId}), addr(${token.addr}), decimals(${token.decimals})`);
                     await(await registry.mapToken(relayToken.addr, element.chainId, token.addr, token.decimals)).wait();
                 }
@@ -206,7 +237,18 @@ task("registry:mapToken", "map Token")
         const RegistryFactory = await ethers.getContractFactory("Registry");
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
-        console.log(`map token ${taskArgs.token}, chain(${taskArgs.chain}), addr(${taskArgs.addr}, decimals(${taskArgs.decimals})`);
+        // Check if token mapping already exists and matches
+        let existingMapping = await registry.getToChainToken(taskArgs.token, taskArgs.chain);
+        let existingDecimals = await registry.getTokenDecimals(taskArgs.chain, taskArgs.addr);
+        if (existingMapping.toLowerCase() === taskArgs.addr.toLowerCase() && Number(existingDecimals) === Number(taskArgs.decimals)) {
+            console.log(`token on chain(${taskArgs.chain}) already mapped with same values, skipping`);
+            return;
+        }
+        if (existingMapping && existingMapping !== "0x") {
+            console.log(`on-chain mapping: ${existingMapping}, decimals: ${existingDecimals}`);
+            console.log(`config mapping: ${taskArgs.addr}, decimals: ${taskArgs.decimals}, updating...`);
+        }
+        console.log(`map token ${taskArgs.token}, chain(${taskArgs.chain}), addr(${taskArgs.addr}), decimals(${taskArgs.decimals})`);
         await(await registry.mapToken(taskArgs.token, taskArgs.chain, taskArgs.addr, taskArgs.decimals)).wait();
 });
 
@@ -218,8 +260,15 @@ async function registerChain(network: string, registry: Registry, chainToken: {
         gasToken: string,
         baseFeeToken:string,
         tokens: any[]}) {
-    
+
         let chainType = (chainToken.chainType === "contract") ? 0 : 1;
+
+        // Check if chain is already registered
+        let isRegistered = await registry.isRegistered(chainToken.chainId);
+        if (isRegistered) {
+            console.log(`chain ${chainToken.chainId} (${network}) already registered, skipping`);
+            return;
+        }
 
         let router = await getRouter(network);
         console.log(

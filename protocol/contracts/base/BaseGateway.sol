@@ -102,7 +102,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
     function updateTokens(address[] calldata _tokens, uint256 _feature) external restricted {
         for (uint256 i = 0; i < _tokens.length; i++) {
             tokenFeatureList[_tokens[i]] = _feature;
-            if(_isSupportBurnFrom(_tokens[i])) {
+            if (_isSupportBurnFrom(_tokens[i])) {
                 IERC20(_tokens[i]).approve(address(this), type(uint256).max);
             }
             emit UpdateTokens(_tokens[i], _feature);
@@ -206,16 +206,16 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
 
     function _bridgeTokenIn(bytes32 hash, BridgeItem memory bridgeItem, TxItem memory txItem, uint256 minGas) internal {
         
-        if(bridgeItem.to.length == 20) {
+        if (bridgeItem.to.length == 20) {
             address to = Utils.fromBytes(bridgeItem.to);
 
             if (txItem.amount > 0 && to != address(0)) {
                 bool needCall = _needCall(to, bridgeItem.payload.length);
                 if (_safeTransferOut(txItem.token, to, txItem.amount, needCall)) {
-                    if(needCall) {
+                    if (needCall) {
                         uint256 fromChain = bridgeItem.chainAndGasLimit >> 192;
                         uint256 gasForCall = gasleft() - MIN_GAS_FOR_LOG;
-                        if(gasForCall < minGas) revert call_on_received_gas_too_low();
+                        if (gasForCall < minGas) revert call_on_received_gas_too_low();
                         try IReceiver(to).onReceived{gas: gasForCall}(
                             txItem.orderId, txItem.token, txItem.amount, fromChain, bridgeItem.from, bridgeItem.payload
                         ) {} catch {}
@@ -225,9 +225,9 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
             }
         }
 
-        if(txItem.amount > 0) {
+        if (txItem.amount > 0) {
             address _transferFailedReceiver = transferFailedReceiver;
-            if(_transferFailedReceiver != address(0)) {
+            if (_transferFailedReceiver != address(0)) {
                 _transferOut(txItem.token, _transferFailedReceiver, txItem.amount);
             }
         }
@@ -301,7 +301,7 @@ abstract contract BaseGateway is IGateway, BaseImplementation, ReentrancyGuardUp
 
     function _checkAndBurn(address _token, uint256 _amount) internal {
         if (_isMintable(_token)) {
-            if(_isSupportBurnFrom(_token)) {
+            if (_isSupportBurnFrom(_token)) {
                 IMintableToken(_token).burnFrom(address(this), _amount);
                 return;
             }

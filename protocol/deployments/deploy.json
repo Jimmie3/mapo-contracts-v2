@@ -61,35 +61,35 @@
     "wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
   },
   "Mapo_prod": {
-    "TSSManager": "",
-    "Authority": "",
-    "Relay": "",
-    "VaultManager": "",
-    "GasService": "",
-    "Registry": "",
-    "SwapManager": "",
+    "TSSManager": "0xf3Fa35B6e3753cFe88Da86c71B2283F75EB64BE9",
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+    "Relay": "0x00004080D86e1077ce96E67C1B167fF105025307",
+    "VaultManager": "0xdfC3F894Fb30F3E2f81608829968959DB65FD13b",
+    "GasService": "0x1De9C47ae0074F347d9fF6bfA39CDd3389322eAD",
+    "Registry": "0xf2C3a9b547875C48Ba8598C4973BAC71eDc4C34c",
+    "SwapManager": "0x5bdB26Eef19dB8A90ec77DC542026Dd0ae7c549c",
     "AffiliateManager": "0x4De2ADb9cB88c10Bf200F76c18035cbB8906b6bC",
-    "ViewController": "",
-    "ProtocolFee": "",
+    "ViewController": "0x8c98bA0a11Cbb0DB3C52e4CD91B0844B39BC1F11",
+    "ProtocolFee": "0xc9041777D421b5fcB272f7Cd8C66757246F1f9F1",
     "wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
   },
   "Eth_prod": {
-    "Authority": " ",
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
     "Gateway": " ",
     "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
   },
   "Bsc_prod": {
-    "Authority": "",
-    "Gateway": "",
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+    "Gateway": "0x00004080D86e1077ce96E67C1B167fF105025307",
     "wToken": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
   },
   "Base_prod": {
-    "Authority": "",
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
     "Gateway": "",
     "wToken": "0x4200000000000000000000000000000000000006"
   },
   "Arb_prod": {
-    "Authority": "",
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
     "Gateway": "",
     "wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
   }

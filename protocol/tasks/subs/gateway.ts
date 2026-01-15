@@ -44,7 +44,12 @@ task("gateway:setWtoken", "set wtoken address")
         }
         if(isTronNetwork(network.name)) {
             let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
-            console.log(`pre wtoken address is: `, await tronFromHex(await c.wToken().call(), network.name));
+            let currentWtoken = await tronFromHex(await c.wToken().call(), network.name);
+            if (currentWtoken.toLowerCase() === wtoken.toLowerCase()) {
+                console.log(`wtoken already set to ${currentWtoken}, skipping`);
+                return;
+            }
+            console.log(`on-chain wtoken: ${currentWtoken}, config wtoken: ${wtoken}, updating...`);
             await c.setWtoken(await tronToHex(wtoken, network.name)).send();
             console.log(`after wtoken address is: `, await tronFromHex(await c.wToken().call(), network.name))
         } else {
@@ -52,8 +57,12 @@ task("gateway:setWtoken", "set wtoken address")
             console.log("deployer address:", await deployer.getAddress())
             const GatewayFactory = await ethers.getContractFactory("Gateway");
             const gateway = GatewayFactory.attach(addr) as Gateway;
-
-            console.log(`pre wtoken address is: `, await gateway.wToken())
+            let currentWtoken = await gateway.wToken();
+            if (currentWtoken.toLowerCase() === wtoken.toLowerCase()) {
+                console.log(`wtoken already set to ${currentWtoken}, skipping`);
+                return;
+            }
+            console.log(`on-chain wtoken: ${currentWtoken}, config wtoken: ${wtoken}, updating...`);
             await(await gateway.setWtoken(wtoken)).wait();
             console.log(`after wtoken address is: `, await gateway.wToken())
         }
@@ -68,14 +77,24 @@ task("gateway:setTssAddress", "set tss pubkey")
         let addr = await getDeploymentByKey(network.name, "Gateway");
         if(isTronNetwork(network.name)) {
             let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
-            console.log(`pre pubkey is: `, await c.activeTss().call())
+            let currentPubkey = await c.activeTss().call();
+            if (currentPubkey.toLowerCase() === taskArgs.pubkey.toLowerCase()) {
+                console.log(`pubkey already set to ${currentPubkey}, skipping`);
+                return;
+            }
+            console.log(`on-chain pubkey: ${currentPubkey}, config pubkey: ${taskArgs.pubkey}, updating...`);
             await c.setTssAddress(taskArgs.pubkey).send();
             console.log(`after pubkey is: `, await c.activeTss().call())
         } else {
             console.log("deployer address:", await deployer.getAddress())
             const GatewayFactory = await ethers.getContractFactory("Gateway");
             const gateway = GatewayFactory.attach(addr) as Gateway;
-            console.log(`pre pubkey is: `, await gateway.activeTss())
+            let currentPubkey = await gateway.activeTss();
+            if (currentPubkey.toLowerCase() === taskArgs.pubkey.toLowerCase()) {
+                console.log(`pubkey already set to ${currentPubkey}, skipping`);
+                return;
+            }
+            console.log(`on-chain pubkey: ${currentPubkey}, config pubkey: ${taskArgs.pubkey}, updating...`);
             await(await gateway.setTssAddress(taskArgs.pubkey)).wait();
             console.log(`after pubkey is: `, await gateway.activeTss())
         }
@@ -97,14 +116,25 @@ task("gateway:setTransferFailedReceiver", "set Transfer Failed Receiver")
 
         if(isTronNetwork(network.name)) {
             let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
-            console.log(`pre transferFailedReceiver is: `, await c.transferFailedReceiver().call())
+            let currentReceiver = await tronFromHex(await c.transferFailedReceiver().call(), network.name);
+            if (currentReceiver.toLowerCase() === transferFailedReceiver.toLowerCase()) {
+                console.log(`transferFailedReceiver already set to ${currentReceiver}, skipping`);
+                return;
+            }
+            console.log(`on-chain transferFailedReceiver: ${currentReceiver}, config: ${transferFailedReceiver}, updating...`);
             await c.setTransferFailedReceiver(await tronToHex(transferFailedReceiver, network.name)).send();
-            console.log(`after transferFailedReceiver is: `, await c.transferFailedReceiver().call())
+            console.log(`after transferFailedReceiver is: `, await tronFromHex(await c.transferFailedReceiver().call(), network.name))
         } else {
             const [deployer] = await ethers.getSigners();
             console.log("deployer address:", await deployer.getAddress())
             const GatewayFactory = await ethers.getContractFactory("Gateway");
             const gateway = GatewayFactory.attach(addr) as Gateway;
+            let currentReceiver = await gateway.transferFailedReceiver();
+            if (currentReceiver.toLowerCase() === transferFailedReceiver.toLowerCase()) {
+                console.log(`transferFailedReceiver already set to ${currentReceiver}, skipping`);
+                return;
+            }
+            console.log(`on-chain transferFailedReceiver: ${currentReceiver}, config: ${transferFailedReceiver}, updating...`);
             await(await gateway.setTransferFailedReceiver(transferFailedReceiver)).wait();
             console.log(`${network.name} transferFailedReceiver is:`, await gateway.transferFailedReceiver());
         }
@@ -126,7 +156,12 @@ task("gateway:updateMinGasCallOnReceive", "update MinGas CallOnReceive")
 
         if(isTronNetwork(network.name)) {
             let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
-            console.log(`pre minGasCallOnReceive is: `, await c.minGasCallOnReceive().call())
+            let currentMinGas = await c.minGasCallOnReceive().call();
+            if (currentMinGas === BigInt(minGasCallOnReceive)) {
+                console.log(`minGasCallOnReceive already set to ${currentMinGas}, skipping`);
+                return;
+            }
+            console.log(`on-chain minGasCallOnReceive: ${currentMinGas}, config: ${minGasCallOnReceive}, updating...`);
             await c.updateMinGasCallOnReceive(minGasCallOnReceive).send();
             console.log(`after minGasCallOnReceive is: `, await c.minGasCallOnReceive().call())
         } else {
@@ -134,6 +169,12 @@ task("gateway:updateMinGasCallOnReceive", "update MinGas CallOnReceive")
             console.log("deployer address:", await deployer.getAddress())
             const GatewayFactory = await ethers.getContractFactory("Gateway");
             const gateway = GatewayFactory.attach(addr) as Gateway;
+            let currentMinGas = await gateway.minGasCallOnReceive();
+            if (currentMinGas === BigInt(minGasCallOnReceive)) {
+                console.log(`minGasCallOnReceive already set to ${currentMinGas}, skipping`);
+                return;
+            }
+            console.log(`on-chain minGasCallOnReceive: ${currentMinGas}, config: ${minGasCallOnReceive}, updating...`);
             await(await gateway.updateMinGasCallOnReceive(minGasCallOnReceive)).wait();
             console.log(`${network.name} minGasCallOnReceive is:`, await gateway.minGasCallOnReceive());
         }
@@ -164,11 +205,13 @@ task("gateway:updateTokens", "update Tokens")
                 if(element.mintAble) feature = feature | 2;
                 if(element.burnFrom) feature = feature | 4;
                 let pre = await c.tokenFeatureList(element.addr).call();
-                console.log(`${element.name} pre tokenFeature`, pre);
-                if(pre !==  BigInt(feature)) {
-                    await c.updateTokens([element.addr], feature).send();
-                    console.log(`${element.name} after tokenFeature`, await c.tokenFeatureList(element.addr).call());
+                if(pre ===  BigInt(feature)) {
+                    console.log(`${element.name} tokenFeature already set to ${pre}, skipping`);
+                    continue;
                 }
+                console.log(`${element.name} on-chain tokenFeature: ${pre}, config: ${feature}, updating...`);
+                await c.updateTokens([element.addr], feature).send();
+                console.log(`${element.name} after tokenFeature`, await c.tokenFeatureList(element.addr).call());
             } 
         } else {
             const [deployer] = await ethers.getSigners();
@@ -182,11 +225,13 @@ task("gateway:updateTokens", "update Tokens")
                 if(element.mintAble) feature = feature | 2;
                 if(element.burnFrom) feature = feature | 4;
                 let pre = await gateway.tokenFeatureList(element.addr);
-                console.log(`${element.name} pre tokenFeature`, pre);
-                if(pre !==  BigInt(feature)) {
-                    await(await gateway.updateTokens([element.addr], feature)).wait();
-                    console.log(`${element.name} after tokenFeature`, await gateway.tokenFeatureList(element.addr));
+                if(pre ===  BigInt(feature)) {
+                    console.log(`${element.name} tokenFeature already set to ${pre}, skipping`);
+                    continue;
                 }
+                console.log(`${element.name} on-chain tokenFeature: ${pre}, config: ${feature}, updating...`);
+                await(await gateway.updateTokens([element.addr], feature)).wait();
+                console.log(`${element.name} after tokenFeature`, await gateway.tokenFeatureList(element.addr));
             } 
         }
 });

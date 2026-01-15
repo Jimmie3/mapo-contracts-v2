@@ -26,13 +26,21 @@
                     "bridgeAble": true,
                     "mintAble": true,
                     "burnFrom": false
+                },
+                {
+                    "name": "BNB",
+                    "addr": "0xc478A25240d9C072ebEC5109b417E0A78A41667c",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": true,
+                    "burnFrom": true
                 }
             ]
         },
 
         "Bsc": {
             "chainId": 56, 
-            "lastScanBlock": 70547507,
+            "lastScanBlock": 75332000,
             "updateGasFeeGap": 3,
             "confirmCount": 6,
             "minGasCallOnReceive": 500000,
@@ -56,18 +64,26 @@
                     "bridgeAble": true,
                     "mintAble": false,
                     "burnFrom": false
+                },
+                {
+                    "name": "BNB",
+                    "addr": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
                 }
             ]
         },
 
         "Btc": {
-            "chainId": 1360095883558913, 
+            "chainId": 1360095883558913,
             "lastScanBlock": 932200,
             "updateGasFeeGap": 0,
             "confirmCount": 3,
             "minGasCallOnReceive": 0,
             "chainType": "no-contract",
-            "gasToken": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB", 
+            "gasToken": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB",
             "baseFeeToken": "0xb877E3562a660C7861117c2f1361A26ABaF19bEB",
             "transferFailedReceiver": "",
             "tokens": [

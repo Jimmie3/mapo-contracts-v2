@@ -1,96 +1,96 @@
 {
-	"Mapo_test": {
-		"TSSManager": "0xeca45BE061CAa8F2Db2385e9Caa348acd55c85a2",
-		"Authority": "0xA6a4F4f0da29feA73F39D641CDF57B06103B4678",
-		"Relay": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
-		"VaultManager": "0x0772a388fEb0CeEd928D40835E6288dfaE077452",
-		"GasService": "0xf9A825A2B9d62550610cDC5a9d05417bC35FF524",
-		"Registry": "0xF67db5535c337261e4EFff49ed956397e8F00078",
-		"SwapManager": "0xa5712790922470D1E03BeD6afbC397F50B781356",
-		"AffiliateManager": " ",
-		"ProtocolFee": "0x9a3EBE3EBF2CDeB3aD7b7f44aD9b56996ae23595",
-		"ViewController": "0xb79bAe710F69f5D9B53098aB16B57A26a762c7BF",
-		"wToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91"
-	},
-	"Bsc_test": {
-		"Authority": "0x018a0b28125923823fa11638957e3124179b3b11",
-		"Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
-		"wToken": "0xae13d989dac2f0debff460ac112a837c89baa7cd"
-	},
-	"Eth_test": {
-		"Authority": "0x66C6e4974A9c52C378897EA21b65FDc9A935415A",
-		"Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
-		"wToken": "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9"
-	},
-	"Tron_test": {
-		"Authority": "TKjtxw24jmE33j2GMuhZiDhGfDHSL8juCV",
-		"Gateway": "TFgVqNsHTtL8xcuvfoT6FrtojpGNnEoowu",
-		"wToken": "TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a"
-	},
-	"Mapo_main": {
-		"TSSManager": "0x062B3Bd0B1A0c9d3cE35dC59D8F5E929314a8706",
-		"Authority": "0xC28459DfF1288992EB81e1C1d1b51a7B4D8b5a13",
-		"Relay": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
-		"VaultManager": "0x423B8BBC20E29C026B4A2F4B9bcfB62F6fE50Ca1",
-		"GasService": "0x43A7dd204f6604F2578Bd5d0859f45296d27F23A",
-		"Registry": "0x78D31173C04e5F1D4b0172440B09453C27990527",
-		"SwapManager": "0x6dC8f617E4AaD27D955be8C3f7eeb481f1d2097A",
-		"AffiliateManager": "0x4De2ADb9cB88c10Bf200F76c18035cbB8906b6bC",
-		"ViewController": "0xaf720ad7086627034c4d8CA2b4493079E97f1C3A",
-		"ProtocolFee": "0x52373c5350fd45b3A096Ab7A47E2cc9008f04507",
-		"wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
-	},
-	"Eth_main": {
-		"Authority": " ",
-		"Gateway": " ",
-		"wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
-	},
-	"Bsc_main": {
-		"Authority": "0x718110E1c08Ef66b1B199B4797C754A9a9ff1084",
-		"Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
-		"wToken": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
-	},
-	"Base_main": {
-		"Authority": "0x52cbbB1A8BfEcdD4Afa04fc74f0A6Dafe58B4c1B",
-		"Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
-		"wToken": "0x4200000000000000000000000000000000000006"
-	},
-	"Arb_main": {
-		"Authority": "0x3fb9ac7adea828d11fb8ae7df5c81f6542fa4c68",
-		"Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
-		"wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
-	},
-	"Mapo_prod": {
-		"TSSManager": "0xf3Fa35B6e3753cFe88Da86c71B2283F75EB64BE9",
-		"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-		"Relay": "0x00004080D86e1077ce96E67C1B167fF105025307",
-		"VaultManager": "0xdfC3F894Fb30F3E2f81608829968959DB65FD13b",
-		"GasService": "0x1De9C47ae0074F347d9fF6bfA39CDd3389322eAD",
-		"Registry": "0xf2C3a9b547875C48Ba8598C4973BAC71eDc4C34c",
-		"SwapManager": "0x5bdB26Eef19dB8A90ec77DC542026Dd0ae7c549c",
-		"AffiliateManager": "0x4De2ADb9cB88c10Bf200F76c18035cbB8906b6bC",
-		"ViewController": "0x8c98bA0a11Cbb0DB3C52e4CD91B0844B39BC1F11",
-		"ProtocolFee": "0xc9041777D421b5fcB272f7Cd8C66757246F1f9F1",
-		"wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
-	},
-	"Eth_prod": {
-		"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-		"Gateway": " ",
-		"wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
-	},
-	"Bsc_prod": {
-		"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-		"Gateway": "",
-		"wToken": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
-	},
-	"Base_prod": {
-		"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-		"Gateway": "",
-		"wToken": "0x4200000000000000000000000000000000000006"
-	},
-	"Arb_prod": {
-		"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-		"Gateway": "",
-		"wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
-	}
+  "Mapo_test": {
+    "TSSManager": "0xeca45BE061CAa8F2Db2385e9Caa348acd55c85a2",
+    "Authority": "0xA6a4F4f0da29feA73F39D641CDF57B06103B4678",
+    "Relay": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "VaultManager": "0x0772a388fEb0CeEd928D40835E6288dfaE077452",
+    "GasService": "0xf9A825A2B9d62550610cDC5a9d05417bC35FF524",
+    "Registry": "0xF67db5535c337261e4EFff49ed956397e8F00078",
+    "SwapManager": "0xa5712790922470D1E03BeD6afbC397F50B781356",
+    "AffiliateManager": " ",
+    "ProtocolFee": "0x9a3EBE3EBF2CDeB3aD7b7f44aD9b56996ae23595",
+    "ViewController": "0xb79bAe710F69f5D9B53098aB16B57A26a762c7BF",
+    "wToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91"
+  },
+  "Bsc_test": {
+    "Authority": "0x018a0b28125923823fa11638957e3124179b3b11",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "0xae13d989dac2f0debff460ac112a837c89baa7cd"
+  },
+  "Eth_test": {
+    "Authority": "0x66C6e4974A9c52C378897EA21b65FDc9A935415A",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9"
+  },
+  "Tron_test": {
+    "Authority": "TKjtxw24jmE33j2GMuhZiDhGfDHSL8juCV",
+    "Gateway": "TFgVqNsHTtL8xcuvfoT6FrtojpGNnEoowu",
+    "wToken": "TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a"
+  },
+  "Mapo_main": {
+    "TSSManager": "0x062B3Bd0B1A0c9d3cE35dC59D8F5E929314a8706",
+    "Authority": "0xC28459DfF1288992EB81e1C1d1b51a7B4D8b5a13",
+    "Relay": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "VaultManager": "0x423B8BBC20E29C026B4A2F4B9bcfB62F6fE50Ca1",
+    "GasService": "0x43A7dd204f6604F2578Bd5d0859f45296d27F23A",
+    "Registry": "0x78D31173C04e5F1D4b0172440B09453C27990527",
+    "SwapManager": "0x6dC8f617E4AaD27D955be8C3f7eeb481f1d2097A",
+    "AffiliateManager": "0x4De2ADb9cB88c10Bf200F76c18035cbB8906b6bC",
+    "ViewController": "0xaf720ad7086627034c4d8CA2b4493079E97f1C3A",
+    "ProtocolFee": "0x52373c5350fd45b3A096Ab7A47E2cc9008f04507",
+    "wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
+  },
+  "Eth_main": {
+    "Authority": " ",
+    "Gateway": " ",
+    "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+  },
+  "Bsc_main": {
+    "Authority": "0x718110E1c08Ef66b1B199B4797C754A9a9ff1084",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+  },
+  "Base_main": {
+    "Authority": "0x52cbbB1A8BfEcdD4Afa04fc74f0A6Dafe58B4c1B",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "0x4200000000000000000000000000000000000006"
+  },
+  "Arb_main": {
+    "Authority": "0x3fb9ac7adea828d11fb8ae7df5c81f6542fa4c68",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+  },
+  "Mapo_prod": {
+    "TSSManager": "0xf3Fa35B6e3753cFe88Da86c71B2283F75EB64BE9",
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+    "Relay": "0x00004080D86e1077ce96E67C1B167fF105025307",
+    "VaultManager": "0xdfC3F894Fb30F3E2f81608829968959DB65FD13b",
+    "GasService": "0x1De9C47ae0074F347d9fF6bfA39CDd3389322eAD",
+    "Registry": "0xf2C3a9b547875C48Ba8598C4973BAC71eDc4C34c",
+    "SwapManager": "0x5bdB26Eef19dB8A90ec77DC542026Dd0ae7c549c",
+    "AffiliateManager": "0x4De2ADb9cB88c10Bf200F76c18035cbB8906b6bC",
+    "ViewController": "0x8c98bA0a11Cbb0DB3C52e4CD91B0844B39BC1F11",
+    "ProtocolFee": "0xc9041777D421b5fcB272f7Cd8C66757246F1f9F1",
+    "wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
+  },
+  "Eth_prod": {
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+    "Gateway": " ",
+    "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+  },
+  "Bsc_prod": {
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+    "Gateway": "0x00004080D86e1077ce96E67C1B167fF105025307",
+    "wToken": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+  },
+  "Base_prod": {
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+    "Gateway": "",
+    "wToken": "0x4200000000000000000000000000000000000006"
+  },
+  "Arb_prod": {
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+    "Gateway": "",
+    "wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+  }
 }

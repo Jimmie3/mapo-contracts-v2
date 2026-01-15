@@ -42,7 +42,7 @@ contract DeployAndSetUp is BaseScript {
 
     function run() public virtual broadcast {
           deploy();
-          // set();
+          set();
 
           // Print verification commands after deployment
           printVerificationCommands();

@@ -58,6 +58,15 @@
                     "weight": 0
                 }
             ]
+        },
+        {
+            "id": 4,
+            "name": "BNB",
+            "addr": "0xc478A25240d9C072ebEC5109b417E0A78A41667c",
+            "vaultToken": "0x10c237dBE9c4E4E18769D17B8412c24d0fd25d98",
+            "chainWeights": [
+
+            ]
         }
     ]
 }

@@ -42,6 +42,7 @@ contract FusionReceiver is BaseImplementation, IReceiver {
     mapping(bytes32 => bool) public stored;
 
     mapping(string => uint256) private nameToChainId;
+    mapping(uint256 => string) private chainIdToName;
 
     error only_self();
     error only_mos_or_gateway();
@@ -81,12 +82,19 @@ contract FusionReceiver is BaseImplementation, IReceiver {
     }
 
     function setNameToChainId(string calldata _name, uint256 _chainId) external restricted {
+        delete chainIdToName[nameToChainId[_name]];
+        delete nameToChainId[chainIdToName[_chainId]];
         nameToChainId[_name] = _chainId;
+        chainIdToName[_chainId] = _name;
         emit SetNameToChainId(_name, _chainId);
     }
 
     function chainIdByName(string calldata _name) external view returns (uint256) {
         return nameToChainId[_name];
+    }
+    
+    function chainNameById(uint256 _chainId) external view returns (string memory) {
+        return chainIdToName[_chainId];
     }
 
     function setForwardTssFailedReceiver(address _failedReceiver) external restricted {

@@ -41,9 +41,6 @@ contract FusionReceiver is BaseImplementation, IReceiver {
 
     mapping(bytes32 => bool) public stored;
 
-    mapping(string => uint256) private nameToChainId;
-    mapping(uint256 => string) private chainIdToName;
-
     error only_self();
     error only_mos_or_gateway();
     error transaction_not_exist();
@@ -59,7 +56,6 @@ contract FusionReceiver is BaseImplementation, IReceiver {
     }
 
     event Set(address _mos, address _gateway);
-    event SetNameToChainId(string _name, uint256 _chainId);
     event SetForwardTssFailedReceiver(address _failedReceiver);
     event EmergencyWithdraw(IERC20 token, uint256 amount, address receiver);
     event TransationConnect(bool butterToTss, bytes32 butterOrderId, bytes32 tssOrderId);
@@ -79,22 +75,6 @@ contract FusionReceiver is BaseImplementation, IReceiver {
         mos = IMOS(_mos);
         gateway = IGateway(_gateway);
         emit Set(_mos, _gateway);
-    }
-
-    function setNameToChainId(string calldata _name, uint256 _chainId) external restricted {
-        delete chainIdToName[nameToChainId[_name]];
-        delete nameToChainId[chainIdToName[_chainId]];
-        nameToChainId[_name] = _chainId;
-        chainIdToName[_chainId] = _name;
-        emit SetNameToChainId(_name, _chainId);
-    }
-
-    function chainIdByName(string calldata _name) external view returns (uint256) {
-        return nameToChainId[_name];
-    }
-    
-    function chainNameById(uint256 _chainId) external view returns (string memory) {
-        return chainIdToName[_chainId];
     }
 
     function setForwardTssFailedReceiver(address _failedReceiver) external restricted {

@@ -6,6 +6,8 @@ import "./subs/protocolFee";
 import "./subs/gasService";
 import "./subs/relay";
 import "./subs/swapManager";
+import "./subs/fusionQuoter";
+import "./subs/fusionReceiver";
 
 
 import { task } from "hardhat/config";

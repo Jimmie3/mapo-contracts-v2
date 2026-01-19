@@ -7,7 +7,7 @@
     "GasService": "0xf9A825A2B9d62550610cDC5a9d05417bC35FF524",
     "Registry": "0xF67db5535c337261e4EFff49ed956397e8F00078",
     "SwapManager": "0xa5712790922470D1E03BeD6afbC397F50B781356",
-    "AffiliateManager": " ",
+    "AffiliateManager": "0xfebca50363d41964da231cab562cbd22bf02d546",
     "ProtocolFee": "0x9a3EBE3EBF2CDeB3aD7b7f44aD9b56996ae23595",
     "ViewController": "0xb79bAe710F69f5D9B53098aB16B57A26a762c7BF",
     "wToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91"
@@ -42,7 +42,7 @@
   },
   "Eth_main": {
     "Authority": " ",
-    "Gateway": " ",
+    "Gateway": "0x",
     "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
   },
   "Bsc_main": {
@@ -75,7 +75,7 @@
   },
   "Eth_prod": {
     "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-    "Gateway": " ",
+    "Gateway": "0x",
     "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
   },
   "Bsc_prod": {

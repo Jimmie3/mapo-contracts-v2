@@ -46,6 +46,44 @@
             ]
         },
 
+        "Eth": {
+            "chainId": 1, 
+            "lastScanBlock": 0,
+            "updateGasFeeGap": 3,
+            "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
+            "chainType": "contract",
+            "gasToken": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec", 
+            "baseFeeToken": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec",
+            "transferFailedReceiver": "0x386ce1a187eC7329CFb8E467EB02FB07c698256A",
+            "tokens": [
+                {
+                    "name": "USDT",
+                    "addr": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "ETH",
+                    "addr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "USDC",
+                    "addr": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
+
         "Bsc": {
             "chainId": 56, 
             "lastScanBlock": 70547507,
@@ -84,6 +122,36 @@
                 {
                     "name": "USDT",
                     "addr": "0x55d398326f99059fF775485246999027B3197955",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
+
+        "Pol": {
+            "chainId": 137, 
+            "lastScanBlock": 753302000,
+            "updateGasFeeGap": 3,
+            "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
+            "chainType": "contract",
+            "gasToken": "0xc478A25240d9C072ebEC5109b417E0A78A41667c", 
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
+            "transferFailedReceiver": "0x386ce1a187eC7329CFb8E467EB02FB07c698256A",
+            "tokens": [
+                {
+                    "name": "USDT",
+                    "addr": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "ETH",
+                    "addr": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
                     "decimals": 18,
                     "bridgeAble": true,
                     "mintAble": false,
@@ -153,6 +221,28 @@
             ]
         },
 
+       "Xlayer": {
+            "chainId": 196, 
+            "lastScanBlock": 0,
+            "updateGasFeeGap": 3,
+            "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
+            "chainType": "contract",
+            "gasToken": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec", 
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
+            "transferFailedReceiver": "0x386ce1a187eC7329CFb8E467EB02FB07c698256A",
+            "tokens": [
+                {
+                    "name": "USDT",
+                    "addr": "0x1e4a5963abfd975d8c9021ce480b42188849d41d",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
+
         "Uni": {
             "chainId": 130, 
             "lastScanBlock": 0,
@@ -182,6 +272,112 @@
                 }
             ]
         },
+
+        "Op": {
+            "chainId": 10, 
+            "lastScanBlock": 0,
+            "updateGasFeeGap": 3,
+            "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
+            "chainType": "contract",
+            "gasToken": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec", 
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
+            "transferFailedReceiver": "0x0cDAe5da23b64bFeCD421d6487FFEABF6558828d",
+            "tokens": [
+                {
+                    "name": "ETH",
+                    "addr": "0x4200000000000000000000000000000000000006",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "USDT",
+                    "addr": "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
+
+        
+       "Kaia": {
+            "chainId": 10, 
+            "lastScanBlock": 0,
+            "updateGasFeeGap": 3,
+            "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
+            "chainType": "contract",
+            "gasToken": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec", 
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
+            "transferFailedReceiver": "0x386ce1a187eC7329CFb8E467EB02FB07c698256A",
+            "tokens": [
+                {
+                    "name": "USDT",
+                    "addr": "0xd077a400968890eacc75cdc901f0356c943e4fdb",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
+
+        "Avax": {
+            "chainId": 43114, 
+            "lastScanBlock": 0,
+            "updateGasFeeGap": 3,
+            "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
+            "chainType": "contract",
+            "gasToken": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec", 
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
+            "transferFailedReceiver": "0x386ce1a187eC7329CFb8E467EB02FB07c698256A",
+            "tokens": [
+                {
+                    "name": "USDC",
+                    "addr": "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
+
+        "Tron": {
+            "chainId": 728126428, 
+            "lastScanBlock": 0,
+            "updateGasFeeGap": 3,
+            "confirmCount": 6,
+            "minGasCallOnReceive": 500000,
+            "chainType": "contract",
+            "gasToken": "0x593a37fe0F6DFd0b6c5A051e9a44aA0F6922A1a2", 
+            "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
+            "transferFailedReceiver": "0x386ce1a187eC7329CFb8E467EB02FB07c698256A",
+            "tokens": [
+                {
+                    "name": "USDT",
+                    "addr": "0xa614f803B6FD780986A42c78Ec9c7f77e6DeD13C",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "TRX",
+                    "addr": "0x891cdb91d149f23B1a45D9c5Ca78a88d0cB44C18",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
+
         "Btc": {
             "chainId": 1360095883558913, 
             "lastScanBlock": 926495,

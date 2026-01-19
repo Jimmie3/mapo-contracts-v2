@@ -1,6 +1,6 @@
 import { task } from "hardhat/config";
 import { Gateway } from "../../typechain-types/contracts"
-import { getDeploymentByKey, getChainTokenByNetwork,  saveDeployment} from "../utils/utils"
+import { getDeploymentByKey, getChainTokenByNetwork, getAllChainTokens, saveDeployment} from "../utils/utils"
 import { tronDeploy, tronFromHex, tronToHex, getTronContract } from "../utils/tronUtil"
 
 
@@ -237,10 +237,237 @@ task("gateway:updateTokens", "update Tokens")
 });
 
 
+task("gateway:bridgeOut", "bridge out tokens to another chain")
+    .addParam("token", "token name (e.g., USDT, BTC) or address")
+    .addParam("amount", "amount to bridge (e.g., 1.5)")
+    .addParam("tochain", "destination chain name (e.g., Bsc, Mapo)")
+    .addOptionalParam("to", "receiver address on destination chain (default: sender)")
+    .addOptionalParam("refund", "refund address (default: sender)")
+    .addOptionalParam("payload", "payload data (default: 0x)")
+    .addOptionalParam("deadline", "deadline timestamp (default: current time + 1 hour)")
+    .setAction(async (taskArgs, hre) => {
+        const { network, ethers } = hre;
+        const [deployer] = await ethers.getSigners();
+        const senderAddress = await deployer.getAddress();
+        console.log("deployer address:", senderAddress);
+
+        let addr;
+        if (isRelayChain(network.name)) {
+            addr = await getDeploymentByKey(network.name, "Relay");
+        } else {
+            addr = await getDeploymentByKey(network.name, "Gateway");
+        }
+
+        // Get token info
+        const tokenInfo = await getTokenInfo(network.name, taskArgs.token);
+        const token = tokenInfo.addr;
+        const decimals = tokenInfo.decimals;
+        const amount = ethers.parseUnits(taskArgs.amount, decimals);
+        console.log(`Token: ${tokenInfo.name}, address: ${token}, decimals: ${decimals}, amount: ${amount}`);
+
+        // Get destination chain id
+        const toChainId = await getChainIdByName(network.name, taskArgs.tochain);
+        console.log(`Destination chain: ${taskArgs.tochain}, chainId: ${toChainId}`);
+
+        // Set receiver address (default to sender)
+        const toAddress = taskArgs.to || senderAddress;
+        const to = ethers.solidityPacked(['address'], [toAddress]);
+        console.log(`Receiver: ${toAddress}`);
+
+        const refundAddr = taskArgs.refund || senderAddress;
+        const payload = taskArgs.payload || "0x";
+        const deadline = taskArgs.deadline || Math.floor(Date.now() / 1000) + 3600;
+
+        const isNativeToken = token === "0x0000000000000000000000000000000000000000";
+
+        if (isTronNetwork(network.name)) {
+            let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
+
+            if (!isNativeToken) {
+                const tokenContract = await getTronContract("IERC20", hre.artifacts, network.name, token);
+                console.log("Approving token...");
+                await tokenContract.approve(await tronToHex(addr, network.name), amount).send();
+            }
+
+            console.log(`Bridging out ${taskArgs.amount} ${tokenInfo.name} to ${taskArgs.tochain}...`);
+            const tx = await c.bridgeOut(
+                await tronToHex(token, network.name),
+                amount,
+                toChainId,
+                to,
+                await tronToHex(refundAddr, network.name),
+                payload,
+                deadline
+            ).send({ callValue: isNativeToken ? amount : 0 });
+
+            console.log("Bridge out tx:", tx);
+        } else {
+            const GatewayFactory = await ethers.getContractFactory("Gateway");
+            const gateway = GatewayFactory.attach(addr) as Gateway;
+
+            if (!isNativeToken) {
+                const tokenContract = await ethers.getContractAt("IERC20", token);
+                console.log("Approving token...");
+                await (await tokenContract.approve(addr, amount)).wait();
+            }
+
+            console.log(`Bridging out ${taskArgs.amount} ${tokenInfo.name} to ${taskArgs.tochain}...`);
+            const tx = await gateway.bridgeOut(
+                token,
+                amount,
+                toChainId,
+                to,
+                refundAddr,
+                payload,
+                deadline,
+                { value: isNativeToken ? amount : 0 }
+            );
+            const receipt = await tx.wait();
+            console.log("Bridge out tx hash:", receipt?.hash);
+
+            const bridgeOutEvent = receipt?.logs.find(log => {
+                try {
+                    const parsed = gateway.interface.parseLog({ topics: log.topics as string[], data: log.data });
+                    return parsed?.name === "BridgeOut";
+                } catch {
+                    return false;
+                }
+            });
+
+            if (bridgeOutEvent) {
+                const parsed = gateway.interface.parseLog({ topics: bridgeOutEvent.topics as string[], data: bridgeOutEvent.data });
+                console.log("Order ID:", parsed?.args[0]);
+            }
+        }
+});
+
+task("gateway:deposit", "deposit tokens to vault")
+    .addParam("token", "token name (e.g., USDT, BTC) or address")
+    .addParam("amount", "amount to deposit (e.g., 1.5)")
+    .addOptionalParam("to", "receiver address (default: sender)")
+    .addOptionalParam("refund", "refund address (default: sender)")
+    .addOptionalParam("deadline", "deadline timestamp (default: current time + 1 hour)")
+    .setAction(async (taskArgs, hre) => {
+        const { network, ethers } = hre;
+        const [deployer] = await ethers.getSigners();
+        const senderAddress = await deployer.getAddress();
+        console.log("deployer address:", senderAddress);
+
+        let addr;
+        if (isRelayChain(network.name)) {
+            addr = await getDeploymentByKey(network.name, "Relay");
+        } else {
+            addr = await getDeploymentByKey(network.name, "Gateway");
+        }
+
+        // Get token info
+        const tokenInfo = await getTokenInfo(network.name, taskArgs.token);
+        const token = tokenInfo.addr;
+        const decimals = tokenInfo.decimals;
+        const amount = ethers.parseUnits(taskArgs.amount, decimals);
+        console.log(`Token: ${tokenInfo.name}, address: ${token}, decimals: ${decimals}, amount: ${amount}`);
+
+        // Set receiver address (default to sender)
+        const toAddress = taskArgs.to || senderAddress;
+        console.log(`Receiver: ${toAddress}`);
+
+        const refundAddr = taskArgs.refund || senderAddress;
+        const deadline = taskArgs.deadline || Math.floor(Date.now() / 1000) + 3600;
+
+        const isNativeToken = token === "0x0000000000000000000000000000000000000000";
+
+        if (isTronNetwork(network.name)) {
+            let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
+
+            if (!isNativeToken) {
+                const tokenContract = await getTronContract("IERC20", hre.artifacts, network.name, token);
+                console.log("Approving token...");
+                await tokenContract.approve(await tronToHex(addr, network.name), amount).send();
+            }
+
+            console.log(`Depositing ${taskArgs.amount} ${tokenInfo.name}...`);
+            const tx = await c.deposit(
+                await tronToHex(token, network.name),
+                amount,
+                await tronToHex(toAddress, network.name),
+                await tronToHex(refundAddr, network.name),
+                deadline
+            ).send({ callValue: isNativeToken ? amount : 0 });
+
+            console.log("Deposit tx:", tx);
+        } else {
+            const GatewayFactory = await ethers.getContractFactory("Gateway");
+            const gateway = GatewayFactory.attach(addr) as Gateway;
+
+            if (!isNativeToken) {
+                const tokenContract = await ethers.getContractAt("IERC20", token);
+                console.log("Approving token...");
+                await (await tokenContract.approve(addr, amount)).wait();
+            }
+
+            console.log(`Depositing ${taskArgs.amount} ${tokenInfo.name}...`);
+            const tx = await gateway.deposit(
+                token,
+                amount,
+                toAddress,
+                refundAddr,
+                deadline,
+                { value: isNativeToken ? amount : 0 }
+            );
+            const receipt = await tx.wait();
+            console.log("Deposit tx hash:", receipt?.hash);
+
+            const bridgeOutEvent = receipt?.logs.find(log => {
+                try {
+                    const parsed = gateway.interface.parseLog({ topics: log.topics as string[], data: log.data });
+                    return parsed?.name === "BridgeOut";
+                } catch {
+                    return false;
+                }
+            });
+
+            if (bridgeOutEvent) {
+                const parsed = gateway.interface.parseLog({ topics: bridgeOutEvent.topics as string[], data: bridgeOutEvent.data });
+                console.log("Order ID:", parsed?.args[0]);
+            }
+        }
+});
+
 function isTronNetwork(network:string) {
     return (network === "Tron" || network === "tron_test")
 }
 
 function isRelayChain(network:string) {
     return (network === "Mapo" || network === "Mapo_test")
+}
+
+async function getTokenInfo(network: string, tokenNameOrAddr: string) {
+    const chainConfig = await getChainTokenByNetwork(network);
+    const tokens = chainConfig.tokens;
+
+    // Try to find by name first
+    for (const token of tokens) {
+        if (token.name.toLowerCase() === tokenNameOrAddr.toLowerCase()) {
+            return token;
+        }
+    }
+
+    // Try to find by address
+    for (const token of tokens) {
+        if (token.addr.toLowerCase() === tokenNameOrAddr.toLowerCase()) {
+            return token;
+        }
+    }
+
+    throw new Error(`Token ${tokenNameOrAddr} not found in ${network} config`);
+}
+
+async function getChainIdByName(currentNetwork: string, chainName: string) {
+    const allChains = await getAllChainTokens(currentNetwork);
+
+    if (allChains[chainName]) {
+        return BigInt(allChains[chainName].chainId);
+    }
+
+    throw new Error(`Chain ${chainName} not found in config`);
 }

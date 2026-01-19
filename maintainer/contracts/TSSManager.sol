@@ -103,6 +103,14 @@ contract TSSManager is BaseImplementation, ITSSManager {
         return e.status;
     }
 
+    function getEpochPubkey(uint256 epochId) external view returns (bytes memory pubkey) {
+        bytes32 keyHash = epochKeys[epochId];
+
+        TSSInfo storage e = tssInfos[keyHash];
+
+        return e.pubkey;
+    }
+
     function getMembers(bytes calldata pubkey) external view returns (address[] memory members) {
         TSSInfo storage e = tssInfos[keccak256(pubkey)];
         return e.maintainers.values();

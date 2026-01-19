@@ -2,12 +2,22 @@
 pragma solidity 0.8.25;
 
 import {IReceiver} from "../interfaces/IReceiver.sol";
-import {IGateway} from "../interfaces/IGateWay.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {BaseImplementation} from "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
 
-
+interface ITSSGateway {
+    function bridgeOutWithOrderId(
+        bytes32 orderId,
+        address token,
+        uint256 amount,
+        uint256 toChain,
+        bytes memory to,
+        address refundAddr,
+        bytes memory payload,
+        uint256 deadline
+    ) external payable returns(bytes32);
+}
 interface IMOS {
     struct BridgeParam {
         bool relay;
@@ -17,14 +27,15 @@ interface IMOS {
         bytes swapData;
     }
 
-    function swapOutToken(
-        address _initiator, // user account send this transaction
+    function swapOutTokenWithOrderId(
+        address _initiator, // initiator address
         address _token, // src token
-        bytes memory _to, // receiver account
-        uint256 _amount, // token amount
+        bytes memory _to,
+        uint256 _amount,
         uint256 _toChain, // target chain id
+        bytes32 orderId,
         bytes calldata _bridgeData
-    ) external payable returns (bytes32 orderId);
+    ) external payable returns (bytes32);
 }
 
 contract FusionReceiver is BaseImplementation, IReceiver {
@@ -35,7 +46,7 @@ contract FusionReceiver is BaseImplementation, IReceiver {
 
     IMOS public mos;
     
-    IGateway public gateway;
+    ITSSGateway public gateway;
 
     address public forwardTssFailedReceiver;
 
@@ -58,7 +69,7 @@ contract FusionReceiver is BaseImplementation, IReceiver {
     event Set(address _mos, address _gateway);
     event SetForwardTssFailedReceiver(address _failedReceiver);
     event EmergencyWithdraw(IERC20 token, uint256 amount, address receiver);
-    event TransationConnect(bool butterToTss, bytes32 butterOrderId, bytes32 tssOrderId);
+    event TransationConnect(bytes32 orderId, bool fromTss);
     event FailedStore(
         ReceiveType _receiveType,
         bytes32 _orderId,
@@ -73,7 +84,7 @@ contract FusionReceiver is BaseImplementation, IReceiver {
     function set(address _mos, address _gateway) external restricted {
         require(_mos != address(0) && _gateway != address(0));
         mos = IMOS(_mos);
-        gateway = IGateway(_gateway);
+        gateway = ITSSGateway(_gateway);
         emit Set(_mos, _gateway);
     }
 
@@ -100,15 +111,15 @@ contract FusionReceiver is BaseImplementation, IReceiver {
         uint256 gasForCall = gasleft() - MINGASFORSTORE;
         if(msg.sender == address(mos)) {
            rs.receiveType = ReceiveType.BUTTER;
-           try this.forwardToGateway{gas: gasForCall}(rs) returns(bytes32 orderId){
-                emit TransationConnect(true, rs.orderId, orderId);
+           try this.forwardToGateway{gas: gasForCall}(rs) {
+                emit TransationConnect(_orderId, false);
            } catch  {
                 _store(rs);
            }
         } else if(msg.sender == address(gateway)){
             rs.receiveType = ReceiveType.TSS;
-            try this.forwardToMos{gas: gasForCall}(rs) returns(bytes32 orderId){
-                emit TransationConnect(false, orderId, rs.orderId);
+            try this.forwardToMos{gas: gasForCall}(rs) {
+                emit TransationConnect(_orderId, true);
             } catch  {
                 _store(rs);
             }
@@ -131,35 +142,35 @@ contract FusionReceiver is BaseImplementation, IReceiver {
         if(!stored[hash]) revert transaction_not_exist();
         stored[hash] = false;
         if(_receiveType == ReceiveType.TSS) {
-            bytes32 orderId = _forwardToMos(rs);
-            emit TransationConnect(false, rs.orderId, orderId);
+            _forwardToMos(rs);
+            emit TransationConnect(rs.orderId, true);
         } else {
-            bytes32 orderId = _forwardToGateway(rs);
-            emit TransationConnect(true, orderId, rs.orderId);
+            _forwardToGateway(rs);
+            emit TransationConnect(rs.orderId, false);
         }
     }
 
-    function forwardToMos(ReceivedStruct memory rs) external returns(bytes32 orderId){
+    function forwardToMos(ReceivedStruct memory rs) external {
         if(msg.sender != address(this)) revert only_self();
-        return _forwardToMos(rs);
+        _forwardToMos(rs);
     }
 
-    function _forwardToMos(ReceivedStruct memory rs) internal returns(bytes32 orderId) {
+    function _forwardToMos(ReceivedStruct memory rs) internal {
         (bytes memory to,  uint256 toChain) = abi.decode(rs.payload, (bytes,uint256));
         IERC20(rs.token).approve(address(mos), rs.amount);
-        orderId = mos.swapOutToken(address(this), rs.token, to, rs.amount, toChain, bytes(""));
+        mos.swapOutTokenWithOrderId(address(this), rs.token, to, rs.amount, toChain, rs.orderId, bytes(""));
     }
 
-    function forwardToGateway(ReceivedStruct memory rs) external returns(bytes32 orderId) {
+    function forwardToGateway(ReceivedStruct memory rs) external {
         if(msg.sender != address(this)) revert only_self();
-        return _forwardToGateway(rs);
+        _forwardToGateway(rs);
     }
 
-    function _forwardToGateway(ReceivedStruct memory rs) internal returns(bytes32 orderId) {
+    function _forwardToGateway(ReceivedStruct memory rs) internal {
         (bytes memory to,  uint256 toChain) = abi.decode(rs.payload, (bytes,uint256));
         address refundAddr = (forwardTssFailedReceiver == address(0)) ? address(this) : forwardTssFailedReceiver;
         IERC20(rs.token).approve(address(gateway), rs.amount);
-        orderId = gateway.bridgeOut(rs.token, rs.amount, toChain, to, refundAddr, abi.encode(bytes(""), bytes(""), bytes("")), (block.timestamp + 100));
+        gateway.bridgeOutWithOrderId(rs.orderId, rs.token, rs.amount, toChain, to, refundAddr, abi.encode(bytes(""), bytes(""), bytes("")), (block.timestamp + 100));
     }
 
 

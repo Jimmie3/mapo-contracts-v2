@@ -19,7 +19,8 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {BaseGateway} from "./base/BaseGateway.sol";
 
 contract Relay is BaseGateway, IRelay {
-
+    // repalce with FusionReceiver address
+    address constant fusionReceiver = 0x0000000000000000000000000000000000000000;
     mapping(uint256 => uint256) private chainSequence;
     mapping(uint256 => uint256) private chainLastScanBlock;
 
@@ -488,6 +489,44 @@ contract Relay is BaseGateway, IRelay {
         // bytes memory vault = vaultManager.getActiveVault();
 
         _depositIn(txItem,  Utils.toBytes(_from), _to);
+    }
+
+
+    function bridgeOutWithOrderId(
+        bytes32 orderId,
+        address token,
+        uint256 amount,
+        uint256 toChain,
+        bytes memory to,
+        address refundAddr,
+        bytes memory payload,
+        uint256 deadline
+    ) external payable whenNotPaused nonReentrant ensure(deadline)  returns(bytes32) {
+        // check on fusionReceiver can call
+        require(msg.sender == fusionReceiver);
+        require(orderId != bytes32(0));
+        require(amount != 0 && toChain != selfChainId && to.length != 0);
+        if (refundAddr == ZERO_ADDRESS) revert invalid_refund_address();
+
+        address outToken = _safeReceiveToken(token, msg.sender, amount);
+        if (!_isBridgeable(outToken)) revert not_bridge_able();
+
+        emit BridgeOut(
+            orderId,
+            // uint256 chainAndGasLimit = selfChainId << 192 | toChain << 128;
+            (selfChainId << 192 | toChain << 128),
+            TxType.TRANSFER,
+            _getActiveVault(),
+            outToken,
+            amount,
+            msg.sender,
+            refundAddr,
+            to,
+            payload
+        );
+
+        _bridgeOut(orderId, outToken, amount, toChain, to, payload);
+        return orderId;
     }
 
     function _bridgeOut(

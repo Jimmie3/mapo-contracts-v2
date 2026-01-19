@@ -20,7 +20,7 @@ import {BaseGateway} from "./base/BaseGateway.sol";
 
 contract Relay is BaseGateway, IRelay {
     // repalce with FusionReceiver address
-    address constant fusionReceiver = 0x0000000000000000000000000000000000000000;
+    address constant fusionReceiver = 0xFe6Fc65c1B47be20bD776db55a412dF7520438F3;
     mapping(uint256 => uint256) private chainSequence;
     mapping(uint256 => uint256) private chainLastScanBlock;
 

@@ -69,7 +69,7 @@ contract FusionReceiver is BaseImplementation, IReceiver {
     event Set(address _mos, address _gateway);
     event SetForwardTssFailedReceiver(address _failedReceiver);
     event EmergencyWithdraw(IERC20 token, uint256 amount, address receiver);
-    event TransationConnect(bytes32 orderId, bool fromTss);
+    event TransactionConnect(bytes32 orderId, bool fromTss);
     event FailedStore(
         ReceiveType _receiveType,
         bytes32 _orderId,
@@ -109,17 +109,17 @@ contract FusionReceiver is BaseImplementation, IReceiver {
     ) external {
         ReceivedStruct memory rs = _assignment(_orderId, _token, _amount, _fromChain, _from, _payload);
         uint256 gasForCall = gasleft() - MINGASFORSTORE;
-        if(msg.sender == address(mos)) {
+        if (msg.sender == address(mos)) {
            rs.receiveType = ReceiveType.BUTTER;
            try this.forwardToGateway{gas: gasForCall}(rs) {
-                emit TransationConnect(_orderId, false);
+                emit TransactionConnect(_orderId, false);
            } catch  {
                 _store(rs);
            }
-        } else if(msg.sender == address(gateway)){
+        } else if (msg.sender == address(gateway)) {
             rs.receiveType = ReceiveType.TSS;
             try this.forwardToMos{gas: gasForCall}(rs) {
-                emit TransationConnect(_orderId, true);
+                emit TransactionConnect(_orderId, true);
             } catch  {
                 _store(rs);
             }
@@ -139,19 +139,19 @@ contract FusionReceiver is BaseImplementation, IReceiver {
     ) external restricted {
         ReceivedStruct memory rs = _assignment(_orderId, _token, _amount, _fromChain, _from, _payload);
         bytes32 hash = _getReceiveHash(_receiveType, rs.orderId, rs.token, rs.amount, rs.fromChain, rs.from);
-        if(!stored[hash]) revert transaction_not_exist();
+        if (!stored[hash]) revert transaction_not_exist();
         stored[hash] = false;
-        if(_receiveType == ReceiveType.TSS) {
+        if (_receiveType == ReceiveType.TSS) {
             _forwardToMos(rs);
-            emit TransationConnect(rs.orderId, true);
+            emit TransactionConnect(rs.orderId, true);
         } else {
             _forwardToGateway(rs);
-            emit TransationConnect(rs.orderId, false);
+            emit TransactionConnect(rs.orderId, false);
         }
     }
 
     function forwardToMos(ReceivedStruct memory rs) external {
-        if(msg.sender != address(this)) revert only_self();
+        if (msg.sender != address(this)) revert only_self();
         _forwardToMos(rs);
     }
 
@@ -162,7 +162,7 @@ contract FusionReceiver is BaseImplementation, IReceiver {
     }
 
     function forwardToGateway(ReceivedStruct memory rs) external {
-        if(msg.sender != address(this)) revert only_self();
+        if (msg.sender != address(this)) revert only_self();
         _forwardToGateway(rs);
     }
 

@@ -28,12 +28,52 @@
                     "burnFrom": false
                 },
                 {
+                    "name": "ETH",
+                    "addr": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
                     "name": "BNB",
                     "addr": "0xc478A25240d9C072ebEC5109b417E0A78A41667c",
                     "decimals": 18,
                     "bridgeAble": true,
                     "mintAble": true,
                     "burnFrom": true
+                },
+                {
+                    "name": "USDC",
+                    "addr": "0x9f722b2cb30093f766221fd0d37964949ed66918",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "SOL",
+                    "addr": "0x5de6606ae1250c64560a603B40078DE268240fdd",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "XRP",
+                    "addr": "0x819826Df0544e8Da17A8a14Be43231C62Fa7130b",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false,
+                    "burnFrom": false
+                },
+                {
+                    "name": "DOGE",
+                    "addr": "0x27DDBa5E2f740b4Cf97014BCa6Fd7750ce5772d0",
+                    "decimals": 18,
+                    "bridgeAble": false,
+                    "mintAble": false,
+                    "burnFrom": false
                 }
             ]
         },
@@ -128,14 +168,6 @@
                 {
                     "name": "USDT",
                     "addr": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
-                    "decimals": 18,
-                    "bridgeAble": true,
-                    "mintAble": false,
-                    "burnFrom": false
-                },
-                {
-                    "name": "ETH",
-                    "addr": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
                     "decimals": 18,
                     "bridgeAble": true,
                     "mintAble": false,
@@ -303,7 +335,7 @@
         },
 
        "Kaia": {
-            "chainId": 10, 
+            "chainId": 8217,
             "lastScanBlock": 0,
             "updateGasFeeGap": 3,
             "confirmCount": 6,
@@ -359,16 +391,8 @@
             "tokens": [
                 {
                     "name": "USDT",
-                    "addr": "0xa614f803B6FD780986A42c78Ec9c7f77e6DeD13C",
+                    "addr": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
                     "decimals": 6,
-                    "bridgeAble": true,
-                    "mintAble": false,
-                    "burnFrom": false
-                },
-                {
-                    "name": "TRX",
-                    "addr": "0x891cdb91d149f23B1a45D9c5Ca78a88d0cB44C18",
-                    "decimals": 18,
                     "bridgeAble": true,
                     "mintAble": false,
                     "burnFrom": false
@@ -404,11 +428,19 @@
             "updateGasFeeGap": 0,
             "confirmCount": 3,
             "minGasCallOnReceive": 0,
-            "chainType": "no-contract",
+            "chainType": "contract",
             "gasToken": "0x5de6606ae1250c64560a603B40078DE268240fdd",
-            "baseFeeToken": "0x5de6606ae1250c64560a603B40078DE268240fdd",
+            "baseFeeToken": "0x9f722b2cb30093f766221fd0d37964949ed66918",
             "transferFailedReceiver": "",
             "tokens": [
+                {
+                    "name": "USDC",
+                    "addr": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                    "decimals": 6,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
 
             ]
         }

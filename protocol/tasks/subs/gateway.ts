@@ -2,6 +2,7 @@ import { task } from "hardhat/config";
 import { Gateway } from "../../typechain-types/contracts"
 import { getDeploymentByKey, getChainTokenByNetwork, getAllChainTokens, saveDeployment} from "../utils/utils"
 import { tronDeploy, tronFromHex, tronToHex, getTronContract } from "../utils/tronUtil"
+import { addressToHex } from "../utils/addressUtil"
 
 
 task("gateway:tronDeploy", "set wtoken address")
@@ -265,14 +266,15 @@ task("gateway:bridgeOut", "bridge out tokens to another chain")
         const amount = ethers.parseUnits(taskArgs.amount, decimals);
         console.log(`Token: ${tokenInfo.name}, address: ${token}, decimals: ${decimals}, amount: ${amount}`);
 
-        // Get destination chain id
-        const toChainId = await getChainIdByName(network.name, taskArgs.tochain);
+        // Get destination chain info
+        const toChainInfo = await getChainInfoByName(network.name, taskArgs.tochain);
+        const toChainId = BigInt(toChainInfo.chainId);
         console.log(`Destination chain: ${taskArgs.tochain}, chainId: ${toChainId}`);
 
         // Set receiver address (default to sender)
         const toAddress = taskArgs.to || senderAddress;
-        const to = ethers.solidityPacked(['address'], [toAddress]);
-        console.log(`Receiver: ${toAddress}`);
+        const to = addressToHex(toAddress, taskArgs.tochain);
+        console.log(`Receiver: ${toAddress}, bytes: ${to}`);
 
         const refundAddr = taskArgs.refund || senderAddress;
         const payload = taskArgs.payload || "0x";
@@ -467,6 +469,16 @@ async function getChainIdByName(currentNetwork: string, chainName: string) {
 
     if (allChains[chainName]) {
         return BigInt(allChains[chainName].chainId);
+    }
+
+    throw new Error(`Chain ${chainName} not found in config`);
+}
+
+async function getChainInfoByName(currentNetwork: string, chainName: string) {
+    const allChains = await getAllChainTokens(currentNetwork);
+
+    if (allChains[chainName]) {
+        return allChains[chainName];
     }
 
     throw new Error(`Chain ${chainName} not found in config`);

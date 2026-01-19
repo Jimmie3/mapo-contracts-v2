@@ -1,12 +1,13 @@
 import { task } from "hardhat/config";
 import { Registry } from "../../typechain-types/contracts"
-import { 
-    getDeploymentByKey, 
-    getAllChainTokens, 
+import {
+    getDeploymentByKey,
+    getAllChainTokens,
     getChainTokenByNetwork,
     getTokenRegsterByTokenName,
     getAllTokenRegster
 } from "../utils/utils"
+import { addressToHex } from "../utils/addressUtil"
 
 task("registry:registerAllChain", "register Chain info")
     .setAction(async (taskArgs, hre) => {
@@ -109,7 +110,7 @@ task("registry:registerAllToken", "register Chain info")
 
 task("registry:setTokenTicker", "set TokenNick name")
     .addParam("chain", "chain id")
-    .addParam("addr", "token address")
+    .addParam("addr", "token address (supports EVM, Tron, Solana formats)")
     .addParam("name", "token nickname")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
@@ -118,8 +119,9 @@ task("registry:setTokenTicker", "set TokenNick name")
         const RegistryFactory = await ethers.getContractFactory("Registry");
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
-        console.log(`set Token Nickname  chain(${taskArgs.chain}), addr(${taskArgs.addr}, name(${taskArgs.name}))`);
-        await(await registry.setTokenTicker(taskArgs.chain, taskArgs.addr, taskArgs.name)).wait();
+        const tokenAddrBytes = addressToHex(taskArgs.addr);
+        console.log(`set Token Nickname  chain(${taskArgs.chain}), addr(${taskArgs.addr} -> ${tokenAddrBytes}), name(${taskArgs.name})`);
+        await(await registry.setTokenTicker(taskArgs.chain, tokenAddrBytes, taskArgs.name)).wait();
 });
 
 task("registry:setTokenTickerByChain", "set TokenNick name")
@@ -142,10 +144,11 @@ task("registry:setTokenTickerByChain", "set TokenNick name")
             if(!tokens || tokens.length === 0) continue;
             for (let j = 0; j < tokens.length; j++) {
                 const token = tokens[j];
-                let preNickname = await registry.getTokenNickname(element.chainId, token.addr);
+                const tokenAddrBytes = addressToHex(token.addr);
+                let preNickname = await registry.getTokenNickname(element.chainId, tokenAddrBytes);
                 if(preNickname !== token.name) {
-                   console.log(`update Token Nickname  chain(${element.chainId}), addr(${token.addr}, name(${token.name})`); 
-                   await(await registry.setTokenTicker(element.chainId, token.addr, token.name)).wait();
+                   console.log(`update Token Nickname  chain(${element.chainId}), addr(${token.addr} -> ${tokenAddrBytes}), name(${token.name})`);
+                   await(await registry.setTokenTicker(element.chainId, tokenAddrBytes, token.name)).wait();
                 }
             }
         }
@@ -169,20 +172,20 @@ task("registry:setAllTokenNickname", "set TokenNick name")
             if(!tokens || tokens.length === 0) continue;
             for (let j = 0; j < tokens.length; j++) {
                 const token = tokens[j];
-                let preNickname = await registry.getTokenNickname(element.chainId, token.addr);
+                const tokenAddrBytes = addressToHex(token.addr);
+                let preNickname = await registry.getTokenNickname(element.chainId, tokenAddrBytes);
                 if(preNickname !== token.name) {
-                   console.log(`update Token Nickname  chain(${element.chainId}), addr(${token.addr}, name(${token.name})`); 
-                   await(await registry.setTokenTicker(element.chainId, token.addr, token.name)).wait();
+                   console.log(`update Token Nickname  chain(${element.chainId}), addr(${token.addr} -> ${tokenAddrBytes}), name(${token.name})`);
+                   await(await registry.setTokenTicker(element.chainId, tokenAddrBytes, token.name)).wait();
                 }
             }
-            
         }
 });
 
 
 task("registry:unmapToken", "unmap Token")
     .addParam("chain", "chain id")
-    .addParam("addr", "token address")
+    .addParam("addr", "token address (supports EVM, Tron, Solana formats)")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
         const [deployer] = await ethers.getSigners();
@@ -190,8 +193,9 @@ task("registry:unmapToken", "unmap Token")
         const RegistryFactory = await ethers.getContractFactory("Registry");
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
-        console.log(`unmap Token: chain(${taskArgs.chain}),  addr(${taskArgs.addr})`);
-        await(await registry.unmapToken(taskArgs.chain, taskArgs.addr)).wait();
+        const tokenAddrBytes = addressToHex(taskArgs.addr);
+        console.log(`unmap Token: chain(${taskArgs.chain}),  addr(${taskArgs.addr} -> ${tokenAddrBytes})`);
+        await(await registry.unmapToken(taskArgs.chain, tokenAddrBytes)).wait();
 });
 
 task("registry:mapAllToken", "map all Token")
@@ -218,7 +222,7 @@ task("registry:mapTokenByTokenName", "map Token by token name")
         const registry = RegistryFactory.attach(addr) as Registry;
 
         let relayToken = await getTokenRegsterByTokenName(network.name, taskArgs.token);
-        if(!relayToken || relayToken === null) throw("token not set");
+        if(!relayToken) throw("token not set");
 
         let chainTokens = await getAllChainTokens(network.name);
         if(!chainTokens) throw("no chain token configs");
@@ -233,21 +237,21 @@ task("registry:mapTokenByTokenName", "map Token by token name")
             for (let j = 0; j < tokens.length; j++) {
                 const token = tokens[j];
                 if(token.name === taskArgs.token) {
+                    const tokenAddrBytes = addressToHex(token.addr);
                     // Check if token mapping already exists and matches
                     let existingMapping = await registry.getToChainToken(relayToken.addr, element.chainId);
-                    let existingDecimals = await registry.getTokenDecimals(element.chainId, token.addr);
-                    let configTokenBytes = token.addr.toLowerCase();
+                    let existingDecimals = await registry.getTokenDecimals(element.chainId, tokenAddrBytes);
                     let existingMappingHex = existingMapping.toLowerCase();
-                    if (existingMappingHex === configTokenBytes && Number(existingDecimals) === token.decimals) {
+                    if (existingMappingHex === tokenAddrBytes.toLowerCase() && Number(existingDecimals) === token.decimals) {
                         console.log(`token ${token.name} on chain(${element.chainId}) already mapped with same values, skipping`);
                         continue;
                     }
                     if (existingMapping && existingMapping !== "0x") {
                         console.log(`token ${token.name} on chain(${element.chainId}) on-chain mapping: ${existingMapping}, decimals: ${existingDecimals}`);
-                        console.log(`config mapping: ${token.addr}, decimals: ${token.decimals}, updating...`);
+                        console.log(`config mapping: ${token.addr} -> ${tokenAddrBytes}, decimals: ${token.decimals}, updating...`);
                     }
-                    console.log(`map token ${token.name}: ${relayToken.addr}, chain(${element.chainId}), addr(${token.addr}), decimals(${token.decimals})`);
-                    await(await registry.mapToken(relayToken.addr, element.chainId, token.addr, token.decimals)).wait();
+                    console.log(`map token ${token.name}: ${relayToken.addr}, chain(${element.chainId}), addr(${token.addr} -> ${tokenAddrBytes}), decimals(${token.decimals})`);
+                    await(await registry.mapToken(relayToken.addr, element.chainId, tokenAddrBytes, token.decimals)).wait();
                 }
             }
         }
@@ -257,7 +261,7 @@ task("registry:mapTokenByTokenName", "map Token by token name")
 task("registry:mapToken", "map Token")
     .addParam("token", "relay chain token address")
     .addParam("chain", "from chain id")
-    .addParam("addr", "from token address")
+    .addParam("addr", "from token address (supports EVM, Tron, Solana formats)")
     .addParam("decimals", "from token decimals")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
@@ -266,19 +270,20 @@ task("registry:mapToken", "map Token")
         const RegistryFactory = await ethers.getContractFactory("Registry");
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
+        const tokenAddrBytes = addressToHex(taskArgs.addr);
         // Check if token mapping already exists and matches
         let existingMapping = await registry.getToChainToken(taskArgs.token, taskArgs.chain);
-        let existingDecimals = await registry.getTokenDecimals(taskArgs.chain, taskArgs.addr);
-        if (existingMapping.toLowerCase() === taskArgs.addr.toLowerCase() && Number(existingDecimals) === Number(taskArgs.decimals)) {
+        let existingDecimals = await registry.getTokenDecimals(taskArgs.chain, tokenAddrBytes);
+        if (existingMapping.toLowerCase() === tokenAddrBytes.toLowerCase() && Number(existingDecimals) === Number(taskArgs.decimals)) {
             console.log(`token on chain(${taskArgs.chain}) already mapped with same values, skipping`);
             return;
         }
         if (existingMapping && existingMapping !== "0x") {
             console.log(`on-chain mapping: ${existingMapping}, decimals: ${existingDecimals}`);
-            console.log(`config mapping: ${taskArgs.addr}, decimals: ${taskArgs.decimals}, updating...`);
+            console.log(`config mapping: ${taskArgs.addr} -> ${tokenAddrBytes}, decimals: ${taskArgs.decimals}, updating...`);
         }
-        console.log(`map token ${taskArgs.token}, chain(${taskArgs.chain}), addr(${taskArgs.addr}), decimals(${taskArgs.decimals})`);
-        await(await registry.mapToken(taskArgs.token, taskArgs.chain, taskArgs.addr, taskArgs.decimals)).wait();
+        console.log(`map token ${taskArgs.token}, chain(${taskArgs.chain}), addr(${taskArgs.addr} -> ${tokenAddrBytes}), decimals(${taskArgs.decimals})`);
+        await(await registry.mapToken(taskArgs.token, taskArgs.chain, tokenAddrBytes, taskArgs.decimals)).wait();
 });
 
 

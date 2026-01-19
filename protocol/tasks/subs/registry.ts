@@ -122,6 +122,35 @@ task("registry:setTokenTicker", "set TokenNick name")
         await(await registry.setTokenTicker(taskArgs.chain, taskArgs.addr, taskArgs.name)).wait();
 });
 
+task("registry:setTokenTickerByChain", "set TokenNick name")
+    .addParam("chain", "chain name")
+    .setAction(async (taskArgs, hre) => {
+        const { network, ethers } = hre;
+        const [deployer] = await ethers.getSigners();
+        console.log("deployer address:", await deployer.getAddress())
+        const RegistryFactory = await ethers.getContractFactory("Registry");
+        let addr = await getDeploymentByKey(network.name, "Registry");
+        const registry = RegistryFactory.attach(addr) as Registry;
+        let chainTokens = await getAllChainTokens(network.name);
+        if(!chainTokens) throw("no chain token configs");
+        let keys = Object.keys(chainTokens);
+        for (let index = 0; index < keys.length; index++) {
+            if(taskArgs.chain !== keys[index]) continue;
+            const name = keys[index];
+            let element = chainTokens[name]
+            let tokens = element.tokens;
+            if(!tokens || tokens.length === 0) continue;
+            for (let j = 0; j < tokens.length; j++) {
+                const token = tokens[j];
+                let preNickname = await registry.getTokenNickname(element.chainId, token.addr);
+                if(preNickname !== token.name) {
+                   console.log(`update Token Nickname  chain(${element.chainId}), addr(${token.addr}, name(${token.name})`); 
+                   await(await registry.setTokenTicker(element.chainId, token.addr, token.name)).wait();
+                }
+            }
+        }
+});
+
 task("registry:setAllTokenNickname", "set TokenNick name")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;

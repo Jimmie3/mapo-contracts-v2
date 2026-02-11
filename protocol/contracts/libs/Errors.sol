@@ -25,4 +25,6 @@ library Errs {
     error map_token_relay_chain();
     error relay_token_not_registered();
     error chain_not_registered();
+
+    error relay_out_amount_too_low();
 }

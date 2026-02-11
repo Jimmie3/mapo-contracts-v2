@@ -109,14 +109,34 @@
             "vaultToken": "",
             "chainWeights": []
         },
-
         {
             "id": 7,
+            "name": "XRP",
+            "addr": "0x819826Df0544e8Da17A8a14Be43231C62Fa7130b",
+            "vaultToken": "0xD34428E9D2f0e9B2DA842F9De1EE801d72EAF967",
+            "chainWeights": [
+                 {
+                    "chainId": 1360117358395393,
+                    "weight": 100
+                },
+                {
+                    "chainId": 22776,
+                    "weight": 100
+                }
+            ],
+            "relayOutMinAmounts":[
+                {
+                    "chainId": 1360117358395393,
+                    "minAmount": "1100000000000000000"
+                }
+            ]
+        },
+        {
+            "id": 8,
             "name": "TRX",
             "addr": "0x593a37fe0F6DFd0b6c5A051e9a44aA0F6922A1a2",
             "vaultToken": "",
             "chainWeights": []
         }
-
     ]
 }

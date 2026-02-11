@@ -66,6 +66,15 @@
                     "bridgeAble": true,
                     "mintAble": false,
                     "burnFrom": false
+                },
+
+                {
+                    "name": "XRP",
+                    "addr": "0x819826Df0544e8Da17A8a14Be43231C62Fa7130b",
+                    "decimals": 18,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
                 }
             ]
         },
@@ -417,6 +426,28 @@
                     "name": "BTC",
                     "addr": "0x425443",
                     "decimals": 8,
+                    "bridgeAble": true,
+                    "mintAble": false,
+                    "burnFrom": false
+                }
+            ]
+        },
+
+        "Xrp": {
+            "chainId": 1360117358395393, 
+            "lastScanBlock": 102038372,
+            "updateGasFeeGap": 0,
+            "confirmCount": 5,
+            "minGasCallOnReceive": 0,
+            "chainType": "no-contract",
+            "gasToken": "0x819826Df0544e8Da17A8a14Be43231C62Fa7130b", 
+            "baseFeeToken": "0x819826Df0544e8Da17A8a14Be43231C62Fa7130b",
+            "transferFailedReceiver": "",
+            "tokens": [
+                {
+                    "name": "XRP",
+                    "addr": "0x585250",
+                    "decimals": 6,
                     "bridgeAble": true,
                     "mintAble": false,
                     "burnFrom": false

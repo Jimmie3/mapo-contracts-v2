@@ -51,8 +51,9 @@ contract Configuration is BaseImplementation, IConfiguration {
     }
 
     function batchSetAddressValue(string[] calldata keys, address[] calldata values) external restricted {
-        require(keys.length == values.length);
-        for (uint256 i = 0; i < keys.length; i++) {
+        uint256 length = keys.length;
+        require(length == values.length);
+        for (uint256 i = 0; i < length; i++) {
             _setAddressValue(keys[i], values[i]);
         }
     }
@@ -67,14 +68,22 @@ contract Configuration is BaseImplementation, IConfiguration {
     function getAddressValue(string calldata key) external view override returns (address value) {
         value = addressValues[keccak256(bytes(key))];
     }
+    function batchGetAddressValue(string[] calldata keys) external view returns (address[] memory values) {
+        uint256 length = keys.length;
+        values = new address[](length);
+        for (uint256 i = 0; i < length; i++) {
+            values[i] = addressValues[keccak256(bytes(keys[i]))];
+        }
+    }
 
     function setBoolValue(string calldata key, bool value) external restricted {
         _setBoolValue(key, value);
     }
 
     function batchSetBoolValue(string[] calldata keys, bool[] calldata values) external restricted {
-        require(keys.length == values.length);
-        for (uint256 i = 0; i < keys.length; i++) {
+        uint256 length = keys.length;
+        require(length == values.length);
+        for (uint256 i = 0; i < length; i++) {
             _setBoolValue(keys[i], values[i]);
         }
     }
@@ -90,13 +99,22 @@ contract Configuration is BaseImplementation, IConfiguration {
         value = boolValues[keccak256(bytes(key))];
     }
 
+    function batchGetBoolValue(string[] calldata keys) external view returns (bool[] memory values) {
+        uint256 length = keys.length;
+        values = new bool[](length);
+        for (uint256 i = 0; i < length; i++) {
+            values[i] = boolValues[keccak256(bytes(keys[i]))];
+        }
+    }
+
     function setStringValue(string calldata key, string calldata value) external restricted {
         _setStringValue(key, value);
     }
 
     function batchSetStringValue(string[] calldata keys, string[] calldata values) external restricted {
-        require(keys.length == values.length);
-        for (uint256 i = 0; i < keys.length; i++) {
+        uint256 length = keys.length;
+        require(length == values.length);
+        for (uint256 i = 0; i < length; i++) {
             _setStringValue(keys[i], values[i]);
         }
     }
@@ -112,13 +130,22 @@ contract Configuration is BaseImplementation, IConfiguration {
         value = stringValues[keccak256(bytes(key))];
     }
 
+    function batchGetStringValue(string[] calldata keys) external view returns (string[] memory values) {
+        uint256 length = keys.length;
+        values = new string[](length);
+        for (uint256 i = 0; i < length; i++) {
+            values[i] = stringValues[keccak256(bytes(keys[i]))];
+        }
+    }
+
     function setBytesValue(string calldata key, bytes calldata value) external restricted {
         _setBytesValue(key, value);
     }
 
     function batchSetBytesValue(string[] calldata keys, bytes[] calldata values) external restricted {
-        require(keys.length == values.length);
-        for (uint256 i = 0; i < keys.length; i++) {
+        uint256 length = keys.length;
+        require(length == values.length);
+        for (uint256 i = 0; i < length; i++) {
             _setBytesValue(keys[i], values[i]);
         }
     }
@@ -134,5 +161,12 @@ contract Configuration is BaseImplementation, IConfiguration {
         value = bytesValues[keccak256(bytes(key))];
     }
 
+    function batchGetBytesValue(string[] calldata keys) external view returns (bytes[] memory values) {
+        uint256 length = keys.length;
+        values = new bytes[](length);
+        for (uint256 i = 0; i < length; i++) {
+            values[i] = bytesValues[keccak256(bytes(keys[i]))];
+        }
+    }
    
 }

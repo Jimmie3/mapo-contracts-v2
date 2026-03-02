@@ -76,6 +76,37 @@ task("configuration:updateGasFeeGapFromConfig", "updateGasFeeGapFromConfig")
         }
     })
 
+task("configuration:updateTransferFailedReceiverFromConfig", "updateTransferFailedReceiverConfig")
+    .setAction(async (taskArgs, hre) => {
+        const { network, ethers } = hre;
+        const [deployer] = await ethers.getSigners();
+        console.log("deployer address:", await deployer.getAddress())
+        const ConfigurationFactory = await ethers.getContractFactory("Configuration");
+        let addr = await getDeploymentByKey(network.name, "Configuration");
+        if(!addr || addr.length == 0) throw("configuration not deploy");
+        let v = ConfigurationFactory.attach(addr) as Configuration;
+        let chainTokens = await getAllChainTokens(network.name);
+        if(!chainTokens) throw("no chain token configs");
+        let keys = Object.keys(chainTokens);
+        for (let index = 0; index < keys.length; index++) {
+            const name = keys[index];
+            let element = chainTokens[name]
+            if(element.chainType === "contract") continue;
+            if(!element.transferFailedReceiver || element.transferFailedReceiver.length == 0 || element.transferFailedReceiver === " ") {
+                console.log("no transferFailedReceiver config for chainId:", element.chainId);
+                continue;
+            }
+            let key = `${element.chainId}_TRANSFER_FAILED_RECEIVER`;
+            let beforeValue = await v.getBytesValue(key);
+            
+            if(beforeValue.toString().toLowerCase() == element.transferFailedReceiver.toString().toLowerCase()) {
+                console.log("value no change:", beforeValue.toString());
+                continue;
+            }
+            await setValue(v, key, element.transferFailedReceiver.toString(), "bytes");
+        }
+    })
+
 task("configuration:confirmCountFromConfig", "confirmCountFromConfig")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;

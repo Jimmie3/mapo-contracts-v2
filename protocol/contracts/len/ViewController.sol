@@ -30,14 +30,118 @@ contract ViewController is BaseImplementation {
         emit SetRegistry(_registry);
     }
 
+    // gas service
+    function getNetworkFeeInfo(uint256 _chainId) external view returns (uint256 gasRate, uint256 txSize, uint256 txSizeWithCall) {
+        IGasService g = _getGasService();
+        (gasRate, txSize, txSizeWithCall) = g.getNetworkFeeInfo(_chainId);
+    }
+
+   // IAffiliateFeeManager
+    function getInfoByShortName(string calldata _shortName) external view returns (IAffiliateFeeManager.AffiliateInfo memory info) {
+        IAffiliateFeeManager afm = _getAffiliateFeeManager();
+        info = afm.getInfoByShortName(_shortName);
+    }
+
+    function getInfoByNickname(string calldata _nickname) external view returns (IAffiliateFeeManager.AffiliateInfo memory info) {
+        IAffiliateFeeManager afm = _getAffiliateFeeManager();
+        info = afm.getInfoByNickname(_nickname);
+    }
+
+    function getShortNameById(uint16 _id) external view returns (string memory) {
+        IAffiliateFeeManager afm = _getAffiliateFeeManager();
+        return afm.getShortNameById(_id);
+    }
+
+    function getInfoById(uint16 _id) external view returns (IAffiliateFeeManager.AffiliateInfo memory info) {
+        IAffiliateFeeManager afm = _getAffiliateFeeManager();
+        info = afm.getInfoById(_id);
+    }
+
+    // registry
+    function getChainName(uint256 chain) external view returns (string memory) {
+        return registry.getChainName(chain);
+    }
+
+    function getChainByName(string memory name) external view returns (uint256) {
+        return registry.getChainByName(name);
+    }
+
+    function getTokenNickname(uint256 chain, bytes memory token) external view returns (string memory) {
+        return registry.getTokenNickname(chain, token);
+    }
+
+    function getChainType(uint256 chain) external view returns (ChainType) {
+        return registry.getChainType(chain);
+    }
+
+    function getTokenDecimals(uint256 chain, bytes calldata token) external view returns (uint256) {
+        return registry.getTokenDecimals(chain, token);
+    }
+
+    function getTokenAddressByNickname(uint256 chain, string memory nickname) external view returns (bytes memory) {
+        return registry.getTokenAddressByNickname(chain, nickname);
+    }
+
+    function getChainRouters(uint256 chain) external view returns (bytes memory router) {
+        return registry.getChainRouters(chain);
+    }
+
+    function getTokenAddressById(uint96 id) external view returns (address token) {
+        return registry.getTokenAddressById(id);
+    }
+
+    function getToChainToken(address _token, uint256 _toChain) external view returns (bytes memory _toChainToken) {
+        return registry.getToChainToken(_token, _toChain);
+    }
+
+    function getTokenInfo(address _relayToken, uint256 _fromChain)
+    external
+    view
+    returns (bytes memory token, uint8 decimals, bool mintable) {
+        return registry.getTokenInfo(_relayToken, _fromChain);
+    }
+
+    function getTargetToken(uint256 _fromChain, uint256 _toChain, bytes memory _fromToken)
+    external
+    view
+    returns (bytes memory toToken, uint8 decimals) {
+        return registry.getTargetToken(_fromChain, _toChain, _fromToken);
+    }
+
+    function getRelayChainGasAmount(uint256 chain, uint256 gasAmount) external view returns (uint256 relayGasAmount) {
+        return registry.getRelayChainGasAmount(chain, gasAmount);
+    }
+
+    function getRelayChainToken(uint256 _fromChain, bytes memory _fromToken) external view returns (address) {
+        return registry.getRelayChainToken(_fromChain, _fromToken);
+    }
+
+    function getRelayChainAmount(bytes memory _fromToken, uint256 _fromChain, uint256 _amount)
+        external
+        view
+        returns (uint256) {
+        return registry.getRelayChainAmount(_fromToken, _fromChain, _amount);
+    }
+
+    function getTargetAmount(uint256 _fromChain, uint256 _toChain, bytes memory _fromToken, uint256 _amount)
+        external
+        view
+        returns (uint256 toAmount) {
+        return registry.getTargetAmount(_fromChain, _toChain, _fromToken, _amount);
+    }
+
+    function getToChainAmount(address _token, uint256 _amount, uint256 _toChain) external view returns (uint256) {
+        return registry.getToChainAmount(_token, _amount, _toChain);
+    }
+
     function getLastTxOutHeight() external view returns (uint256) {
         IRelay relay = _getRelay();
         return relay.getChainLastScanBlock(selfChainId);
     }
 
-    function getLastTxInHeight(uint256 chain) external view returns (uint256) {
+    function getLastTxInHeight(uint256 _chainId) external view returns (uint256) {
         IRelay relay = _getRelay();
-        return relay.getChainLastScanBlock(chain);
+        return relay.getChainLastScanBlock(_chainId);
     }
 
     struct VaultRouter {
@@ -241,8 +345,9 @@ contract ViewController is BaseImplementation {
             } else {
                 result.amountOut = _bridgeAmount;
             }
-            result.vaultBalance = _getVaultBalance(vm, _toChain, _bridgeInToken);
-            if(result.vaultBalance < result.amountOut) result.amountOut = 0;
+            uint256 vaultBalanceRelayChainDecimals;
+            (vaultBalanceRelayChainDecimals, result.vaultBalance) = _getVaultBalance(vm, _toChain, _bridgeInToken);
+            if(vaultBalanceRelayChainDecimals < result.amountOut) result.amountOut = 0;
             if(result.amountOut <= vm.getRelayOutMinAmount(_bridgeInToken, _toChain)) result.amountOut = 0;
             return result;
         } else {
@@ -294,22 +399,24 @@ contract ViewController is BaseImplementation {
             } else {
                 result.amountOut = _bridgeAmount;
             }
-            result.vaultBalance = _getVaultBalance(vm, _toChain, _bridgeOutToken);
-            if(result.vaultBalance < result.amountOut) result.amountOut = 0;
+            uint256 vaultBalanceRelayChainDecimals;
+            (vaultBalanceRelayChainDecimals, result.vaultBalance) = _getVaultBalance(vm, _toChain, _bridgeOutToken);
+            if(vaultBalanceRelayChainDecimals < result.amountOut) result.amountOut = 0;
             if(result.amountOut <= vm.getRelayOutMinAmount(_bridgeOutToken, _toChain)) result.amountOut = 0;
             return result;
         }
 
     }
 
-    function _getVaultBalance(IVaultManager vm, uint256 chain, address token) internal view returns (uint256 balance) {
+    function _getVaultBalance(IVaultManager vm, uint256 chain, address token) internal view returns (uint256 vaultBalanceRelayChainDecimals, uint256 vaultBalance) {
         if(chain == selfChainId) {
              // minted token has infinite balance
-             address relayAddress = registry.getContractAddress(ContractType.RELAY);
+            address relayAddress = registry.getContractAddress(ContractType.RELAY);
             if(IMintAbleChecker(relayAddress).isMintable(token)) {
-                return type(uint256).max;
+                return (type(uint256).max, type(uint256).max);
             } else {
-                return IERC20(token).balanceOf(relayAddress);
+                uint256 balance = IERC20(token).balanceOf(relayAddress);
+                return (balance, balance);
             }
         }
         bytes memory active = vm.getActiveVault();
@@ -317,16 +424,19 @@ contract ViewController is BaseImplementation {
         (int256 bal, ) = vm.getVaultTokenBalance(active, chain, token);
         // unsupported minted token on other chain
         if(bal < 0) {
-            balance = 0;
+            vaultBalanceRelayChainDecimals = 0;
         } else {
-            balance = uint256(bal);
+            vaultBalanceRelayChainDecimals = uint256(bal);
         }
         if(retiring.length > 0) {
             (int256 balRetir, ) = vm.getVaultTokenBalance(retiring, chain, token);
-            if(balRetir > 0 && uint256(balRetir) > balance) {
-                balance = uint256(balRetir);
+            if(balRetir > 0 && uint256(balRetir) > vaultBalanceRelayChainDecimals) {
+                vaultBalanceRelayChainDecimals = uint256(balRetir);
             }
         }
+        bytes memory toChainToken = registry.getToChainToken(token, chain);
+        uint256 decimals = registry.getTokenDecimals(chain, toChainToken);
+        vaultBalance = _adjustDecimals(vaultBalanceRelayChainDecimals, decimals);
     }
 
     function _getFee(uint256 amount, uint256 feeRate) internal pure returns (uint256 fee) {
@@ -362,5 +472,9 @@ contract ViewController is BaseImplementation {
 
     function _getTSSManager() internal view returns (ITSSManager TSSManager) {
         TSSManager = ITSSManager(registry.getContractAddress(ContractType.TSS_MANAGER));
+    }
+
+    function _getAffiliateFeeManager() internal view returns (IAffiliateFeeManager affiliateFeeManager) {
+        affiliateFeeManager = IAffiliateFeeManager(registry.getContractAddress(ContractType.AFFILIATE));
     }
 }

@@ -86,10 +86,12 @@ contract FusionQuoter is BaseImplementation {
         // bool _withSwap,
         bytes calldata _affiliateFee
     ) external view returns(FusionQuoterResult memory fusionQuoterResult) {
+        require(_fromChain != _toChain);
         require(_fromChain != selfChainId && _toChain != selfChainId);
-        require(_fromChain == btcChainId || _toChain == btcChainId);
+        require((_isBridgeByTss(_fromChain) && !_isBridgeByTss(_toChain)) || (!_isBridgeByTss(_fromChain) && _isBridgeByTss(_toChain)));
+
         // btc -> evm  swap on tss 
-        if(_fromChain == btcChainId) {
+        if(_isBridgeByTss(_fromChain)) {
             // affiliateFee and maybe swap
             ITssQuoter.QuoteResult memory result = tssQuoter.quote(_fromChain, selfChainId, _bridgeInToken, _bridgeOutToken, _bridgeAmount, false, _affiliateFee);
             fusionQuoterResult.affiliateFee = result.affiliateFee;
@@ -146,6 +148,10 @@ contract FusionQuoter is BaseImplementation {
             fusionQuoterResult.amountOut = result.amountOut;
         }
         
+    }
+
+    function _isBridgeByTss(uint256 _chainId) internal pure returns (bool) {
+        return (_chainId == 1360095883558913) || (_chainId == 1360117358395393) || (_chainId == 1360121653362689);
     }
 
 }

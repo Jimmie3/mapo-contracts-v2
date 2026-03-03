@@ -46,6 +46,14 @@ contract Configuration is BaseImplementation, IConfiguration {
         value = intValues[keccak256(bytes(key))];
     }
 
+    function batchGetIntValue(string[] calldata keys) external view returns (int256[] memory values) {
+        uint256 length = keys.length;
+        values = new int256[](length);
+        for (uint256 i = 0; i < length; i++) {
+            values[i] = intValues[keccak256(bytes(keys[i]))];
+        }
+    }
+
     function setAddressValue(string calldata key, address value) external restricted {
         _setAddressValue(key, value);
     }

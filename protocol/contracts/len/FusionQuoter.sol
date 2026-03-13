@@ -52,7 +52,6 @@ interface IButterQuoter {
 
 contract FusionQuoter is BaseImplementation {
     uint256 public immutable selfChainId = block.chainid;
-    uint256 public immutable btcChainId = 1360095883558913;
     
     address public fusionReceiver;
     ITssQuoter public tssQuoter;
@@ -83,15 +82,14 @@ contract FusionQuoter is BaseImplementation {
         address _bridgeInToken,
         address _bridgeOutToken,
         uint256 _bridgeAmount,
-        // bool _withSwap,
+        bool _fromChainTss,          
         bytes calldata _affiliateFee
     ) external view returns(FusionQuoterResult memory fusionQuoterResult) {
         require(_fromChain != _toChain);
         require(_fromChain != selfChainId && _toChain != selfChainId);
-        require((_isBridgeByTss(_fromChain) && !_isBridgeByTss(_toChain)) || (!_isBridgeByTss(_fromChain) && _isBridgeByTss(_toChain)));
 
-        // btc -> evm  swap on tss 
-        if(_isBridgeByTss(_fromChain)) {
+        // tss -> mos  swap on tss 
+        if(_fromChainTss) {
             // affiliateFee and maybe swap
             ITssQuoter.QuoteResult memory result = tssQuoter.quote(_fromChain, selfChainId, _bridgeInToken, _bridgeOutToken, _bridgeAmount, false, _affiliateFee);
             fusionQuoterResult.affiliateFee = result.affiliateFee;
@@ -120,7 +118,7 @@ contract FusionQuoter is BaseImplementation {
             fusionQuoterResult.bridgeOutFee += inFee;
             fusionQuoterResult.bridgeOutFee += outFee;
         } else {
-            // evm -> btc swap on mos
+            // mos -> tss swap on mos
             (
                 fusionQuoterResult.bridgeInFee,
                 fusionQuoterResult.bridgeOutFee,
@@ -148,10 +146,6 @@ contract FusionQuoter is BaseImplementation {
             fusionQuoterResult.amountOut = result.amountOut;
         }
         
-    }
-
-    function _isBridgeByTss(uint256 _chainId) internal pure returns (bool) {
-        return (_chainId == 1360095883558913) || (_chainId == 1360117358395393) || (_chainId == 1360121653362689);
     }
 
 }

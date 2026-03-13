@@ -123,7 +123,7 @@
             "chainType": "no-contract",
             "gasToken": "0xE85C9Bc2Aef9374EAe55E844f1B6d8cB2cFA5A89", 
             "baseFeeToken": "0xE85C9Bc2Aef9374EAe55E844f1B6d8cB2cFA5A89",
-            "transferFailedReceiver": "",
+            "transferFailedReceiver": "0x011b82c3b93dda9e6324d5e3c5f9b5f7bf644af3964b1932d8b8f8a2b821a8a45d",
             "tokens": [
                 {
                     "name": "BTC",

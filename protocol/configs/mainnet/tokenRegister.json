@@ -64,6 +64,22 @@
                 {
                     "chainId": 42161,
                     "weight": 100
+                },
+                {
+                    "chainId": 10,
+                    "weight": 100
+                },
+                {
+                    "chainId": 130,
+                    "weight": 100
+                },
+                {
+                    "chainId": 137,
+                    "weight": 100
+                },
+                {
+                    "chainId": 196,
+                    "weight": 100
                 }
             ]
         },
@@ -122,6 +138,10 @@
                 {
                     "chainId": 22776,
                     "weight": 100
+                },
+                {
+                    "chainId": 56,
+                    "weight": 100
                 }
             ],
             "relayOutMinAmounts":[
@@ -133,8 +153,50 @@
         },
         {
             "id": 8,
+            "name": "DOGE",
+            "addr": "0x27DDBa5E2f740b4Cf97014BCa6Fd7750ce5772d0",
+            "vaultToken": "0x787405B9Acdc4771A294B8042608919dC1861823",
+            "chainWeights": [
+                 {
+                    "chainId": 1360117358395393,
+                    "weight": 100
+                },
+                {
+                    "chainId": 22776,
+                    "weight": 100
+                },
+                {
+                    "chainId": 56,
+                    "weight": 100
+                }
+            ],
+            "relayOutMinAmounts":[
+                {
+                    "chainId": 1360117358395393,
+                    "minAmount": "1000000000000000000"
+                }
+            ]
+        },
+        {
+            "id": 9,
             "name": "TRX",
             "addr": "0x593a37fe0F6DFd0b6c5A051e9a44aA0F6922A1a2",
+            "vaultToken": "",
+            "chainWeights": []
+        },
+
+        {
+            "id": 10,
+            "name": "POL",
+            "addr": "0xC56DF761A4af3F45CC36AC55244Aa1131E13F51B",
+            "vaultToken": "",
+            "chainWeights": []
+        },
+
+        {
+            "id": 11,
+            "name": "OKB",
+            "addr": "0xfB5F32512E3a60C591F8f27D27166593E7eE5733",
             "vaultToken": "",
             "chainWeights": []
         }

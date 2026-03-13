@@ -161,6 +161,38 @@ abstract contract BaseScript is Script {
                 return "Arb_prod";
             }
         }
+
+        if(chainId == 10){
+            if(isMain) {
+                return "Op_main";
+            } else {
+                return "Op_prod";
+            }
+        }
+
+        if(chainId == 130){
+            if(isMain) {
+                return "Uni_main";
+            } else {
+                return "Uni_prod";
+            }
+        }
+
+        if(chainId == 137){
+            if(isMain) {
+                return "Pol_main";
+            } else {
+                return "Pol_prod";
+            }
+        }
+
+        if(chainId == 196){
+            if(isMain) {
+                return "Xlayer_main";
+            } else {
+                return "Xlayer_prod";
+            }
+        }
         revert("unknown");
     }
 

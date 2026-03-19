@@ -182,7 +182,7 @@ contract Registry is BaseImplementation, IRegistry {
     function unmapToken(uint256 _fromChain, bytes memory _fromToken) external restricted {
         if (_fromChain == selfChainId) revert Errs.map_token_relay_chain();
         address relayToken = tokenMappingList[_fromChain][_fromToken];
-        if (relayToken != address(0)) revert Errs.relay_token_not_registered();
+        if (relayToken == address(0)) revert Errs.relay_token_not_registered();
 
         Token storage token = tokenList[relayToken];
         if (token.tokenAddress != address(0)) {

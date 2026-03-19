@@ -137,7 +137,7 @@ contract Relay is BaseGateway, IRelay {
         if (!completed) revert Errs.migration_not_completed();
         vaultManager.removeChain(_chain);
 
-        emit AddChain(_chain);
+        emit RemoveChain(_chain);
     }
 
 
@@ -291,6 +291,7 @@ contract Relay is BaseGateway, IRelay {
         orderExecuted[txInItem.orderId] = ORDER_EXECUTED;
 
         BridgeItem calldata bridgeItem = txInItem.bridgeItem;
+        require(bridgeItem.txType == TxType.DEPOSIT || bridgeItem.txType == TxType.TRANSFER);
 
         (uint256 fromChain, uint256 toChain) = _getFromAndToChain(bridgeItem.chainAndGasLimit);
 

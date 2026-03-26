@@ -79,7 +79,7 @@
         "bsc_test": {
             "chainId": 97, 
             "lastScanBlock": 73811503,
-            "updateGasFeeGap": 0,
+            "updateGasFeeGap": 5,
             "confirmCount": 6,
             "minGasCallOnReceive": 500000,
             "chainType": "contract",
@@ -117,13 +117,13 @@
         "btc_test": {
             "chainId": 1360095883558914, 
             "lastScanBlock": 279084,
-            "updateGasFeeGap": 3,
+            "updateGasFeeGap": 0,
             "confirmCount": 2,
             "minGasCallOnReceive": 500000,
             "chainType": "no-contract",
             "gasToken": "0xE85C9Bc2Aef9374EAe55E844f1B6d8cB2cFA5A89", 
             "baseFeeToken": "0xE85C9Bc2Aef9374EAe55E844f1B6d8cB2cFA5A89",
-            "transferFailedReceiver": "",
+            "transferFailedReceiver": "0x011b82c3b93dda9e6324d5e3c5f9b5f7bf644af3964b1932d8b8f8a2b821a8a45d",
             "tokens": [
                 {
                     "name": "BTC",

@@ -137,7 +137,7 @@ contract Relay is BaseGateway, IRelay {
         if (!completed) revert Errs.migration_not_completed();
         vaultManager.removeChain(_chain);
 
-        emit AddChain(_chain);
+        emit RemoveChain(_chain);
     }
 
 
@@ -291,6 +291,7 @@ contract Relay is BaseGateway, IRelay {
         orderExecuted[txInItem.orderId] = ORDER_EXECUTED;
 
         BridgeItem calldata bridgeItem = txInItem.bridgeItem;
+        require(bridgeItem.txType == TxType.DEPOSIT || bridgeItem.txType == TxType.TRANSFER);
 
         (uint256 fromChain, uint256 toChain) = _getFromAndToChain(bridgeItem.chainAndGasLimit);
 
@@ -380,13 +381,12 @@ contract Relay is BaseGateway, IRelay {
         }
     }
 
-    function _swap(address tokenIn, uint256 amountInt, bytes memory payload) internal returns (address , uint256) {
-        (address tokenOut, uint256 amountOutMin) = abi.decode(payload, (address, uint256));
+    function _swap(address tokenIn, uint256 amountInt, address targetToken) internal returns (uint256) {
         ISwap swap = ISwap(registry.getContractAddress(ContractType.SWAP));
         _approveToken(tokenIn, amountInt, address(swap));
-        uint amountOut = swap.swap(tokenIn, amountInt, tokenOut, amountOutMin);
-        _transferFromToken(address(swap), tokenOut, amountOut, address(this));
-        return (tokenOut, amountOut);
+        uint amountOut = swap.swap(tokenIn, amountInt, targetToken, 1);
+        _transferFromToken(address(swap), targetToken, amountOut, address(this));
+        return amountOut;
     }
 
     function execute(bytes calldata from, bytes calldata to, TxItem calldata txItem, uint256 toChain, bytes calldata relayPayload, bytes calldata targetPayload) public returns (address, uint256) {
@@ -399,15 +399,22 @@ contract Relay is BaseGateway, IRelay {
         bool choose;
         GasInfo memory gasInfo;
         BridgeItem memory bridgeOutItem;
-
         uint256 fromChain = txItem.chain;
 
-        if (relayPayload.length > 0) {
+        uint256 relayMinAmount;
+        address relayTargetToken;
+
+        if(relayPayload.length > 0) {
+            (relayTargetToken, relayMinAmount) = abi.decode(relayPayload, (address,uint256));
+        }
+
+        if (relayTargetToken != address(0) && relayTargetToken != txItem.token) {
             // 1 collect from chain vault fee and balance fee
             txItem.amount = vaultManager.transferIn(txItem, toChain);
 
             // 2 swap
-            (txItem.token, txItem.amount) = _swap(txItem.token, txItem.amount, relayPayload);
+            txItem.amount = _swap(txItem.token, txItem.amount, relayTargetToken);
+            txItem.token = relayTargetToken;
 
             // todo: update target payload
             txItem.chain = toChain;
@@ -437,7 +444,8 @@ contract Relay is BaseGateway, IRelay {
             txItem.chainType = registry.getChainType(toChain);
         }
 
-        // todo: check relay min amount
+        // check relay min amount
+        if (txItem.amount < relayMinAmount) revert Errs.relay_out_amount_too_low();
 
         // 4 emit BridgeRelay event
         if (toChain != selfChainId) {

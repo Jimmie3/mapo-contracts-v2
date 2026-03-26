@@ -52,7 +52,6 @@ interface IButterQuoter {
 
 contract FusionQuoter is BaseImplementation {
     uint256 public immutable selfChainId = block.chainid;
-    uint256 public immutable btcChainId = 1360095883558913;
     
     address public fusionReceiver;
     ITssQuoter public tssQuoter;
@@ -83,13 +82,14 @@ contract FusionQuoter is BaseImplementation {
         address _bridgeInToken,
         address _bridgeOutToken,
         uint256 _bridgeAmount,
-        // bool _withSwap,
+        bool _fromChainTss,          
         bytes calldata _affiliateFee
     ) external view returns(FusionQuoterResult memory fusionQuoterResult) {
+        require(_fromChain != _toChain);
         require(_fromChain != selfChainId && _toChain != selfChainId);
-        require(_fromChain == btcChainId || _toChain == btcChainId);
-        // btc -> evm  swap on tss 
-        if(_fromChain == btcChainId) {
+
+        // tss -> mos  swap on tss 
+        if(_fromChainTss) {
             // affiliateFee and maybe swap
             ITssQuoter.QuoteResult memory result = tssQuoter.quote(_fromChain, selfChainId, _bridgeInToken, _bridgeOutToken, _bridgeAmount, false, _affiliateFee);
             fusionQuoterResult.affiliateFee = result.affiliateFee;
@@ -118,7 +118,7 @@ contract FusionQuoter is BaseImplementation {
             fusionQuoterResult.bridgeOutFee += inFee;
             fusionQuoterResult.bridgeOutFee += outFee;
         } else {
-            // evm -> btc swap on mos
+            // mos -> tss swap on mos
             (
                 fusionQuoterResult.bridgeInFee,
                 fusionQuoterResult.bridgeOutFee,

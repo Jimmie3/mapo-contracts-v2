@@ -87,6 +87,34 @@ const config: HardhatUserConfig = {
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
 
+    Op: {
+      url: `https://optimism-public.nodies.app`,
+      chainId: 10,
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+
+    Uni: {
+      url: `https://unichain.drpc.org`,
+      chainId: 130,
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+
+    Pol: {
+      url: `https://polygon.rpc.subquery.network/public`,
+      chainId: 137,
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+
+    Xlayer: {
+      url: `https://rpc.xlayer.tech`,
+      chainId: 196,
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+
     Tron: {
       url: `https://api.trongrid.io/jsonrpc`,
       chainId: 728126428,
@@ -99,7 +127,11 @@ const config: HardhatUserConfig = {
       Eth: process.env.ETHERSCAN_API_KEY || "",
       Bsc: process.env.ETHERSCAN_API_KEY || "",
       Base: process.env.ETHERSCAN_API_KEY || "",
-      Arb: process.env.ETHERSCAN_API_KEY || ""
+      Arb: process.env.ETHERSCAN_API_KEY || "",
+      Op: process.env.ETHERSCAN_API_KEY || "",
+      Uni: process.env.ETHERSCAN_API_KEY || "",
+      Pol: process.env.ETHERSCAN_API_KEY || "",
+      Xlayer: " ",
     },
     customChains: [
       {
@@ -142,6 +174,38 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://api.etherscan.io/v2/api?chainid=42161",
           browserURL: "https://arbiscan.io/",
+        },
+      },
+      {
+        network: "Op",
+        chainId: 10,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api?chainid=10",
+          browserURL: "https://optimistic.etherscan.io/",
+        },
+      },
+      {
+        network: "Uni",
+        chainId: 130,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api?chainid=130",
+          browserURL: "https://uniscan.io/",
+        },
+      },
+      {
+        network: "Pol",
+        chainId: 137,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api?chainid=137",
+          browserURL: "https://polygonscan.com/",
+        },
+      },
+      {
+        network: "Xlayer",
+        chainId: 196,
+        urls: {
+          apiURL: "https://www.oklink.com/api/v5/explorer/contract/verify-source-code-plugin/xlayer",
+          browserURL: "https://www.oklink.com",
         },
       },
     ]

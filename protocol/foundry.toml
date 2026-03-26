@@ -37,7 +37,11 @@ Eth_test = { url = "https://api.ehterscan.org/v2/api?chainid=11155111", key = "$
 Bsc = { url = "https://api.ehterscan.org/v2/api?chainid=56", key = "${ETHERSCAN_API_KEY}", chain = 56 }
 Bsc_test = { url = "https://api.ehterscan.org/v2/api?chainid=97", key = "${ETHERSCAN_API_KEY}", chain = 97 }
 Base = { url = "https://api.ehterscan.org/v2/api?chainid=8453", key = "${ETHERSCAN_API_KEY}", chain = 8453 }
-Arbitrum = { url = "https://api.ehterscan.org/v2/api?chainid=42161", key = "${ETHERSCAN_API_KEY}", chain = 42161 }
+Arb = { url = "https://api.ehterscan.org/v2/api?chainid=42161", key = "${ETHERSCAN_API_KEY}", chain = 42161 }
+Op = { url = "https://api.ehterscan.org/v2/api?chainid=10", key = "${ETHERSCAN_API_KEY}", chain = 10 }
+Pol = { url = "https://api.ehterscan.org/v2/api?chainid=137", key = "${ETHERSCAN_API_KEY}", chain = 137 }
+Uni = { url = "https://api.ehterscan.org/v2/api?chainid=130", key = "${ETHERSCAN_API_KEY}", chain = 130 }
+# Xlayer = { url = "https://www.oklink.com/api/v5/explorer/contract/verify-source-code-plugin/xlayer", key = " ", chain = 196 }
 
 [rpc_endpoints]
 Mapo = "https://rpc.maplabs.io"
@@ -48,3 +52,9 @@ Eth_test = "https://1rpc.io/sepolia"
 
 Bsc = "https://binance-smart-chain-public.nodies.app"
 Bsc_test = "https://bsc-testnet.public.blastapi.io"
+
+Arb = "https://public-arb-mainnet.fastnode.io"
+Op = "https://optimism-public.nodies.app"
+Pol = "https://polygon.rpc.subquery.network/public"
+Uni = "https://unichain.drpc.org"
+Xlayer = "https://rpc.xlayer.tech"

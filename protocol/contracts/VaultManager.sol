@@ -257,7 +257,12 @@ contract VaultManager is BaseImplementation, IVaultManager {
 
 
     function updateBalanceFeeRate(Rebalance.BalanceFeeRate calldata _balanceFeeRate) external restricted {
-        // todo: check rate
+        require(_balanceFeeRate.balanceThreshold < MAX_RATE_UNIT);
+        require(_balanceFeeRate.fixedFromBalance > -int32(int256(MAX_RATE_UNIT)) && _balanceFeeRate.fixedFromBalance < int32(int256(MAX_RATE_UNIT)));
+        require(_balanceFeeRate.fixedToBalance > -int32(int256(MAX_RATE_UNIT)) && _balanceFeeRate.fixedToBalance < int32(int256(MAX_RATE_UNIT)));
+        require(_balanceFeeRate.minBalance > -int32(int256(MAX_RATE_UNIT)) && _balanceFeeRate.minBalance < int32(int256(MAX_RATE_UNIT)));
+        require(_balanceFeeRate.maxBalance > -int32(int256(MAX_RATE_UNIT)) && _balanceFeeRate.maxBalance < int32(int256(MAX_RATE_UNIT)));
+        require(_balanceFeeRate.minBalance < _balanceFeeRate.maxBalance);
         balanceFeeRate = _balanceFeeRate;
         emit UpdateBalanceFeeRate(_balanceFeeRate);
     }

@@ -229,13 +229,12 @@ contract Relay is BaseGateway, IRelay {
 
         if (outOrderExecuted[txOutItem.orderId]) revert Errs.order_executed();
 
-        outOrderExecuted[txOutItem.orderId] = true;
-
         BridgeItem calldata bridgeItem = txOutItem.bridgeItem;
 
         (, uint256 chain) = _getFromAndToChain(bridgeItem.chainAndGasLimit);
         if(chain == selfChainId) return;
-
+        
+        outOrderExecuted[txOutItem.orderId] = true;
         _updateLastScanBlock(chain, txOutItem.height);
 
         TxItem memory txItem = _getTxItem(txOutItem.orderId, bridgeItem, chain);
@@ -577,22 +576,27 @@ contract Relay is BaseGateway, IRelay {
         uint256 affiliateFee;
         if (affiliateData.length > 0) {
             IAffiliateFeeManager affiliateFeeManager = IAffiliateFeeManager(registry.getContractAddress(ContractType.AFFILIATE));
+            // The affiliate fee is charged as a percentage and will always be less than txItem.amount.
             try affiliateFeeManager.collectAffiliatesFee(txItem.orderId, txItem.token, txItem.amount, affiliateData) returns (uint256 totalFee) {
                 affiliateFee = totalFee;
-                _sendToken(txItem.token, affiliateFee, address(affiliateFeeManager), true);
+                if(affiliateFee > 0) {
+                    _sendToken(txItem.token, affiliateFee, address(affiliateFeeManager), true);
+                }
             } catch (bytes memory) {
                 // do nothing
             }
         }
 
         (address receiver, uint256 protocolFee) = registry.getProtocolFee(txItem.token, txItem.amount);
-        if(protocolFee > 0) _sendToken(txItem.token, protocolFee, receiver, true);
 
-        uint256 amount = txItem.amount - affiliateFee - protocolFee;
-
-        emit BridgeFeeCollected(txItem.orderId, txItem.token, protocolFee);
-
-        return amount;
+        if(protocolFee + affiliateFee > txItem.amount) protocolFee = txItem.amount - affiliateFee;
+        
+        if(protocolFee > 0) {
+            _sendToken(txItem.token, protocolFee, receiver, true);
+            emit BridgeFeeCollected(txItem.orderId, txItem.token, protocolFee);
+        }
+        
+        return (txItem.amount - affiliateFee - protocolFee);
     }
 
 

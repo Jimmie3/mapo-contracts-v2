@@ -192,6 +192,7 @@ contract Relay is BaseGateway, IRelay {
 
     function relaySigned(bytes32 orderId, bytes calldata relayData, bytes calldata signature)
         external
+        whenNotPaused
     {
         OrderInfo storage order = orderInfos[orderId];
         if (order.signed) return;

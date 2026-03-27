@@ -147,8 +147,9 @@ contract ProtocolFee is BaseImplementation, IProtocolFee {
 
     function _getClaimable(FeeType feeType, address token) internal view returns (uint256) {
         uint256 totalCollected = _balance(token) + totalClaimed[token];
-        uint256 totalAvailable = totalCollected * feeShares[feeType].share / totalShare;
+        if(totalShare == 0) return 0;
 
+        uint256 totalAvailable = totalCollected * feeShares[feeType].share / totalShare;
         return (totalAvailable - claimed[token][feeType]);
     }
 

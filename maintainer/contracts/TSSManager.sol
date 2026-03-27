@@ -232,7 +232,6 @@ contract TSSManager is BaseImplementation, ITSSManager {
 
         TSSInfo storage e = tssInfos[ELECTING_PUBKEY_HASH];
         if(!_checkTssPoolStatus(e)) return;
-        _updateKeyShare(user, param.pubkey, param.keyShare);
         Proposal storage p = proposals[_getUpdateTSSPoolHash(param, e.electBlock)];
         bool keyGen = (param.blames.length == 0);
         uint256 delaySlashPoint;
@@ -246,6 +245,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         }
         bool hasErr = _beforePropose(delaySlashPoint, user, p, e);
         if(hasErr) return;
+        _updateKeyShare(user, param.pubkey, param.keyShare);
         if (keyGen) {
             if (!Utils.addressListEq(param.members, e.maintainers.values())) revert invalid_members();
 
@@ -487,7 +487,7 @@ contract TSSManager is BaseImplementation, ITSSManager {
         if (signer != _publicKeyHashToAddress(pubkeyHash)) revert invalid_sig();
     }
 
-    function _publicKeyHashToAddress(bytes32 pubkeyHash) public pure returns (address) {
+    function _publicKeyHashToAddress(bytes32 pubkeyHash) internal pure returns (address) {
         return address(uint160(uint256(pubkeyHash)));
     }
 

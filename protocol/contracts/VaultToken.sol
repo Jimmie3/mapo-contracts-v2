@@ -14,6 +14,7 @@ contract VaultToken is ERC4626Upgradeable, BaseImplementation {
 
     event VaultIncreased(address indexed token, uint256 feeAmount, uint256 totalValue);
     event VaultDecreased(address indexed token, uint256 feeAmount, uint256 totalValue);
+    event VaultManagerSet(address indexed newManager);
 
     modifier onlyManager() {
         if (msg.sender != vaultManager) revert only_manager_role();
@@ -28,6 +29,7 @@ contract VaultToken is ERC4626Upgradeable, BaseImplementation {
 
     function setVaultManager(address _manager) external restricted {
         vaultManager = _manager;
+        emit VaultManagerSet(_manager);
     }
 
 

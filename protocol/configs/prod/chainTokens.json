@@ -31,8 +31,8 @@
                     "name": "ETH",
                     "addr": "0x05ab928d446d8ce6761e368c8e7be03c3168a9ec",
                     "decimals": 18,
-                    "bridgeAble": false,
-                    "mintAble": false,
+                    "bridgeAble": true,
+                    "mintAble": true,
                     "burnFrom": false
                 },
                 {
@@ -47,8 +47,8 @@
                     "name": "USDC",
                     "addr": "0x9f722b2cb30093f766221fd0d37964949ed66918",
                     "decimals": 18,
-                    "bridgeAble": false,
-                    "mintAble": false,
+                    "bridgeAble": true,
+                    "mintAble": true,
                     "burnFrom": false
                 },
                 {

@@ -63,7 +63,7 @@
                     "name": "TRX",
                     "addr": "0x593a37fe0F6DFd0b6c5A051e9a44aA0F6922A1a2",
                     "decimals": 18,
-                    "bridgeAble": true,
+                    "bridgeAble": false,
                     "mintAble": false,
                     "burnFrom": false
                 },

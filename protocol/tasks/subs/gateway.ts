@@ -205,14 +205,14 @@ task("gateway:updateTokens", "update Tokens")
                 if(element.bridgeAble) feature = feature | 1;
                 if(element.mintAble) feature = feature | 2;
                 if(element.burnFrom) feature = feature | 4;
-                let pre = await c.tokenFeatureList(element.addr).call();
+                let pre = await c.tokenFeatureList(addressToHex(element.addr)).call();
                 if(pre ===  BigInt(feature)) {
                     console.log(`${element.name} tokenFeature already set to ${pre}, skipping`);
                     continue;
                 }
                 console.log(`${element.name} on-chain tokenFeature: ${pre}, config: ${feature}, updating...`);
-                await c.updateTokens([element.addr], feature).send();
-                console.log(`${element.name} after tokenFeature`, await c.tokenFeatureList(element.addr).call());
+                await c.updateTokens([addressToHex(element.addr)], feature).send();
+                console.log(`${element.name} after tokenFeature`, await c.tokenFeatureList(addressToHex(element.addr)).call());
             } 
         } else {
             const [deployer] = await ethers.getSigners();

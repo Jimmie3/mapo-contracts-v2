@@ -158,7 +158,7 @@
             "vaultToken": "0x787405B9Acdc4771A294B8042608919dC1861823",
             "chainWeights": [
                  {
-                    "chainId": 1360117358395393,
+                    "chainId": 1360121653362689,
                     "weight": 100
                 },
                 {
@@ -172,7 +172,7 @@
             ],
             "relayOutMinAmounts":[
                 {
-                    "chainId": 1360117358395393,
+                    "chainId": 1360121653362689,
                     "minAmount": "1000000000000000000"
                 }
             ]

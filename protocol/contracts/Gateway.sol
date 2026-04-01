@@ -120,7 +120,7 @@ contract Gateway is BaseGateway {
         bytes32 orderId,
         bytes calldata signature,
         BridgeItem memory bridgeItem
-    ) internal view returns (bytes32) {
+    ) internal view virtual returns (bytes32) {
         address vaultAddr = Utils.getAddressFromPublicKey(bridgeItem.vault);
 
         bytes32 hash = _getSignHash(orderId, bridgeItem);

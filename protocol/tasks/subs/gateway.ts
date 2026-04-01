@@ -1,5 +1,5 @@
 import { task } from "hardhat/config";
-import { Gateway } from "../../typechain-types/contracts"
+import { Gateway, VaultManager } from "../../typechain-types/contracts"
 import { getDeploymentByKey, getChainTokenByNetwork, getAllChainTokens, saveDeployment} from "../utils/utils"
 import { tronDeploy, tronFromHex, tronToHex, getTronContract } from "../utils/tronUtil"
 import { addressToHex } from "../utils/addressUtil"
@@ -70,33 +70,39 @@ task("gateway:setWtoken", "set wtoken address")
 });
 
 task("gateway:setTssAddress", "set tss pubkey")
-    .addParam("pubkey", "tss pubkey")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
         const [deployer] = await ethers.getSigners();
 
         let addr = await getDeploymentByKey(network.name, "Gateway");
+
+        let tssPubkey = await getPubkey(network.name, ethers);
+        
+        if(!tssPubkey) throw("tss not active yet, cannot get pubkey");
+        if(tssPubkey.length !== 130) throw("invalid pubkey length");
+        console.log(`current active tss pubkey is ${tssPubkey}`);
+
         if(isTronNetwork(network.name)) {
             let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
             let currentPubkey = await c.activeTss().call();
-            if (currentPubkey.toLowerCase() === taskArgs.pubkey.toLowerCase()) {
+            if (currentPubkey.toLowerCase() === tssPubkey.toLowerCase()) {
                 console.log(`pubkey already set to ${currentPubkey}, skipping`);
                 return;
             }
-            console.log(`on-chain pubkey: ${currentPubkey}, config pubkey: ${taskArgs.pubkey}, updating...`);
-            await c.setTssAddress(taskArgs.pubkey).send();
+            console.log(`on-chain pubkey: ${currentPubkey}, config pubkey: ${tssPubkey}, updating...`);
+            await c.setTssAddress(tssPubkey).send();
             console.log(`after pubkey is: `, await c.activeTss().call())
         } else {
             console.log("deployer address:", await deployer.getAddress())
             const GatewayFactory = await ethers.getContractFactory("Gateway");
             const gateway = GatewayFactory.attach(addr) as Gateway;
             let currentPubkey = await gateway.activeTss();
-            if (currentPubkey.toLowerCase() === taskArgs.pubkey.toLowerCase()) {
+            if (currentPubkey.toLowerCase() === tssPubkey.toLowerCase()) {
                 console.log(`pubkey already set to ${currentPubkey}, skipping`);
                 return;
             }
-            console.log(`on-chain pubkey: ${currentPubkey}, config pubkey: ${taskArgs.pubkey}, updating...`);
-            await(await gateway.setTssAddress(taskArgs.pubkey)).wait();
+            console.log(`on-chain pubkey: ${currentPubkey}, config pubkey: ${tssPubkey}, updating...`);
+            await(await gateway.setTssAddress(tssPubkey)).wait();
             console.log(`after pubkey is: `, await gateway.activeTss())
         }
 
@@ -483,3 +489,18 @@ async function getChainInfoByName(currentNetwork: string, chainName: string) {
 
     throw new Error(`Chain ${chainName} not found in config`);
 }
+
+async function getPubkey(chainName: string , ethers: any) {
+    const VaultManagerFactory = await ethers.getContractFactory("VaultManager");
+    if(chainName.indexOf("test") > 0) {
+        let addr = await getDeploymentByKey("Mapo_test", "VaultManager");
+        let provider = new ethers.JsonRpcProvider("https://testnet-rpc.maplabs.io");
+        const v = VaultManagerFactory.attach(addr) as VaultManager;
+        return v.connect(provider).getActiveVault();
+    } else {
+        let addr = await getDeploymentByKey("Mapo", "VaultManager");
+        let provider = new ethers.JsonRpcProvider("https://rpc.maplabs.io");
+        const v = VaultManagerFactory.attach(addr) as VaultManager;
+        return v.connect(provider).getActiveVault();
+    }
+}       

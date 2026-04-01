@@ -10,7 +10,8 @@
     "AffiliateManager": "0xfebca50363d41964da231cab562cbd22bf02d546",
     "ProtocolFee": "0x9a3EBE3EBF2CDeB3aD7b7f44aD9b56996ae23595",
     "ViewController": "0xb79bAe710F69f5D9B53098aB16B57A26a762c7BF",
-    "wToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91"
+    "wToken": "0x2eD27dF9B4c903aB53666CcA59AFB431F7D15e91",
+    "Configuration": "0x64bc32a79d98581d01a4cFe580f6Aebc002d8474"
   },
   "Bsc_test": {
     "Authority": "0x018a0b28125923823fa11638957e3124179b3b11",
@@ -38,7 +39,8 @@
     "AffiliateManager": "0x4De2ADb9cB88c10Bf200F76c18035cbB8906b6bC",
     "ViewController": "0xaf720ad7086627034c4d8CA2b4493079E97f1C3A",
     "ProtocolFee": "0x52373c5350fd45b3A096Ab7A47E2cc9008f04507",
-    "wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
+    "wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23",
+    "Configuration": "0xE45C548c066184894ABF542C7D223D58D443C1c9"
   },
   "Eth_main": {
     "Authority": " ",
@@ -60,6 +62,31 @@
     "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
     "wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
   },
+  "Op_main": {
+    "Authority": "0xddC96b457C69DEFd5Fe2e810301F52b10Ef122bE",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "0x4200000000000000000000000000000000000006"
+  },
+  "Uni_main": {
+    "Authority": "0xa82453b149ce34ca03a34320715a761cf76e4d27",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "0x4200000000000000000000000000000000000006"
+  },
+  "Pol_main": {
+    "Authority": "0x523418E53fF38Fe77445901eA200d4Ab573FA34C",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
+  },
+  "Tron_main": {
+    "Authority": "",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "TNUC9Qb1rRpS5CbWLmNMxXBjyFoydXjWFR"
+  },
+  "Xlayer_main": {
+    "Authority": "0x0E2898696D2106abfc5d8E885F7ff1BfDb542607",
+    "Gateway": "0x42D64eD9381bF456697b0C360e8acE139F176a80",
+    "wToken": "0xe538905cf8410324e03a5a23c1c177a474d59b2b"
+  },
   "Mapo_prod": {
     "TSSManager": "0xf3Fa35B6e3753cFe88Da86c71B2283F75EB64BE9",
     "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
@@ -71,7 +98,8 @@
     "AffiliateManager": "0x4De2ADb9cB88c10Bf200F76c18035cbB8906b6bC",
     "ViewController": "0x8c98bA0a11Cbb0DB3C52e4CD91B0844B39BC1F11",
     "ProtocolFee": "0xc9041777D421b5fcB272f7Cd8C66757246F1f9F1",
-    "wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23"
+    "wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23",
+    "Configuration": ""
   },
   "Eth_prod": {
     "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
@@ -92,5 +120,29 @@
     "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
     "Gateway": "",
     "wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+  },
+
+  "Xlayer_prod": {
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+    "Gateway": "",
+    "wToken": "0xe538905cf8410324e03a5a23c1c177a474d59b2b"
+  },
+
+  "Uni_prod": {
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+    "Gateway": "",
+    "wToken": "0x4200000000000000000000000000000000000006"
+  },
+
+  "Pol_prod": {
+    "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
+    "Gateway": "",
+    "wToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
+  },
+
+  "Tron_prod": {
+    "Authority": "TSCja7kmWZ7Do7VEKTxBYBm9439bZcSBoD",
+    "Gateway": "",
+    "wToken": "TNUC9Qb1rRpS5CbWLmNMxXBjyFoydXjWFR"
   }
 }

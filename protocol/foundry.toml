@@ -53,6 +53,7 @@ Eth_test = "https://1rpc.io/sepolia"
 Bsc = "https://binance-smart-chain-public.nodies.app"
 Bsc_test = "https://bsc-testnet.public.blastapi.io"
 
+Base = "https://base.llamarpc.com"
 Arb = "https://public-arb-mainnet.fastnode.io"
 Op = "https://optimism-public.nodies.app"
 Pol = "https://polygon.rpc.subquery.network/public"

@@ -283,7 +283,7 @@ task("gateway:bridgeOut", "bridge out tokens to another chain")
         console.log(`Receiver: ${toAddress}, bytes: ${to}`);
 
         const refundAddr = taskArgs.refund || senderAddress;
-        const payload = taskArgs.payload || "0x";
+        let payload = taskArgs.payload || "0x";
         const deadline = taskArgs.deadline || Math.floor(Date.now() / 1000) + 3600;
 
         const isNativeToken = token === "0x0000000000000000000000000000000000000000";
@@ -320,6 +320,9 @@ task("gateway:bridgeOut", "bridge out tokens to another chain")
             }
 
             console.log(`Bridging out ${taskArgs.amount} ${tokenInfo.name} to ${taskArgs.tochain}...`);
+            if(payload === "0x" && network.name.indexOf("Mapo") !== -1) { 
+                payload = ethers.AbiCoder.defaultAbiCoder().encode(["bytes", "bytes", "bytes"], ["0x", "0x", "0x"]);
+            }
             const tx = await gateway.bridgeOut(
                 token,
                 amount,

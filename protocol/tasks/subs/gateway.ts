@@ -44,7 +44,7 @@ task("gateway:setWtoken", "set wtoken address")
             addr = await getDeploymentByKey(network.name, "Gateway");
         }
         if(isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
+            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
             let currentWtoken = await tronFromHex(await c.wToken().call(), network.name);
             if (currentWtoken.toLowerCase() === wtoken.toLowerCase()) {
                 console.log(`wtoken already set to ${currentWtoken}, skipping`);
@@ -83,7 +83,7 @@ task("gateway:setTssAddress", "set tss pubkey")
         console.log(`current active tss pubkey is ${tssPubkey}`);
 
         if(isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
+            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
             let currentPubkey = await c.activeTss().call();
             if (currentPubkey.toLowerCase() === tssPubkey.toLowerCase()) {
                 console.log(`pubkey already set to ${currentPubkey}, skipping`);
@@ -122,7 +122,7 @@ task("gateway:setTransferFailedReceiver", "set Transfer Failed Receiver")
         if(!transferFailedReceiver || transferFailedReceiver.length == 0) return;
 
         if(isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
+            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
             let currentReceiver = await tronFromHex(await c.transferFailedReceiver().call(), network.name);
             if (currentReceiver.toLowerCase() === transferFailedReceiver.toLowerCase()) {
                 console.log(`transferFailedReceiver already set to ${currentReceiver}, skipping`);
@@ -162,7 +162,7 @@ task("gateway:updateMinGasCallOnReceive", "update MinGas CallOnReceive")
         if(!minGasCallOnReceive || minGasCallOnReceive === 0) return;
 
         if(isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
+            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
             let currentMinGas = await c.minGasCallOnReceive().call();
             if (currentMinGas === BigInt(minGasCallOnReceive)) {
                 console.log(`minGasCallOnReceive already set to ${currentMinGas}, skipping`);
@@ -204,7 +204,7 @@ task("gateway:updateTokens", "update Tokens")
 
 
         if(isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
+            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
            for (let index = 0; index < tokens.length; index++) {
                 const element = tokens[index];
                 let feature = 0;
@@ -289,10 +289,10 @@ task("gateway:bridgeOut", "bridge out tokens to another chain")
         const isNativeToken = token === "0x0000000000000000000000000000000000000000";
 
         if (isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
+            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
 
             if (!isNativeToken) {
-                const tokenContract = await getTronContract("IERC20", hre.artifacts, network.name, token);
+                const tokenContract = await getTronContract("IERC20", hre.artifacts, network.name, await tronFromHex(token, network.name));
                 console.log("Approving token...");
                 await tokenContract.approve(await tronToHex(addr, network.name), amount).send();
             }
@@ -385,10 +385,10 @@ task("gateway:deposit", "deposit tokens to vault")
         const isNativeToken = token === "0x0000000000000000000000000000000000000000";
 
         if (isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, addr);
+            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
 
             if (!isNativeToken) {
-                const tokenContract = await getTronContract("IERC20", hre.artifacts, network.name, token);
+                const tokenContract = await getTronContract("IERC20", hre.artifacts, network.name, await tronFromHex(token, network.name));
                 console.log("Approving token...");
                 await tokenContract.approve(await tronToHex(addr, network.name), amount).send();
             }

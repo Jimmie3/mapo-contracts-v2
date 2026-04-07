@@ -1,10 +1,12 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-foundry";
+import "dotenv/config";
+import "./tasks/index";
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.24",
+    version: "0.8.25",
     settings: {
       optimizer: {
         enabled: true,
@@ -22,7 +24,17 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       chainId: 31337
-    }
+    },
+    Tron: {
+      url: process.env.TRON_RPC_URL || "https://api.trongrid.io/jsonrpc",
+      chainId: 728126428,
+      accounts: process.env.TRON_PRIVATE_KEY ? [process.env.TRON_PRIVATE_KEY] : [],
+    },
+    Tron_test: {
+      url: "https://api.nileex.io/jsonrpc",
+      chainId: 3448148188,
+      accounts: process.env.TESTNET_PRIVATE_KEY ? [process.env.TESTNET_PRIVATE_KEY] : [],
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,

@@ -138,14 +138,6 @@
                     "bridgeAble": true,
                     "mintAble": false,
                     "burnFrom": false
-                },
-                {
-                    "name": "BTC",
-                    "addr": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-                    "decimals": 8,
-                    "bridgeAble": true,
-                    "mintAble": false,
-                    "burnFrom": false
                 }
             ]
         },
@@ -200,14 +192,6 @@
                     "bridgeAble": false,
                     "mintAble": false,
                     "burnFrom": false
-                },
-                {
-                    "name": "USDC",
-                    "addr": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
-                    "decimals": 18,
-                    "bridgeAble": false,
-                    "mintAble": false,
-                    "burnFrom": false
                 }
             ]
         },
@@ -227,14 +211,6 @@
                     "name": "USDT",
                     "addr": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
                     "decimals": 6,
-                    "bridgeAble": true,
-                    "mintAble": false,
-                    "burnFrom": false
-                },
-                {
-                    "name": "ETH",
-                    "addr": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
-                    "decimals": 18,
                     "bridgeAble": true,
                     "mintAble": false,
                     "burnFrom": false

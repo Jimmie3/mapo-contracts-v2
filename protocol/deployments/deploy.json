@@ -103,7 +103,7 @@
   },
   "Eth_prod": {
     "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-    "Gateway": "0x",
+    "Gateway": "0x00004080D86e1077ce96E67C1B167fF105025307",
     "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
   },
   "Bsc_prod": {
@@ -113,33 +113,29 @@
   },
   "Base_prod": {
     "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-    "Gateway": "",
+    "Gateway": "0x00004080D86e1077ce96E67C1B167fF105025307",
     "wToken": "0x4200000000000000000000000000000000000006"
   },
   "Arb_prod": {
     "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-    "Gateway": "",
+    "Gateway": "0x00004080D86e1077ce96E67C1B167fF105025307",
     "wToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
   },
-
   "Xlayer_prod": {
     "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-    "Gateway": "",
+    "Gateway": "0x00004080D86e1077ce96E67C1B167fF105025307",
     "wToken": "0xe538905cf8410324e03a5a23c1c177a474d59b2b"
   },
-
   "Uni_prod": {
     "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-    "Gateway": "",
+    "Gateway": "0x00004080D86e1077ce96E67C1B167fF105025307",
     "wToken": "0x4200000000000000000000000000000000000006"
   },
-
   "Pol_prod": {
     "Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA",
-    "Gateway": "",
+    "Gateway": "0x00004080D86e1077ce96E67C1B167fF105025307",
     "wToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
   },
-
   "Tron_prod": {
     "Authority": "TSCja7kmWZ7Do7VEKTxBYBm9439bZcSBoD",
     "Gateway": "",

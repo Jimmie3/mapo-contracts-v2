@@ -189,7 +189,7 @@ export async function getBalanceFeeRate(network:string) {
    return tokenRegister.balanceFeeRate;
 }
 
-export async function getTokenRegsterByTokenName(network:string, tokenName:string) {
+export async function getTokenRegisterByTokenName(network:string, tokenName:string) {
 
    let filePath = getFilePath(network);
 

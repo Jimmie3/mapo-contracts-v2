@@ -35,10 +35,16 @@ For `maintainer/` directory:
 - `npm run typecheck` - Type check TypeScript files without compilation
 - `npm run compile` - Compile contracts and generate TypeChain types
 
-### Deployment Commands
-- `npm run deploy` - Deploy using Forge (requires RPC_URL and PRIVATE_KEY env vars)
-- `npm run deploy:hardhat` - Deploy using Hardhat scripts
-- `forge script script/Deploy.s.sol --rpc-url <url> --private-key <key> --broadcast` - Direct Forge deployment
+### Deployment Commands (via Makefile in protocol/)
+- `make deploy CHAIN=Bsc` - Deploy contracts (auto-detects relay vs gateway)
+- `make upgrade CHAIN=Bsc CONTRACT=Gateway` - Upgrade specific contract
+- `make deploy-dry CHAIN=Bsc` - Dry-run deployment
+- `make gen-verify CONTRACT=Gateway` - Generate verification files
+
+### Configuration Commands (Hardhat tasks in protocol/)
+- `npx hardhat setup:init --network Mapo` - Full initialization (dry-run by default)
+- `npx hardhat setup:addChain --chain Eth --network Mapo` - Add a new chain (dry-run by default)
+- All batch tasks support `--dryrun false` to execute changes
 
 ### Code Quality
 - `forge fmt` or `npm run format` - Format Solidity code

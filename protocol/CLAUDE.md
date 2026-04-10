@@ -102,10 +102,41 @@ forge test           # Direct Foundry test
 forge test --gas-report  # With gas reporting
 ```
 
-### Deployment
+### Deployment & Upgrade (Forge via Makefile)
 ```bash
-forge script script/Deploy.s.sol --rpc-url <url> --private-key <key> --broadcast
+make deploy CHAIN=Mapo                       # Deploy relay chain contracts
+make deploy CHAIN=Bsc                        # Deploy gateway on external chain
+make upgrade CHAIN=Bsc CONTRACT=Gateway      # Upgrade specific contract
+make deploy-dry CHAIN=Bsc                    # Dry-run (simulate without broadcast)
 ```
+
+### Contract Verification
+```bash
+make gen-verify CONTRACT=Gateway             # Generate standard JSON input + flatten
+make gen-verify-all                          # Generate for all contracts
+# Then upload verify-output/*_standard_input.json to block explorer
+```
+
+### Initialization & Configuration (Hardhat tasks)
+```bash
+# Full initialization after deployment (run on Mapo)
+npx hardhat setup:init --network Mapo                  # dry-run (default)
+npx hardhat setup:init --dryrun false --network Mapo   # execute
+
+# Add a single new chain
+npx hardhat setup:addChain --chain Eth --network Mapo                 # dry-run
+npx hardhat setup:addChain --chain Eth --dryrun false --network Mapo  # execute
+
+# External chain config (run on target chain)
+npx hardhat gateway:updateTokens --dryrun false --network Bsc
+npx hardhat gateway:setWtoken --network Bsc
+npx hardhat gateway:setTssAddress --pubkey <key> --network Bsc
+```
+
+### Hardhat Task Conventions
+- All batch tasks default to `--dryrun true` (show diff only)
+- Pass `--dryrun false` to execute changes
+- Output labels: `[skip]` = already set, `[diff]` = needs update, `[new]` = not yet configured
 
 ## Important Notes
 

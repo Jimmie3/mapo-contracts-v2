@@ -34,6 +34,18 @@ export async function getDeploymentByKey(network:string, key:string) {
     return deployAddress;
 }
 
+// Check if a contract is deployed (has a valid non-empty address)
+export async function hasDeployment(network:string, key:string): Promise<boolean> {
+    try {
+        network = getNetworkName(network)
+        let deployment = await readDeploymentFromFile(network);
+        let addr = deployment[network]?.[key];
+        return !!addr && addr.length > 2 && addr !== "0x";
+    } catch {
+        return false;
+    }
+}
+
 async function readDeploymentFromFile(network: string): Promise<Deployment> {
     let deployments_path = "../../deployments/";
     let deployFile = "deploy.json";
@@ -211,7 +223,7 @@ export async function getTokenRegisterByTokenName(network:string, tokenName:stri
 }
 
 
-export async function getAllTokenRegster(network:string) {
+export async function getAllTokenRegister(network:string) {
 
    let filePath = getFilePath(network); 
    let p = path.join(__dirname, filePath + "tokenRegister.json");

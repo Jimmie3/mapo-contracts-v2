@@ -4,14 +4,16 @@ import {
     getDeploymentByKey,
     getAllChainTokens,
     getChainTokenByNetwork,
-    getTokenRegsterByTokenName,
-    getAllTokenRegster
+    getTokenRegisterByTokenName,
+    getAllTokenRegister
 } from "../utils/utils"
 import { addressToHex } from "../utils/addressUtil"
 
-task("registry:registerAllChain", "register Chain info")
+task("registry:registerAllChains", "register all chain info")
+    .addOptionalParam("dryrun", "dry run mode, only show diff (set false to execute)", "true")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
+        const dryRun = taskArgs.dryrun === "true";
         const [deployer] = await ethers.getSigners();
         console.log("deployer address:", await deployer.getAddress())
         const RegistryFactory = await ethers.getContractFactory("Registry");
@@ -23,12 +25,12 @@ task("registry:registerAllChain", "register Chain info")
         let keys = Object.keys(chainTokens);
         for (let index = 0; index < keys.length; index++) {
             const name = keys[index];
-            await registerChain(name, registry, chainTokens[name]);
+            await registerChain(name, registry, chainTokens[name], dryRun);
         }
-        
+
 });
 
-task("registry:registerChainByNetwork", "register Chain info By Network name")
+task("registry:registerChain", "register chain info by network name")
     .addParam("name", "chain name")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
@@ -56,7 +58,7 @@ task("registry:deregisterChain", "deregisterChain")
         await(await registry.deregisterChain(taskArgs.chain)).wait();
 });
 
-task("registry:registerToken", "register Chain info by token name")
+task("registry:registerToken", "register token by token name")
     .addParam("name", "token name")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
@@ -65,7 +67,7 @@ task("registry:registerToken", "register Chain info by token name")
         const RegistryFactory = await ethers.getContractFactory("Registry");
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
-        let token = await getTokenRegsterByTokenName(network.name, taskArgs.name);
+        let token = await getTokenRegisterByTokenName(network.name, taskArgs.name);
         if(!token || token === null) throw("token not set");
         // Check if token is already registered with same address
         let existingToken = await registry.getTokenAddressById(token.id);
@@ -80,35 +82,39 @@ task("registry:registerToken", "register Chain info by token name")
         await(await registry.registerToken(token.id, token.addr)).wait();
 });
 
-task("registry:registerAllToken", "register Chain info")
+task("registry:registerAllTokens", "register all tokens")
+    .addOptionalParam("dryrun", "dry run mode, only show diff (set false to execute)", "true")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
+        const dryRun = taskArgs.dryrun === "true";
         const [deployer] = await ethers.getSigners();
         console.log("deployer address:", await deployer.getAddress())
         const RegistryFactory = await ethers.getContractFactory("Registry");
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
-        let tokens = await getAllTokenRegster(network.name);
+        let tokens = await getAllTokenRegister(network.name);
         if(!tokens || tokens.length === 0) throw("token not set");
         for (let index = 0; index < tokens.length; index++) {
             const token = tokens[index];
-            // Check if token is already registered with same address
             let existingToken = await registry.getTokenAddressById(token.id);
             if (existingToken.toLowerCase() === token.addr.toLowerCase()) {
-                console.log(`token ${token.name} id(${token.id}) already registered with same address, skipping`);
+                console.log(`[skip] token ${token.name} id(${token.id}) already registered`);
                 continue;
             }
             if (existingToken !== "0x0000000000000000000000000000000000000000") {
-                console.log(`token ${token.name} id(${token.id}) on-chain address: ${existingToken}, config address: ${token.addr}, updating...`);
+                console.log(`[diff] token ${token.name} id(${token.id}) on-chain: ${existingToken} -> config: ${token.addr}`);
+            } else {
+                console.log(`[new]  token ${token.name} id(${token.id}), addr(${token.addr})`);
             }
-            console.log(`registerToken ${token.name} id(${token.id}), addr(${token.addr})`);
-            await(await registry.registerToken(token.id, token.addr)).wait();
+            if (!dryRun) {
+                await(await registry.registerToken(token.id, token.addr)).wait();
+            }
         }
 });
 
 
 
-task("registry:setTokenTicker", "set TokenNick name")
+task("registry:setTokenTicker", "set token ticker")
     .addParam("chain", "chain id")
     .addParam("addr", "token address (supports EVM, Tron, Solana formats)")
     .addParam("name", "token nickname")
@@ -120,14 +126,16 @@ task("registry:setTokenTicker", "set TokenNick name")
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
         const tokenAddrBytes = addressToHex(taskArgs.addr);
-        console.log(`set Token Nickname  chain(${taskArgs.chain}), addr(${taskArgs.addr} -> ${tokenAddrBytes}), name(${taskArgs.name})`);
+        console.log(`set Token Ticker chain(${taskArgs.chain}), addr(${taskArgs.addr} -> ${tokenAddrBytes}), name(${taskArgs.name})`);
         await(await registry.setTokenTicker(taskArgs.chain, tokenAddrBytes, taskArgs.name)).wait();
 });
 
-task("registry:setTokenTickerByChain", "set TokenNick name")
+task("registry:setTokenTickerByChain", "set token tickers by chain name")
     .addParam("chain", "chain name")
+    .addOptionalParam("dryrun", "dry run mode, only show diff (set false to execute)", "true")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
+        const dryRun = taskArgs.dryrun === "true";
         const [deployer] = await ethers.getSigners();
         console.log("deployer address:", await deployer.getAddress())
         const RegistryFactory = await ethers.getContractFactory("Registry");
@@ -145,18 +153,24 @@ task("registry:setTokenTickerByChain", "set TokenNick name")
             for (let j = 0; j < tokens.length; j++) {
                 const token = tokens[j];
                 const tokenAddrBytes = addressToHex(token.addr);
-                let preNickname = await registry.getTokenNickname(element.chainId, tokenAddrBytes);
-                if(preNickname !== token.name) {
-                   console.log(`update Token Nickname  chain(${element.chainId}), addr(${token.addr} -> ${tokenAddrBytes}), name(${token.name})`);
-                   await(await registry.setTokenTicker(element.chainId, tokenAddrBytes, token.name)).wait();
+                let preTicker = await registry.getTokenNickname(element.chainId, tokenAddrBytes);
+                if(preTicker === token.name) {
+                    console.log(`[skip] ${token.name} on chain(${element.chainId}) ticker already set`);
+                    continue;
+                }
+                console.log(`[diff] ${token.name} on chain(${element.chainId}): "${preTicker}" -> "${token.name}"`);
+                if (!dryRun) {
+                    await(await registry.setTokenTicker(element.chainId, tokenAddrBytes, token.name)).wait();
                 }
             }
         }
 });
 
-task("registry:setAllTokenNickname", "set TokenNick name")
+task("registry:setAllTokenTicker", "set all token tickers")
+    .addOptionalParam("dryrun", "dry run mode, only show diff (set false to execute)", "true")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
+        const dryRun = taskArgs.dryrun === "true";
         const [deployer] = await ethers.getSigners();
         console.log("deployer address:", await deployer.getAddress())
         const RegistryFactory = await ethers.getContractFactory("Registry");
@@ -173,10 +187,14 @@ task("registry:setAllTokenNickname", "set TokenNick name")
             for (let j = 0; j < tokens.length; j++) {
                 const token = tokens[j];
                 const tokenAddrBytes = addressToHex(token.addr);
-                let preNickname = await registry.getTokenNickname(element.chainId, tokenAddrBytes);
-                if(preNickname !== token.name) {
-                   console.log(`update Token Nickname  chain(${element.chainId}), addr(${token.addr} -> ${tokenAddrBytes}), name(${token.name})`);
-                   await(await registry.setTokenTicker(element.chainId, tokenAddrBytes, token.name)).wait();
+                let preTicker = await registry.getTokenNickname(element.chainId, tokenAddrBytes);
+                if(preTicker === token.name) {
+                    console.log(`[skip] ${token.name} on chain(${element.chainId}) ticker already set`);
+                    continue;
+                }
+                console.log(`[diff] ${token.name} on chain(${element.chainId}): "${preTicker}" -> "${token.name}"`);
+                if (!dryRun) {
+                    await(await registry.setTokenTicker(element.chainId, tokenAddrBytes, token.name)).wait();
                 }
             }
         }
@@ -198,30 +216,35 @@ task("registry:unmapToken", "unmap Token")
         await(await registry.unmapToken(taskArgs.chain, tokenAddrBytes)).wait();
 });
 
-task("registry:mapAllToken", "map all Token")
+task("registry:mapAllTokens", "map all tokens")
+    .addOptionalParam("dryrun", "dry run mode, only show diff (set false to execute)", "true")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
-        let tokens = await getAllTokenRegster(network.name);
+        const dryRun = taskArgs.dryrun === "true";
+        let tokens = await getAllTokenRegister(network.name);
         if(!tokens || tokens.length === 0) throw("token not set");
         for (let index = 0; index < tokens.length; index++) {
             const token = tokens[index];
-            await hre.run("registry:mapTokenByTokenName", {
-                token: token.name
+            await hre.run("registry:mapTokenByName", {
+                token: token.name,
+                dryrun: dryRun ? "true" : "false"
             })
         }
 });
 
-task("registry:mapTokenByTokenName", "map Token by token name")
+task("registry:mapTokenByName", "map token by token name")
     .addParam("token", "token name")
+    .addOptionalParam("dryrun", "dry run mode, only show diff (set false to execute)", "true")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
+        const dryRun = taskArgs.dryrun === "true";
         const [deployer] = await ethers.getSigners();
         console.log("deployer address:", await deployer.getAddress())
         const RegistryFactory = await ethers.getContractFactory("Registry");
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
 
-        let relayToken = await getTokenRegsterByTokenName(network.name, taskArgs.token);
+        let relayToken = await getTokenRegisterByTokenName(network.name, taskArgs.token);
         if(!relayToken) throw("token not set");
 
         let chainTokens = await getAllChainTokens(network.name);
@@ -238,20 +261,21 @@ task("registry:mapTokenByTokenName", "map Token by token name")
                 const token = tokens[j];
                 if(token.name === taskArgs.token) {
                     const tokenAddrBytes = addressToHex(token.addr);
-                    // Check if token mapping already exists and matches
                     let existingMapping = await registry.getToChainToken(relayToken.addr, element.chainId);
                     let existingDecimals = await registry.getTokenDecimals(element.chainId, tokenAddrBytes);
                     let existingMappingHex = existingMapping.toLowerCase();
                     if (existingMappingHex === tokenAddrBytes.toLowerCase() && Number(existingDecimals) === token.decimals) {
-                        console.log(`token ${token.name} on chain(${element.chainId}) already mapped with same values, skipping`);
+                        console.log(`[skip] ${token.name} on chain(${element.chainId}) already mapped`);
                         continue;
                     }
                     if (existingMapping && existingMapping !== "0x") {
-                        console.log(`token ${token.name} on chain(${element.chainId}) on-chain mapping: ${existingMapping}, decimals: ${existingDecimals}`);
-                        console.log(`config mapping: ${token.addr} -> ${tokenAddrBytes}, decimals: ${token.decimals}, updating...`);
+                        console.log(`[diff] ${token.name} on chain(${element.chainId}): ${existingMapping}(${existingDecimals}) -> ${tokenAddrBytes}(${token.decimals})`);
+                    } else {
+                        console.log(`[new]  ${token.name} on chain(${element.chainId}): ${token.addr} -> ${tokenAddrBytes}, decimals(${token.decimals})`);
                     }
-                    console.log(`map token ${token.name}: ${relayToken.addr}, chain(${element.chainId}), addr(${token.addr} -> ${tokenAddrBytes}), decimals(${token.decimals})`);
-                    await(await registry.mapToken(relayToken.addr, element.chainId, tokenAddrBytes, token.decimals)).wait();
+                    if (!dryRun) {
+                        await(await registry.mapToken(relayToken.addr, element.chainId, tokenAddrBytes, token.decimals)).wait();
+                    }
                 }
             }
         }
@@ -271,7 +295,6 @@ task("registry:mapToken", "map Token")
         let addr = await getDeploymentByKey(network.name, "Registry");
         const registry = RegistryFactory.attach(addr) as Registry;
         const tokenAddrBytes = addressToHex(taskArgs.addr);
-        // Check if token mapping already exists and matches
         let existingMapping = await registry.getToChainToken(taskArgs.token, taskArgs.chain);
         let existingDecimals = await registry.getTokenDecimals(taskArgs.chain, tokenAddrBytes);
         if (existingMapping.toLowerCase() === tokenAddrBytes.toLowerCase() && Number(existingDecimals) === Number(taskArgs.decimals)) {
@@ -293,29 +316,30 @@ async function registerChain(network: string, registry: Registry, chainToken: {
         chainType: string,
         gasToken: string,
         baseFeeToken:string,
-        tokens: any[]}) {
+        tokens: any[]}, dryRun: boolean = false) {
 
         let chainType = (chainToken.chainType === "contract") ? 0 : 1;
 
-        // Check if chain is already registered
         let isRegistered = await registry.isRegistered(chainToken.chainId);
         if (isRegistered) {
-            console.log(`chain ${chainToken.chainId} (${network}) already registered, skipping`);
+            console.log(`[skip] chain ${chainToken.chainId} (${network}) already registered`);
             return;
         }
 
         let router = await getRouter(network);
         console.log(
-            `registerChain ${network} chain(${chainToken.chainId}), chainType(${chainType}), router(${router}), gasToken(${chainToken.gasToken}), baseFeeToken(${chainToken.baseFeeToken})`
+            `[new]  registerChain ${network} chain(${chainToken.chainId}), chainType(${chainType}), router(${router}), gasToken(${chainToken.gasToken}), baseFeeToken(${chainToken.baseFeeToken})`
         );
-        await(await registry.registerChain(
-            chainToken.chainId,
-            chainType,
-            router,
-            chainToken.gasToken,
-            chainToken.baseFeeToken,
-            network
-        )).wait()
+        if (!dryRun) {
+            await(await registry.registerChain(
+                chainToken.chainId,
+                chainType,
+                router,
+                chainToken.gasToken,
+                chainToken.baseFeeToken,
+                network
+            )).wait()
+        }
 }
 
 async function getRouter(network:string) {

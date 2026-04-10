@@ -190,8 +190,10 @@ task("gateway:updateMinGasCallOnReceive", "update MinGas CallOnReceive")
 
 
 task("gateway:updateTokens", "update Tokens")
+    .addOptionalParam("dryrun", "dry run mode, only show diff (set false to execute)", "true")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
+        const dryRun = taskArgs.dryrun === "true";
 
         let addr;
         if(isRelayChain(network.name)) {
@@ -213,13 +215,15 @@ task("gateway:updateTokens", "update Tokens")
                 if(element.burnFrom) feature = feature | 4;
                 let pre = await c.tokenFeatureList(addressToHex(element.addr)).call();
                 if(pre ===  BigInt(feature)) {
-                    console.log(`${element.name} tokenFeature already set to ${pre}, skipping`);
+                    console.log(`[skip] ${element.name} tokenFeature already set to ${pre}`);
                     continue;
                 }
-                console.log(`${element.name} on-chain tokenFeature: ${pre}, config: ${feature}, updating...`);
-                await c.updateTokens([addressToHex(element.addr)], feature).send();
-                console.log(`${element.name} after tokenFeature`, await c.tokenFeatureList(addressToHex(element.addr)).call());
-            } 
+                console.log(`[diff] ${element.name} tokenFeature: ${pre} -> ${feature}`);
+                if (!dryRun) {
+                    await c.updateTokens([addressToHex(element.addr)], feature).send();
+                    console.log(`${element.name} after tokenFeature`, await c.tokenFeatureList(addressToHex(element.addr)).call());
+                }
+            }
         } else {
             const [deployer] = await ethers.getSigners();
             console.log("deployer address:", await deployer.getAddress())
@@ -233,13 +237,15 @@ task("gateway:updateTokens", "update Tokens")
                 if(element.burnFrom) feature = feature | 4;
                 let pre = await gateway.tokenFeatureList(element.addr);
                 if(pre ===  BigInt(feature)) {
-                    console.log(`${element.name} tokenFeature already set to ${pre}, skipping`);
+                    console.log(`[skip] ${element.name} tokenFeature already set to ${pre}`);
                     continue;
                 }
-                console.log(`${element.name} on-chain tokenFeature: ${pre}, config: ${feature}, updating...`);
-                await(await gateway.updateTokens([element.addr], feature)).wait();
-                console.log(`${element.name} after tokenFeature`, await gateway.tokenFeatureList(element.addr));
-            } 
+                console.log(`[diff] ${element.name} tokenFeature: ${pre} -> ${feature}`);
+                if (!dryRun) {
+                    await(await gateway.updateTokens([element.addr], feature)).wait();
+                    console.log(`${element.name} after tokenFeature`, await gateway.tokenFeatureList(element.addr));
+                }
+            }
         }
 });
 

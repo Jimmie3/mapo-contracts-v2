@@ -1,6 +1,6 @@
 import { task } from "hardhat/config";
 import { Relay } from "../../typechain-types/contracts"
-import { getDeploymentByKey, getAllChainTokens } from "../utils/utils"
+import { getDeploymentByKey, getAllChainTokens, hasDeployment } from "../utils/utils"
 
 task("relay:setRegistry", "set registry address")
     .setAction(async (taskArgs, hre) => {
@@ -41,9 +41,11 @@ task("relay:setVaultManager", "set Vault Manager address")
         console.log("after vaultManager is", await relay.vaultManager());
 });
 
-task("relay:addAllChain", "add Chain")
+task("relay:addAllChains", "add all chains")
+    .addOptionalParam("dryrun", "dry run mode, only show diff (set false to execute)", "true")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
+        const dryRun = taskArgs.dryrun === "true";
         const [deployer] = await ethers.getSigners();
         console.log("deployer address:", await deployer.getAddress())
         const RelayFactory = await ethers.getContractFactory("Relay");
@@ -54,20 +56,31 @@ task("relay:addAllChain", "add Chain")
         let keys = Object.keys(chainTokens);
         for (let index = 0; index < keys.length; index++) {
             const name = keys[index];
-            if(chainTokens[name].lastScanBlock && chainTokens[name].lastScanBlock > 0) {
-                let currentBlock = await relay.getChainLastScanBlock(chainTokens[name].chainId);
-                if (currentBlock > 0n) {
-                    console.log(`chain ${chainTokens[name].chainId} already added with lastScanBlock(${currentBlock}), skipping`);
-                    // continue;
-                }
-                console.log(`relay add chain chainId(${chainTokens[name].chainId}), lastScanBlock(${chainTokens[name].lastScanBlock})`)
+            if(!chainTokens[name].lastScanBlock || chainTokens[name].lastScanBlock <= 0) {
+                console.log(`[skip] ${name} chainId(${chainTokens[name].chainId}) lastScanBlock is 0`);
+                continue;
+            }
+            // Skip chains without Gateway/Relay deployment
+            let contractKey = (name === network.name || name === "Mapo" || name === "Mapo_test") ? "Relay" : "Gateway";
+            let deployed = await hasDeployment(name, contractKey);
+            if (!deployed) {
+                console.log(`[skip] ${name} chainId(${chainTokens[name].chainId}) ${contractKey} not deployed`);
+                continue;
+            }
+            let currentBlock = await relay.getChainLastScanBlock(chainTokens[name].chainId);
+            if (currentBlock > 0n) {
+                console.log(`[skip] ${name} chainId(${chainTokens[name].chainId}) already added, lastScanBlock(${currentBlock})`);
+                continue;
+            }
+            console.log(`[new]  ${name} chainId(${chainTokens[name].chainId}), lastScanBlock(${chainTokens[name].lastScanBlock})`);
+            if (!dryRun) {
                 await(await relay.addChain(chainTokens[name].chainId, chainTokens[name].lastScanBlock)).wait();
             }
         }
 });
 
-task("relay:addChain", "add Chain")
-    .addParam("chain")
+task("relay:addChain", "add chain")
+    .addParam("chain", "chain id")
     .addParam("block", "last block")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
@@ -86,8 +99,8 @@ task("relay:addChain", "add Chain")
 
 });
 
-task("relay:removeChain", "remove Chain")
-    .addParam("chain")
+task("relay:removeChain", "remove chain")
+    .addParam("chain", "chain id")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
         const [deployer] = await ethers.getSigners();
@@ -97,8 +110,3 @@ task("relay:removeChain", "remove Chain")
         const relay = RelayFactory.attach(addr) as Relay;
         await(await relay.removeChain(taskArgs.chain)).wait();
 });
-
-
-
-
-

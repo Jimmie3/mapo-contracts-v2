@@ -9,6 +9,7 @@ import "./subs/swapManager";
 import "./subs/fusionQuoter";
 import "./subs/fusionReceiver";
 import "./subs/configuration";
+import "./subs/setup";
 
 
 import { task } from "hardhat/config";
@@ -46,25 +47,63 @@ task("upgrade", "upgrade contract")
       await verify(hre, await impl.getAddress(), [], code);
   })
 
-// all before deploy vaultToken and Authority and SwapManager config in deploy.json
-// steps  first Configuration protocol/configs file
-// 1. deploy contract (a.deploy maintainer contract b.deploy protocol contract)  forge script
-// 2. set up contract (a.set maintainer contract b.set protocol contract) forge script
-// 3. gateway and relay -> gateway:updateTokens
-// 4. gateway and relay -> gateway:gateway:setTransferFailedReceiver
-// 5. vaultManager -> vaultManager:updateVaultFeeRate
-// 6. vaultManager -> vaultManager:updateBalanceFeeRate
-// 7. vaultManager -> vaultManager:registerToken
-// 8. registry -> registry:registerAllChain
-// 9. registry -> registry:registerAllToken
-// 10. registry -> registry:mapAllToken
-// 11. registry -> registry:setAllTokenNickname
-// 12. relay -> relay:addAllChain
-// 13. vaultManager -> vaultManager:updateAllTokenWeights
-// 14. protocolFee ->  protocolFee:updateProtocolFee
-// 15  vaultManager -> vaultManager:setAllMinAmount
-// 16  gateway -> gateway:updateMinGasCallOnReceive
-// 17  configuration -> configuration:configuration:deploy
-// 18  configuration -> configuration:updateGasFeeGapFromConfig
-// 19  configuration -> configuration:confirmCountFromConfig
-// 20  configuration -> configuration:updateConfigrationFromConfig
+// ============================================================
+// Deployment & Initialization Guide
+// ============================================================
+//
+// Prerequisites:
+//   - Configure protocol/configs/ (chainTokens, tokenRegister, etc.)
+//   - Set deploy.json with Authority, wToken, SwapManager, AffiliateManager addresses
+//   - Set .env with PRIVATE_KEY, GATEWAY_SALT, ETHERSCAN_API_KEY
+//
+// === Step 1: Deploy (Forge) ===
+//   make deploy CHAIN=Mapo                  # Relay chain (deploys Relay + VaultManager + Registry + ...)
+//   make deploy CHAIN=Bsc                   # External chain (deploys Gateway)
+//
+// === Step 2: Upgrade (Forge) ===
+//   make upgrade CHAIN=Bsc CONTRACT=Gateway
+//   make upgrade CHAIN=Mapo CONTRACT=Relay
+//   npx hardhat upgrade --contract Gateway --network Bsc   # alternative via hardhat
+//
+// === Step 3: Full Initialization (Hardhat - run on Mapo) ===
+//   npx hardhat setup:init --network Mapo                  # dry-run (default)
+//   npx hardhat setup:init --dryrun false --network Mapo   # execute
+//
+//   This runs steps 3-16 below in order:
+//    3. gateway:updateTokens
+//    4. gateway:setTransferFailedReceiver
+//    5. gateway:updateMinGasCallOnReceive
+//    6. vaultManager:updateVaultFeeRate
+//    7. vaultManager:updateBalanceFeeRate
+//    8. vaultManager:registerToken
+//    9. registry:registerAllChains
+//   10. registry:registerAllTokens
+//   11. registry:mapAllTokens
+//   12. registry:setAllTokenTicker
+//   13. relay:addAllChains
+//   14. vaultManager:updateAllTokenWeights
+//   15. vaultManager:setAllMinAmount
+//
+// === Step 4: Add a New Chain (Hardhat - run on Mapo) ===
+//   npx hardhat setup:addChain --chain Eth --network Mapo                 # dry-run
+//   npx hardhat setup:addChain --chain Eth --dryrun false --network Mapo  # execute
+//
+//   This runs: registerChain -> mapTokens -> setTokenTickers -> relay:addChain
+//
+// === External Chain Config (Hardhat - run on target chain) ===
+//   npx hardhat gateway:updateTokens --dryrun false --network Bsc
+//   npx hardhat gateway:setWtoken --network Bsc
+//   npx hardhat gateway:setTssAddress --pubkey <key> --network Bsc
+//   npx hardhat gateway:setTransferFailedReceiver --network Bsc
+//   npx hardhat gateway:updateMinGasCallOnReceive --network Bsc
+//
+// === Verification (Forge) ===
+//   make gen-verify CONTRACT=Gateway        # generate standard json input
+//   make gen-verify-all                     # generate for all contracts
+//
+// === Other Config ===
+//   npx hardhat protocolFee:updateProtocolFee --network Mapo
+//   npx hardhat configuration:deploy --network Mapo
+//   npx hardhat configuration:updateGasFeeGapFromConfig --network Mapo
+//   npx hardhat configuration:confirmCountFromConfig --network Mapo
+//   npx hardhat configuration:updateConfigrationFromConfig --network Mapo

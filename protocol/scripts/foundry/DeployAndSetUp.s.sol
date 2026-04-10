@@ -230,6 +230,10 @@ contract DeployAndSetUp is BaseScript {
         vc.setRegistry(registry_addr);
    }
 
+   function upgradeContract(string memory c) public broadcast {
+        upgrade(c);
+   }
+
    function upgrade(string memory c) internal {
      string memory networkName = getNetworkName();
      if(keccak256(bytes(c)) == keccak256(bytes("Relay"))) {
@@ -267,8 +271,8 @@ contract DeployAndSetUp is BaseScript {
           ViewController v = ViewController(viewController_addr);
           ViewController impl = new ViewController();
           v.upgradeToAndCall(address(impl), bytes(""));
-     } {
-          revert("unknow contract");
+     } else {
+          revert("unknown contract");
      }
    }
 

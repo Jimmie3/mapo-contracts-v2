@@ -26,9 +26,9 @@ fs_permissions = [{ access = "read-write", path = "./" }]
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
 [etherscan]
-# MAPO chains (Blockscout) - must use command line: --verifier blockscout --verifier-url <url>
-# forge script ... --verify --verifier blockscout --verifier-url https://explorer-api.chainservice.io/api
-# Mapo = { url = "https://explorer-api.chainservice.io/api", key = "", chain = 22776 }
+# MAPO chains (Blockscout)
+Mapo = { url = "https://explorer-api.chainservice.io/api", key = "", chain = 22776 }
+Makalu = { url = "https://testnet-explorer-api.chainservice.io/api", key = "", chain = 212 }
 
 # Etherscan-compatible chains
 # Deploy with verify: forge script ... --verify

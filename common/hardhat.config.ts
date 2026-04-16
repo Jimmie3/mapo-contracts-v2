@@ -114,6 +114,37 @@ const config: HardhatUserConfig = {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "USD"
   },
+  etherscan: {
+    apiKey: {
+      Mapo: " ",
+      Makalu: " ",
+      Eth: process.env.ETHERSCAN_API_KEY || "",
+      Bsc: process.env.ETHERSCAN_API_KEY || "",
+      Base: process.env.ETHERSCAN_API_KEY || "",
+      Arb: process.env.ETHERSCAN_API_KEY || "",
+      Op: process.env.ETHERSCAN_API_KEY || "",
+      Uni: process.env.ETHERSCAN_API_KEY || "",
+      Pol: process.env.ETHERSCAN_API_KEY || "",
+    },
+    customChains: [
+      {
+        network: "Mapo",
+        chainId: 22776,
+        urls: {
+          apiURL: "https://explorer-api.chainservice.io/api",
+          browserURL: "https://explorer.mapprotocol.io"
+        },
+      },
+      {
+        network: "Makalu",
+        chainId: 212,
+        urls: {
+          apiURL: "https://testnet-explorer-api.chainservice.io/api",
+          browserURL: "https://testnet-explorer.mapprotocol.io"
+        },
+      },
+    ]
+  },
   typechain: {
     outDir: "typechain-types",
     target: "ethers-v6",

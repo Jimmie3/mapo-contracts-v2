@@ -1,3 +1,7 @@
+/**
+ * Deploy record — read/write deployed contract addresses from deploy.json
+ * Each network environment (e.g. Bsc_prod, Mapo_main) has its own key in the JSON.
+ */
 let fs = require("fs");
 let path = require("path");
 

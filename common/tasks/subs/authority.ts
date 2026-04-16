@@ -1,10 +1,11 @@
 import { task, types } from "hardhat/config";
-import { getDeploymentByKey as _getDeploymentByKey, saveDeployment as _saveDeployment } from "../../utils/deployment";
+import { getDeploymentByKey as _getDeploymentByKey, saveDeployment as _saveDeployment } from "../../utils/deployRecord";
 
 function getSuffix() { return process.env.NETWORK_SUFFIX || "prod"; }
 const getDeploymentByKey = (network: string, key: string) => _getDeploymentByKey(network, key, { suffix: getSuffix() });
 const saveDeployment = (network: string, key: string, addr: string) => _saveDeployment(network, key, addr, { suffix: getSuffix() });
 import { tronDeploy, getTronContract, createTronWeb, tronToHex, tronFromHex, isTronNetwork, TronConfig } from "../../utils/tronHelper";
+import { evmDeploy } from "../../utils/evmHelper";
 
 function getRole(role: string): number {
     if (role === "root") return 0;
@@ -40,27 +41,24 @@ async function getAuth(hre: any, contractAddress: string) {
 
 task("auth:deploy", "deploy AuthorityManager")
     .addOptionalParam("admin", "default admin address", "", types.string)
+    .addOptionalParam("salt", "salt for factory deployment (enables CREATE2)", "", types.string)
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
         const [deployer] = await ethers.getSigners();
         console.log("deployer address:", deployer.address);
 
-        let admin = taskArgs.admin;
-        if (admin === "") {
-            admin = deployer.address;
-        }
+        let admin = taskArgs.admin || deployer.address;
+        const useSalt = taskArgs.salt !== "";
 
         if (isTronNetwork(network.name)) {
             let tronWeb = createTronWeb(getTronConfig());
             let adminHex = tronToHex(admin);
-            let addr = await tronDeploy(tronWeb, hre.artifacts, "AuthorityManager", [adminHex]);
-            let tronAddr = tronFromHex(addr);
-            await saveDeployment(network.name, "Authority", tronAddr);
-            console.log(`AuthorityManager deployed: ${tronAddr}`);
+            let { hex, base58 } = await tronDeploy(tronWeb, hre.artifacts, "AuthorityManager", [adminHex], taskArgs.salt);
+            await saveDeployment(network.name, "Authority", base58);
+            console.log(`AuthorityManager deployed: ${base58} (${hex})`);
         } else {
-            const AuthorityFactory = await ethers.getContractFactory("AuthorityManager");
-            let authority = await (await AuthorityFactory.deploy(admin)).waitForDeployment();
-            let addr = await authority.getAddress();
+            let addr = await evmDeploy(ethers, hre.artifacts, "AuthorityManager", [admin], taskArgs.salt);
+
             await saveDeployment(network.name, "Authority", addr);
             console.log(`AuthorityManager deployed: ${addr}`);
         }

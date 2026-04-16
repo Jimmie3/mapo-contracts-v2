@@ -1,9 +1,10 @@
 import bs58 from "bs58";
+import { tronToHex } from "./tronHelper";
 
 /**
  * Convert address to hex bytes based on address format
- * - EVM address (0x prefix): return as-is (20 bytes)
- * - Tron address (T prefix, 34 chars): base58 decode, extract 20 bytes
+ * - EVM address (0x prefix): return as-is lowercase
+ * - Tron address (T prefix, 34 chars, 0x41 byte): convert via tronToHex
  * - Solana/other base58 address: base58 decode to full bytes
  */
 export function addressToHex(addr: string): string {
@@ -12,10 +13,7 @@ export function addressToHex(addr: string): string {
     }
 
     if (isTronAddress(addr)) {
-        const decoded = bs58.decode(addr);
-        // Tron format: 0x41 (1 byte) + address (20 bytes) + checksum (4 bytes)
-        const addressBytes = decoded.slice(1, 21);
-        return "0x" + Buffer.from(addressBytes).toString("hex");
+        return tronToHex(addr);
     }
 
     if (isBase58(addr)) {

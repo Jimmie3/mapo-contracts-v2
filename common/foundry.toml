@@ -10,13 +10,41 @@ remappings = [
 ]
 
 
+script = "script"
+
 # Solidity compiler settings
-solc_version = "0.8.24"
+solc_version = "0.8.25"
 optimizer = true
 optimizer_runs = 200
 via_ir = false
 evm_version = "london"
 
+# File system access for scripts
+fs_permissions = [{ access = "read-write", path = "./" }]
+
+
+[etherscan]
+Mapo = { url = "https://explorer-api.chainservice.io/api", key = "", chain = 22776 }
+Makalu = { url = "https://testnet-explorer-api.chainservice.io/api", key = "", chain = 212 }
+Eth = { url = "https://api.ehterscan.org/v2/api?chainid=1", key = "${ETHERSCAN_API_KEY}", chain = 1 }
+Bsc = { url = "https://api.ehterscan.org/v2/api?chainid=56", key = "${ETHERSCAN_API_KEY}", chain = 56 }
+Base = { url = "https://api.ehterscan.org/v2/api?chainid=8453", key = "${ETHERSCAN_API_KEY}", chain = 8453 }
+Arb = { url = "https://api.ehterscan.org/v2/api?chainid=42161", key = "${ETHERSCAN_API_KEY}", chain = 42161 }
+Op = { url = "https://api.ehterscan.org/v2/api?chainid=10", key = "${ETHERSCAN_API_KEY}", chain = 10 }
+Pol = { url = "https://api.ehterscan.org/v2/api?chainid=137", key = "${ETHERSCAN_API_KEY}", chain = 137 }
+Uni = { url = "https://api.ehterscan.org/v2/api?chainid=130", key = "${ETHERSCAN_API_KEY}", chain = 130 }
+
+[rpc_endpoints]
+Mapo = "https://rpc.maplabs.io"
+Makalu = "https://testnet-rpc.maplabs.io"
+Eth = "https://eth-mainnet.public.blastapi.io"
+Bsc = "https://binance-smart-chain-public.nodies.app"
+Base = "https://base.llamarpc.com"
+Arb = "https://public-arb-mainnet.fastnode.io"
+Op = "https://optimism-public.nodies.app"
+Pol = "https://polygon.rpc.subquery.network/public"
+Uni = "https://unichain.drpc.org"
+Xlayer = "https://rpc.xlayer.tech"
 
 [fmt]
 line_length = 120

@@ -1,6 +1,6 @@
 # @mapprotocol/common-contracts
 
-Common smart contracts library for MAP Protocol.
+Shared smart contracts and TypeScript utilities for MAP Protocol's multi-chain infrastructure.
 
 ## Installation
 
@@ -8,100 +8,156 @@ Common smart contracts library for MAP Protocol.
 npm install @mapprotocol/common-contracts
 ```
 
-or
+## Solidity Contracts
 
-```bash
-yarn add @mapprotocol/common-contracts
-```
+### BaseImplementation
 
-## Usage
-
-### Solidity Contracts
-
-Import contracts in your Solidity files:
+Abstract base for all upgradeable protocol contracts. Combines UUPS proxy, pausable, and access control in one inheritance.
 
 ```solidity
-import "@mapprotocol/common-contracts/contracts/base/BaseImplemention.sol";
+import "@mapprotocol/common-contracts/contracts/base/BaseImplementation.sol";
+
+contract MyContract is BaseImplementation {
+    function initialize(address _admin) public initializer {
+        __BaseImplementation_init(_admin);
+    }
+}
+```
+
+**Includes:**
+- `UUPSUpgradeable` — proxy upgrade pattern
+- `PausableUpgradeable` — emergency pause via `trigger()`
+- `AccessManagedUpgradeable` — role-based function access
+- `getImplementation()` — read current implementation address
+
+### AuthorityManager
+
+Extended `AccessManager` with enumerable role members. One instance per chain controls all protocol contracts.
+
+```solidity
 import "@mapprotocol/common-contracts/contracts/AuthorityManager.sol";
 ```
 
-### TypeScript/JavaScript
+**Key functions:**
+- `grantRole(roleId, account, delay)` — assign role
+- `revokeRole(roleId, account)` — remove role
+- `setTargetFunctionRole(target, selectors, roleId)` — restrict contract functions to a role
+- `getRoleMembers(roleId)` — list all members of a role
 
-Use TypeChain generated types for type-safe contract interactions:
+## TypeScript Utilities
+
+### Deployment
 
 ```typescript
-import { BaseImplement__factory } from "@mapprotocol/common-contracts";
-import { ethers } from "ethers";
+import { getDeploymentByKey, saveDeployment, resolveDeploymentEnv } from "@mapprotocol/common-contracts/utils/deployment";
 
-// Deploy or connect to contract
-const signer = await ethers.getSigner();
-const baseContract = await BaseImplement__factory.deploy(signer);
+// Read deployed address (defaults to <cwd>/deployments/deploy.json)
+const addr = await getDeploymentByKey("Bsc", "Gateway");
 
-// Or connect to existing contract
-const contractAddress = "0x...";
-const contract = BaseImplement__factory.connect(contractAddress, signer);
+// With custom suffix and path
+const addr = await getDeploymentByKey("Bsc", "Gateway", { suffix: "main", basePath: "./my-deployments" });
+
+// Save deployment
+await saveDeployment("Bsc", "Gateway", "0x...");
 ```
 
-## Contracts Overview
+### Tron Interaction
 
-### Base Contracts
-- `BaseImplemention.sol` - Base implementation with common functionality including pausable, reentrancy guard, and UUPS upgradeable patterns
+```typescript
+import { createTronWeb, tronDeploy, getTronContract, tronToHex, tronFromHex } from "@mapprotocol/common-contracts/utils/tronHelper";
 
-### Authority Management
-- `AuthorityManager.sol` - Authority and access control management
+// Address conversion (pure, no RPC needed)
+const hex = tronToHex("TXyz...");        // -> "0x..."
+const base58 = tronFromHex("0x...");     // -> "TXyz..."
 
-## Features
+// Deploy contract on Tron
+const tronWeb = createTronWeb({ rpcUrl: "https://api.trongrid.io", privateKey: "..." });
+const addr = await tronDeploy(tronWeb, artifacts, "MyContract", [arg1, arg2]);
 
-- **Upgradeable**: Contracts use UUPS (Universal Upgradeable Proxy Standard) pattern
-- **Pausable**: Emergency pause functionality for critical operations
-- **Reentrancy Protection**: Built-in reentrancy guards for secure operations
-- **Access Control**: Flexible authority management system
-- **TypeScript Support**: Full TypeChain generated types for type-safe development
+// Read-only (no privateKey needed)
+const readOnly = createTronWeb({ rpcUrl: "https://api.trongrid.io" });
+const contract = await getTronContract(readOnly, artifacts, "MyContract", addr);
+```
+
+### Address Encoding
+
+```typescript
+import { addressToHex, isTronAddress, isSolanaChain } from "@mapprotocol/common-contracts/utils/addressCodec";
+
+// Auto-detect format and convert to hex
+addressToHex("0xAbC...");              // EVM -> lowercase hex
+addressToHex("TXyz...");              // Tron -> extract 20-byte address
+addressToHex("So11111...");           // Solana -> full base58 decode
+
+// Type checks
+isTronAddress("TXyz...");             // true (validates 0x41 prefix byte)
+isSolanaChain("Sol");                 // true
+```
+
+## Forge Script Base
+
+For monorepo projects, `script/Base.s.sol` provides deployment primitives:
+
+```solidity
+import {BaseScript} from "../../common/script/Base.s.sol";
+
+contract MyDeploy is BaseScript {
+    function run() public broadcast {
+        // CREATE2 factory deployment (deterministic address)
+        address addr = deployByFactory("my_salt", type(MyContract).creationCode, abi.encode(arg));
+
+        // Check factory availability
+        require(isFactoryAvailable(), "no factory on this chain");
+
+        // UUPS proxy upgrade
+        upgradeProxy(proxyAddr, newImplAddr);
+
+        // Deploy new impl + upgrade in one step
+        deployAndUpgrade(proxyAddr, type(MyContractV2).creationCode);
+    }
+}
+```
 
 ## Development
 
-This library uses a dual toolchain setup:
-
-### Foundry
 ```bash
-forge build          # Build contracts
-forge test           # Run tests
-forge fmt            # Format code
+# Build
+forge build                  # Foundry
+npm run build:hardhat        # Hardhat + TypeChain
+
+# Test
+forge test
+forge test --gas-report
+
+# Format
+forge fmt
+
+# Publish
+npm run prepublishOnly       # clean + build + typecheck
+npm publish
 ```
 
-### Hardhat
-```bash
-npm run build:hardhat    # Build with Hardhat
-npm run test:hardhat     # Run Hardhat tests
-npm run compile          # Compile and generate types
-```
+## Package Contents
 
-### Other Commands
-```bash
-npm run clean            # Clean all artifacts
-npm run typecheck        # Check TypeScript types
-npm run gas-report       # Generate gas usage report
-npm run coverage         # Generate test coverage
-```
+| Path | Description |
+|------|-------------|
+| `contracts/**/*.sol` | Solidity source files |
+| `artifacts/**/*.json` | Compiled ABI + bytecode |
+| `typechain-types/**/*` | TypeChain generated types |
+| `utils/*.ts` | Shared TypeScript utilities |
 
 ## Requirements
 
-- Node.js >= 18.0.0
-- Solidity 0.8.20
-
-## Dependencies
-
-- OpenZeppelin Contracts v5.0.0
-- OpenZeppelin Contracts Upgradeable v5.0.0
+- Solidity ^0.8.20
+- Node.js >= 18
+- OpenZeppelin Contracts 5.4.0
 
 ## License
 
 MIT
 
-## Repository
+## Links
 
-[GitHub](https://github.com/mapprotocol/mapo-contracts-v2/tree/main/common)
-
-## Issues
-
-Please report issues at [GitHub Issues](https://github.com/mapprotocol/mapo-contracts-v2/issues)
+- [Repository](https://github.com/mapprotocol/mapo-contracts-v2/tree/main/common)
+- [Issues](https://github.com/mapprotocol/mapo-contracts-v2/issues)
+- [MAP Protocol](https://mapprotocol.io)

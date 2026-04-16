@@ -1,6 +1,10 @@
 import { task, types } from "hardhat/config";
-import { getDeploymentByKey, saveDeployment } from "../utils/utils";
-import { tronDeploy, getTronContract, tronToHex, tronFromHex, isTronNetwork } from "../utils/tronUtil";
+import { getDeploymentByKey as _getDeploymentByKey, saveDeployment as _saveDeployment } from "../../utils/deployment";
+
+function getSuffix() { return process.env.NETWORK_SUFFIX || "prod"; }
+const getDeploymentByKey = (network: string, key: string) => _getDeploymentByKey(network, key, { suffix: getSuffix() });
+const saveDeployment = (network: string, key: string, addr: string) => _saveDeployment(network, key, addr, { suffix: getSuffix() });
+import { tronDeploy, getTronContract, createTronWeb, tronToHex, tronFromHex, isTronNetwork, TronConfig } from "../../utils/tronHelper";
 
 function getRole(role: string): number {
     if (role === "root") return 0;
@@ -8,6 +12,13 @@ function getRole(role: string): number {
     if (role === "manager") return 2;
     if (role === "minter") return 10;
     throw "unknown role";
+}
+
+function getTronConfig(): TronConfig {
+    const rpcUrl = process.env.TRON_RPC_URL;
+    const privateKey = process.env.TRON_PRIVATE_KEY;
+    if (!rpcUrl || !privateKey) throw new Error("TRON_RPC_URL and TRON_PRIVATE_KEY are required");
+    return { rpcUrl, privateKey };
 }
 
 async function getAuth(hre: any, contractAddress: string) {
@@ -18,7 +29,8 @@ async function getAuth(hre: any, contractAddress: string) {
 
     let authority;
     if (isTronNetwork(hre.network.name)) {
-        authority = await getTronContract("AuthorityManager", hre.artifacts, hre.network.name, addr);
+        let tronWeb = createTronWeb(getTronConfig());
+        authority = await getTronContract(tronWeb, hre.artifacts, "AuthorityManager", addr);
     } else {
         const { ethers } = hre;
         authority = await ethers.getContractAt("AuthorityManager", addr);
@@ -39,9 +51,10 @@ task("auth:deploy", "deploy AuthorityManager")
         }
 
         if (isTronNetwork(network.name)) {
-            let adminHex = await tronToHex(admin, network.name);
-            let addr = await tronDeploy("AuthorityManager", [adminHex], hre.artifacts, network.name);
-            let tronAddr = await tronFromHex(addr, network.name);
+            let tronWeb = createTronWeb(getTronConfig());
+            let adminHex = tronToHex(admin);
+            let addr = await tronDeploy(tronWeb, hre.artifacts, "AuthorityManager", [adminHex]);
+            let tronAddr = tronFromHex(addr);
             await saveDeployment(network.name, "Authority", tronAddr);
             console.log(`AuthorityManager deployed: ${tronAddr}`);
         } else {
@@ -65,7 +78,7 @@ task("auth:grant", "grant role to account")
 
         let account = taskArgs.account;
         if (isTronNetwork(network.name)) {
-            account = await tronToHex(account, network.name);
+            account = tronToHex(account);
             await authority.grantRole(role, account, taskArgs.delay).send();
         } else {
             await (await authority.grantRole(role, account, taskArgs.delay)).wait();
@@ -84,7 +97,7 @@ task("auth:revoke", "revoke role from account")
 
         let account = taskArgs.account;
         if (isTronNetwork(network.name)) {
-            account = await tronToHex(account, network.name);
+            account = tronToHex(account);
             await authority.revokeRole(role, account).send();
         } else {
             await (await authority.revokeRole(role, account)).wait();
@@ -129,7 +142,7 @@ task("auth:setTarget", "set target function role")
 
         let target = taskArgs.target;
         if (isTronNetwork(network.name)) {
-            target = await tronToHex(target, network.name);
+            target = tronToHex(target);
             await authority.setTargetFunctionRole(target, funSigs, role).send();
         } else {
             await (await authority.setTargetFunctionRole(target, funSigs, role)).wait();
@@ -146,8 +159,8 @@ task("auth:setAuth", "update target authority")
         let authority = await getAuth(hre, taskArgs.auth);
 
         if (isTronNetwork(network.name)) {
-            let target = await tronToHex(taskArgs.target, network.name);
-            let newAuth = await tronToHex(taskArgs.addr, network.name);
+            let target = tronToHex(taskArgs.target);
+            let newAuth = tronToHex(taskArgs.addr);
             await authority.updateAuthority(target, newAuth).send();
         } else {
             await (await authority.updateAuthority(taskArgs.target, taskArgs.addr)).wait();
@@ -165,7 +178,7 @@ task("auth:closeTarget", "close/open target")
         let close = taskArgs.close === "true";
 
         if (isTronNetwork(network.name)) {
-            let target = await tronToHex(taskArgs.target, network.name);
+            let target = tronToHex(taskArgs.target);
             await authority.setTargetClosed(target, close).send();
         } else {
             await (await authority.setTargetClosed(taskArgs.target, close)).wait();

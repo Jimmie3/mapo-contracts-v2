@@ -1,6 +1,6 @@
 {
   "name": "@mapprotocol/common-contracts",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Common contracts for MAP Protocol",
   "main": "typechain-types/index.js",
   "types": "typechain-types/index.d.ts",
@@ -9,6 +9,7 @@
     "artifacts/contracts/**/*.json",
     "!artifacts/contracts/**/*.dbg.json",
     "typechain-types/**/*",
+    "utils/**/*.ts",
     "README.md"
   ],
   "repository": {
@@ -47,7 +48,16 @@
   "license": "MIT",
   "dependencies": {
     "@openzeppelin/contracts": "5.4.0",
-    "@openzeppelin/contracts-upgradeable": "5.4.0"
+    "@openzeppelin/contracts-upgradeable": "5.4.0",
+    "bs58": "^4.0.1"
+  },
+  "peerDependencies": {
+    "tronweb": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "tronweb": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",

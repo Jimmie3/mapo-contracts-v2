@@ -1,9 +1,13 @@
 import { task, types } from "hardhat/config";
 import { getDeploymentByKey as _getDeploymentByKey, saveDeployment as _saveDeployment } from "../../utils/deployRecord";
 
-function getSuffix() { return process.env.NETWORK_SUFFIX || "prod"; }
-const getDeploymentByKey = (network: string, key: string) => _getDeploymentByKey(network, key, { suffix: getSuffix() });
-const saveDeployment = (network: string, key: string, addr: string) => _saveDeployment(network, key, addr, { suffix: getSuffix() });
+function getEnv() {
+    const env = process.env.NETWORK_ENV;
+    if (!env) throw new Error("NETWORK_ENV is required. Set to test/prod/main in .env");
+    return env;
+}
+const getDeploymentByKey = (network: string, key: string) => _getDeploymentByKey(network, key, { env: getEnv() });
+const saveDeployment = (network: string, key: string, addr: string) => _saveDeployment(network, key, addr, { env: getEnv() });
 import { TronClient, tronToHex, isTronNetwork } from "../../utils/tronHelper";
 import { createDeployer } from "../../utils/deployer";
 

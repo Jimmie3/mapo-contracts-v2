@@ -26,7 +26,7 @@ export interface DeploymentPath {
 
 export interface DeploymentOptions {
     basePath?: string;  // defaults to <cwd>/deployments/
-    suffix?: string;    // defaults to "prod"
+    env?: string;       // "prod", "main", "test". defaults to "test"
 }
 
 function defaultDeployPath(): string {
@@ -34,28 +34,26 @@ function defaultDeployPath(): string {
 }
 
 /**
- * Resolve deployment path from hardhat network name.
- * @param network - hardhat network name (e.g. "Bsc", "Mapo_test", "tron_test")
- * @param suffix - environment suffix (e.g. "prod", "main"), defaults to "prod"
+ * Resolve deployment path from network name and env.
+ * @param network - hardhat network name (e.g. "Bsc", "Mapo_test", "Tron")
+ * @param env - deployment environment: "prod", "main", "test"
  * @returns { env, chain } for deploy.json lookup
  */
-export function resolveDeploymentPath(network: string, suffix: string = "prod"): DeploymentPath {
-    if (network.toLowerCase().includes("test")) {
-        const chain = network.replace(/_?test$/i, "");
-        return { env: "test", chain: chain.charAt(0).toUpperCase() + chain.slice(1) };
-    }
-    return { env: suffix, chain: network };
+export function resolveDeploymentPath(network: string, env: string): DeploymentPath {
+    // Strip _test suffix from network name to get chain name
+    const chain = network.replace(/_?test$/i, "");
+    return { env, chain: chain.charAt(0).toUpperCase() + chain.slice(1) };
 }
 
 /**
  * Read a deployed contract address from deploy.json.
  * @param network - hardhat network name
  * @param key - contract key (e.g. "Gateway", "Authority")
- * @param opts - optional basePath and suffix overrides
+ * @param opts - optional basePath and env overrides
  */
 export async function getDeploymentByKey(network: string, key: string, opts?: DeploymentOptions): Promise<string> {
     const deployPath = opts?.basePath || defaultDeployPath();
-    const { env, chain } = resolveDeploymentPath(network, opts?.suffix);
+    const { env, chain } = resolveDeploymentPath(network, opts?.env);
     const data = await readDeployFile(deployPath);
     const addr = data[env]?.[chain]?.[key];
     if (!addr) throw new Error(`no ${key} deployment in ${env}.${chain}`);
@@ -66,12 +64,12 @@ export async function getDeploymentByKey(network: string, key: string, opts?: De
  * Check if a contract address exists and is valid in deploy.json.
  * @param network - hardhat network name
  * @param key - contract key
- * @param opts - optional basePath and suffix overrides
+ * @param opts - optional basePath and env overrides
  */
 export async function hasDeployment(network: string, key: string, opts?: DeploymentOptions): Promise<boolean> {
     try {
         const deployPath = opts?.basePath || defaultDeployPath();
-        const { env, chain } = resolveDeploymentPath(network, opts?.suffix);
+        const { env, chain } = resolveDeploymentPath(network, opts?.env);
         const data = await readDeployFile(deployPath);
         const addr = data[env]?.[chain]?.[key];
         return !!addr && addr.length > 2 && addr !== "0x";
@@ -85,11 +83,11 @@ export async function hasDeployment(network: string, key: string, opts?: Deploym
  * @param network - hardhat network name
  * @param key - contract key (e.g. "Gateway")
  * @param addr - deployed address
- * @param opts - optional basePath and suffix overrides
+ * @param opts - optional basePath and env overrides
  */
 export async function saveDeployment(network: string, key: string, addr: string, opts?: DeploymentOptions): Promise<void> {
     const deployPath = opts?.basePath || defaultDeployPath();
-    const { env, chain } = resolveDeploymentPath(network, opts?.suffix);
+    const { env, chain } = resolveDeploymentPath(network, opts?.env);
     const data = await readDeployFile(deployPath);
     if (!data[env]) data[env] = {};
     if (!data[env][chain]) data[env][chain] = {};

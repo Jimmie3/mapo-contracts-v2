@@ -199,19 +199,12 @@ abstract contract BaseScript is Script {
     // Internal helpers
     // ============================================================
 
-    /// @notice Resolve deployment path (env, chain) based on chainId and NETWORK_SUFFIX
+    /// @notice Resolve deployment path (env, chain) based on chainId and NETWORK_ENV
     /// @return env "prod", "main", or "test"
     /// @return chain "Mapo", "Bsc", etc.
     function _resolveDeploymentPath() internal view returns (string memory env, string memory chain) {
         uint256 chainId = block.chainid;
-        string memory suffix = vm.envOr("NETWORK_SUFFIX", string("prod"));
-        bool isTest = (chainId == 212 || chainId == 11155111 || chainId == 97);
-
-        if (isTest) {
-            env = "test";
-        } else {
-            env = suffix;
-        }
+        env = vm.envString("NETWORK_ENV"); // required: test/prod/main
 
         if (chainId == 212 || chainId == 22776) chain = "Mapo";
         else if (chainId == 11155111 || chainId == 1) chain = "Eth";

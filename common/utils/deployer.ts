@@ -1,4 +1,4 @@
-import { isTronNetwork, createTronWeb, tronDeploy, tronDeployProxy, tronUpgradeProxy, TronConfig, TronAddress } from "./tronHelper";
+import { isTronNetwork, TronClient } from "./tronHelper";
 import { evmDeploy, evmDeployProxy, evmUpgradeProxy } from "./evmHelper";
 import { verify as _verify } from "./verifier";
 
@@ -14,7 +14,6 @@ import { verify as _verify } from "./verifier";
 
 export interface DeployerOptions {
     autoVerify?: boolean;   // auto verify after deploy/upgrade, defaults to false
-    tronConfig?: TronConfig;
 }
 
 export interface DeployResult {
@@ -38,6 +37,11 @@ export interface Deployer {
     network: string;
 }
 
+/**
+ * Create a unified deployer that auto-routes to EVM or Tron based on network.
+ * @param hre - hardhat runtime environment
+ * @param opts - options (autoVerify: auto-verify after deploy, defaults to false)
+ */
 export function createDeployer(hre: any, opts: DeployerOptions = {}): Deployer {
     const network = hre.network.name;
     const isTron = isTronNetwork(network);
@@ -53,27 +57,20 @@ export function createDeployer(hre: any, opts: DeployerOptions = {}): Deployer {
     }
 
     if (isTron) {
-        let tronConfig = opts.tronConfig;
-        if (!tronConfig) {
-            const rpcUrl = process.env.TRON_RPC_URL;
-            const privateKey = process.env.TRON_PRIVATE_KEY;
-            if (!rpcUrl || !privateKey) throw new Error("TRON_RPC_URL and TRON_PRIVATE_KEY required");
-            tronConfig = { rpcUrl, privateKey };
-        }
-        const tronWeb = createTronWeb(tronConfig);
+        const client = TronClient.fromHre(hre);
 
         return {
             isTron: true,
             network,
 
             async deploy(contractName, args = [], salt = "") {
-                let result = await tronDeploy(tronWeb, hre.artifacts, contractName, args, salt);
+                let result = await client.deploy(hre.artifacts, contractName, args, salt);
                 await tryVerify(contractName, result.base58, args);
                 return { address: result.base58, hex: result.hex };
             },
 
             async deployProxy(contractName, initArgs = [], salt = "") {
-                let result = await tronDeployProxy(tronWeb, hre.artifacts, contractName, initArgs, salt);
+                let result = await client.deployProxy(hre.artifacts, contractName, initArgs, salt);
                 await tryVerify(contractName, result.implementation.base58);
                 return {
                     proxy: result.proxy.base58,
@@ -84,7 +81,7 @@ export function createDeployer(hre: any, opts: DeployerOptions = {}): Deployer {
             },
 
             async upgrade(contractName, proxyAddr) {
-                let result = await tronUpgradeProxy(tronWeb, hre.artifacts, contractName, proxyAddr);
+                let result = await client.upgradeProxy(hre.artifacts, contractName, proxyAddr);
                 await tryVerify(contractName, result.base58);
                 return { address: result.base58, hex: result.hex };
             },

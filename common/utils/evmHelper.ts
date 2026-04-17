@@ -4,8 +4,8 @@
  * @param artifacts - hardhat artifacts (hre.artifacts)
  * @param contractName - contract name to deploy
  * @param args - constructor arguments array
- * @param salt - optional salt string for factory deployment
- * @returns deployed contract address
+ * @param salt - optional CREATE2 salt for deterministic address
+ * @returns deployed contract address (0x hex)
  */
 export async function evmDeploy(
     ethers: any,
@@ -41,7 +41,12 @@ export async function evmDeploy(
 /**
  * Deploy implementation + ERC1967 proxy in one step.
  * If salt is provided, proxy is deployed via factory.
- * @returns proxy address
+ * @param ethers - ethers from hardhat runtime (hre.ethers)
+ * @param artifacts - hardhat artifacts (hre.artifacts)
+ * @param contractName - implementation contract name
+ * @param initArgs - initialize() function arguments
+ * @param salt - optional CREATE2 salt for proxy
+ * @returns { proxy, implementation } addresses
  */
 export async function evmDeployProxy(
     ethers: any,
@@ -50,16 +55,13 @@ export async function evmDeployProxy(
     initArgs: any[] = [],
     salt: string = ""
 ): Promise<{ proxy: string; implementation: string }> {
-    // Deploy implementation
     const ImplFactory = await ethers.getContractFactory(contractName);
     const impl = await (await ImplFactory.deploy()).waitForDeployment();
     const implAddr = await impl.getAddress();
     console.log(`${contractName} implementation: ${implAddr}`);
 
-    // Encode initialize call
     const initData = ImplFactory.interface.encodeFunctionData("initialize", initArgs);
 
-    // Deploy proxy
     let proxyAddr: string;
     if (salt) {
         const { evmDeployByFactory } = require("./factory");
@@ -80,7 +82,11 @@ export async function evmDeployProxy(
 }
 
 /**
- * Upgrade a UUPS proxy to a new implementation
+ * Upgrade a UUPS proxy to a new implementation.
+ * Deploys new implementation, then calls upgradeToAndCall on the proxy.
+ * @param ethers - ethers from hardhat runtime (hre.ethers)
+ * @param contractName - new implementation contract name
+ * @param proxyAddr - proxy address to upgrade
  * @returns new implementation address
  */
 export async function evmUpgradeProxy(

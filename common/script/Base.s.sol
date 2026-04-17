@@ -165,30 +165,32 @@ abstract contract BaseScript is Script {
 
     /// @notice Read a deployed address from deployments/deploy.json
     function readDeployment(string memory key) internal view returns (address) {
-        string memory env = _resolveDeploymentEnv();
-        return _readDeploymentByEnv(env, key);
+        (string memory env, string memory chain) = _resolveDeploymentPath();
+        return _readDeploymentByPath(env, chain, key);
     }
 
-    /// @notice Read a deployed address for a specific environment
-    function _readDeploymentByEnv(string memory env, string memory key) internal view returns (address addr) {
+    /// @notice Read a deployed address for a specific env and chain
+    function _readDeploymentByPath(string memory env, string memory chain, string memory key) internal view returns (address addr) {
         string memory filePath = "deployments/deploy.json";
         if (!vm.exists(filePath)) {
             revert(string(abi.encodePacked("deploy.json not found: ", filePath)));
         }
         string memory json = vm.readFile(filePath);
-        string memory jsonPath = string(abi.encodePacked(".", env, ".", key));
+        // JSON path: .prod.Bsc.Gateway
+        string memory jsonPath = string(abi.encodePacked(".", env, ".", chain, ".", key));
         addr = json.readAddress(jsonPath);
     }
 
     /// @notice Save a deployed address to deployments/deploy.json
     function saveDeployment(string memory key, address addr) internal {
-        string memory env = _resolveDeploymentEnv();
+        (string memory env, string memory chain) = _resolveDeploymentPath();
         string memory filePath = "deployments/deploy.json";
-        string memory jsonPath = string(abi.encodePacked(".", env, ".", key));
+        // JSON path: .prod.Bsc.Gateway
+        string memory jsonPath = string(abi.encodePacked(".", env, ".", chain, ".", key));
         string memory json = vm.readFile(filePath);
         bool exists = vm.keyExistsJson(json, jsonPath);
         if (!exists) {
-            revert(string(abi.encodePacked("key not found: ", key)));
+            revert(string(abi.encodePacked("key not found: ", env, ".", chain, ".", key)));
         }
         vm.writeJson(vm.toString(addr), filePath, jsonPath);
     }
@@ -197,29 +199,30 @@ abstract contract BaseScript is Script {
     // Internal helpers
     // ============================================================
 
-    /// @notice Resolve deployment environment key based on chainId and NETWORK_SUFFIX env
-    function _resolveDeploymentEnv() internal view returns (string memory) {
+    /// @notice Resolve deployment path (env, chain) based on chainId and NETWORK_SUFFIX
+    /// @return env "prod", "main", or "test"
+    /// @return chain "Mapo", "Bsc", etc.
+    function _resolveDeploymentPath() internal view returns (string memory env, string memory chain) {
         uint256 chainId = block.chainid;
-        string memory suffix = vm.envOr("NETWORK_SUFFIX", string(""));
-        bool isMain = keccak256(bytes(suffix)) == keccak256(bytes("main"));
+        string memory suffix = vm.envOr("NETWORK_SUFFIX", string("prod"));
+        bool isTest = (chainId == 212 || chainId == 11155111 || chainId == 97);
 
-        // Testnets
-        if (chainId == 212) return "Mapo_test";
-        if (chainId == 11155111) return "Eth_test";
-        if (chainId == 97) return "Bsc_test";
+        if (isTest) {
+            env = "test";
+        } else {
+            env = suffix;
+        }
 
-        // Mainnets
-        if (chainId == 22776) return isMain ? "Mapo_main" : "Mapo_prod";
-        if (chainId == 1) return isMain ? "Eth_main" : "Eth_prod";
-        if (chainId == 56) return isMain ? "Bsc_main" : "Bsc_prod";
-        if (chainId == 8453) return isMain ? "Base_main" : "Base_prod";
-        if (chainId == 42161) return isMain ? "Arb_main" : "Arb_prod";
-        if (chainId == 10) return isMain ? "Op_main" : "Op_prod";
-        if (chainId == 130) return isMain ? "Uni_main" : "Uni_prod";
-        if (chainId == 137) return isMain ? "Pol_main" : "Pol_prod";
-        if (chainId == 196) return isMain ? "Xlayer_main" : "Xlayer_prod";
-
-        revert("unknown chain");
+        if (chainId == 212 || chainId == 22776) chain = "Mapo";
+        else if (chainId == 11155111 || chainId == 1) chain = "Eth";
+        else if (chainId == 97 || chainId == 56) chain = "Bsc";
+        else if (chainId == 8453) chain = "Base";
+        else if (chainId == 42161) chain = "Arb";
+        else if (chainId == 10) chain = "Op";
+        else if (chainId == 130) chain = "Uni";
+        else if (chainId == 137) chain = "Pol";
+        else if (chainId == 196) chain = "Xlayer";
+        else revert("unknown chain");
     }
 
     /// @notice Read current implementation address from a UUPS proxy

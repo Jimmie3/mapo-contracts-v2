@@ -1,5 +1,74 @@
 {
-	"Tron_main": {
-		"Authority": "TQaBr8DeMwchCis3Ydamkyfx27btrBgzje"
+	"test": {
+		"Mapo": {
+			"Authority": "0xA6a4F4f0da29feA73F39D641CDF57B06103B4678"
+		},
+		"Bsc": {
+			"Authority": "0x018a0b28125923823fa11638957e3124179b3b11"
+		},
+		"Eth": {
+			"Authority": "0x66C6e4974A9c52C378897EA21b65FDc9A935415A"
+		},
+		"Tron": {
+			"Authority": "TKjtxw24jmE33j2GMuhZiDhGfDHSL8juCV"
+		}
+	},
+	"main": {
+		"Mapo": {
+			"Authority": "0xC28459DfF1288992EB81e1C1d1b51a7B4D8b5a13"
+		},
+		"Bsc": {
+			"Authority": "0x718110E1c08Ef66b1B199B4797C754A9a9ff1084"
+		},
+		"Base": {
+			"Authority": "0x52cbbB1A8BfEcdD4Afa04fc74f0A6Dafe58B4c1B"
+		},
+		"Arb": {
+			"Authority": "0x3fb9ac7adea828d11fb8ae7df5c81f6542fa4c68"
+		},
+		"Op": {
+			"Authority": "0xddC96b457C69DEFd5Fe2e810301F52b10Ef122bE"
+		},
+		"Uni": {
+			"Authority": "0xa82453b149ce34ca03a34320715a761cf76e4d27"
+		},
+		"Pol": {
+			"Authority": "0x523418E53fF38Fe77445901eA200d4Ab573FA34C"
+		},
+		"Xlayer": {
+			"Authority": "0x0E2898696D2106abfc5d8E885F7ff1BfDb542607"
+		},
+		"Tron": {
+			"Authority": "TQaBr8DeMwchCis3Ydamkyfx27btrBgzje"
+		}
+	},
+	"prod": {
+		"Mapo": {
+			"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA"
+		},
+		"Eth": {
+			"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA"
+		},
+		"Bsc": {
+			"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA"
+		},
+		"Base": {
+			"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA"
+		},
+		"Arb": {
+			"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA"
+		},
+		"Xlayer": {
+			"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA"
+		},
+		"Uni": {
+			"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA"
+		},
+		"Pol": {
+			"Authority": "0xACC31A6756B60304C03d6626fc98c062E4539CCA"
+		},
+		"Tron": {
+			"Authority": "TSCja7kmWZ7Do7VEKTxBYBm9439bZcSBoD"
+		}
 	}
 }

@@ -4,8 +4,8 @@ import { getDeploymentByKey as _getDeploymentByKey, saveDeployment as _saveDeplo
 function getSuffix() { return process.env.NETWORK_SUFFIX || "prod"; }
 const getDeploymentByKey = (network: string, key: string) => _getDeploymentByKey(network, key, { suffix: getSuffix() });
 const saveDeployment = (network: string, key: string, addr: string) => _saveDeployment(network, key, addr, { suffix: getSuffix() });
-import { tronDeploy, getTronContract, createTronWeb, tronToHex, tronFromHex, isTronNetwork, TronConfig } from "../../utils/tronHelper";
-import { evmDeploy } from "../../utils/evmHelper";
+import { TronClient, tronToHex, isTronNetwork } from "../../utils/tronHelper";
+import { createDeployer } from "../../utils/deployer";
 
 function getRole(role: string): number {
     if (role === "root") return 0;
@@ -15,53 +15,39 @@ function getRole(role: string): number {
     throw "unknown role";
 }
 
-function getTronConfig(): TronConfig {
-    const rpcUrl = process.env.TRON_RPC_URL;
-    const privateKey = process.env.TRON_PRIVATE_KEY;
-    if (!rpcUrl || !privateKey) throw new Error("TRON_RPC_URL and TRON_PRIVATE_KEY are required");
-    return { rpcUrl, privateKey };
-}
-
 async function getAuth(hre: any, contractAddress: string) {
     let addr = contractAddress;
     if (addr === "" || addr === "latest") {
         addr = await getDeploymentByKey(hre.network.name, "Authority");
     }
 
-    let authority;
     if (isTronNetwork(hre.network.name)) {
-        let tronWeb = createTronWeb(getTronConfig());
-        authority = await getTronContract(tronWeb, hre.artifacts, "AuthorityManager", addr);
+        let client = TronClient.fromHre(hre);
+        let contract = await client.getContract(hre.artifacts, "AuthorityManager", addr);
+        return { contract, isTron: true, client };
     } else {
-        const { ethers } = hre;
-        authority = await ethers.getContractAt("AuthorityManager", addr);
+        let contract = await hre.ethers.getContractAt("AuthorityManager", addr);
+        return { contract, isTron: false, client: null as any };
     }
-    return authority;
 }
 
 task("auth:deploy", "deploy AuthorityManager")
     .addOptionalParam("admin", "default admin address", "", types.string)
     .addOptionalParam("salt", "salt for factory deployment (enables CREATE2)", "", types.string)
+    .addOptionalParam("verify", "verify contract after deploy", "false", types.string)
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
         const [deployer] = await ethers.getSigners();
         console.log("deployer address:", deployer.address);
 
         let admin = taskArgs.admin || deployer.address;
-        const useSalt = taskArgs.salt !== "";
+        const d = createDeployer(hre, { autoVerify: taskArgs.verify === "true" });
 
-        if (isTronNetwork(network.name)) {
-            let tronWeb = createTronWeb(getTronConfig());
-            let adminHex = tronToHex(admin);
-            let { hex, base58 } = await tronDeploy(tronWeb, hre.artifacts, "AuthorityManager", [adminHex], taskArgs.salt);
-            await saveDeployment(network.name, "Authority", base58);
-            console.log(`AuthorityManager deployed: ${base58} (${hex})`);
-        } else {
-            let addr = await evmDeploy(ethers, hre.artifacts, "AuthorityManager", [admin], taskArgs.salt);
-
-            await saveDeployment(network.name, "Authority", addr);
-            console.log(`AuthorityManager deployed: ${addr}`);
-        }
+        // Tron needs hex address for constructor args
+        let adminArg = d.isTron ? tronToHex(admin) : admin;
+        let result = await d.deploy("AuthorityManager", [adminArg], taskArgs.salt);
+        await saveDeployment(network.name, "Authority", result.address);
+        console.log(`AuthorityManager deployed: ${result.address}${result.hex ? ` (${result.hex})` : ""}`);
     });
 
 task("auth:grant", "grant role to account")
@@ -70,16 +56,14 @@ task("auth:grant", "grant role to account")
     .addOptionalParam("delay", "execution delay", 0, types.int)
     .addOptionalParam("auth", "authority address", "", types.string)
     .setAction(async (taskArgs, hre) => {
-        const { network } = hre;
-        let authority = await getAuth(hre, taskArgs.auth);
+        let { contract, isTron } = await getAuth(hre, taskArgs.auth);
         let role = getRole(taskArgs.role);
+        let account = isTron ? tronToHex(taskArgs.account) : taskArgs.account;
 
-        let account = taskArgs.account;
-        if (isTronNetwork(network.name)) {
-            account = tronToHex(account);
-            await authority.grantRole(role, account, taskArgs.delay).send();
+        if (isTron) {
+            await contract.grantRole(role, account, taskArgs.delay).sendAndWait();
         } else {
-            await (await authority.grantRole(role, account, taskArgs.delay)).wait();
+            await (await contract.grantRole(role, account, taskArgs.delay)).wait();
         }
         console.log(`granted role ${taskArgs.role}(${role}) to ${taskArgs.account}`);
     });
@@ -89,16 +73,14 @@ task("auth:revoke", "revoke role from account")
     .addParam("role", "role name: admin/manager/minter")
     .addOptionalParam("auth", "authority address", "", types.string)
     .setAction(async (taskArgs, hre) => {
-        const { network } = hre;
-        let authority = await getAuth(hre, taskArgs.auth);
+        let { contract, isTron } = await getAuth(hre, taskArgs.auth);
         let role = getRole(taskArgs.role);
+        let account = isTron ? tronToHex(taskArgs.account) : taskArgs.account;
 
-        let account = taskArgs.account;
-        if (isTronNetwork(network.name)) {
-            account = tronToHex(account);
-            await authority.revokeRole(role, account).send();
+        if (isTron) {
+            await contract.revokeRole(role, account).sendAndWait();
         } else {
-            await (await authority.revokeRole(role, account)).wait();
+            await (await contract.revokeRole(role, account)).wait();
         }
         console.log(`revoked role ${taskArgs.role}(${role}) from ${taskArgs.account}`);
     });
@@ -107,21 +89,21 @@ task("auth:getMember", "get role members")
     .addOptionalParam("role", "role name", "admin", types.string)
     .addOptionalParam("auth", "authority address", "", types.string)
     .setAction(async (taskArgs, hre) => {
-        let authority = await getAuth(hre, taskArgs.auth);
+        let { contract, isTron } = await getAuth(hre, taskArgs.auth);
         let role = getRole(taskArgs.role);
 
-        if (isTronNetwork(hre.network.name)) {
-            let count = await authority.getRoleMemberCount(role).call();
+        if (isTron) {
+            let count = await contract.getRoleMemberCount(role).call();
             console.log(`role ${taskArgs.role}(${role}) has ${count} member(s)`);
             for (let i = 0; i < count; i++) {
-                let member = await authority.getRoleMember(role, i).call();
+                let member = await contract.getRoleMember(role, i).call();
                 console.log(`  ${i}: ${member}`);
             }
         } else {
-            let count = await authority.getRoleMemberCount(role);
+            let count = await contract.getRoleMemberCount(role);
             console.log(`role ${taskArgs.role}(${role}) has ${count} member(s)`);
             for (let i = 0; i < count; i++) {
-                let member = await authority.getRoleMember(role, i);
+                let member = await contract.getRoleMember(role, i);
                 console.log(`  ${i}: ${member}`);
             }
         }
@@ -133,17 +115,15 @@ task("auth:setTarget", "set target function role")
     .addParam("role", "role name")
     .addOptionalParam("auth", "authority address", "", types.string)
     .setAction(async (taskArgs, hre) => {
-        const { network } = hre;
-        let authority = await getAuth(hre, taskArgs.auth);
+        let { contract, isTron } = await getAuth(hre, taskArgs.auth);
         let role = getRole(taskArgs.role);
         let funSigs = taskArgs.funcs.split(",");
+        let target = isTron ? tronToHex(taskArgs.target) : taskArgs.target;
 
-        let target = taskArgs.target;
-        if (isTronNetwork(network.name)) {
-            target = tronToHex(target);
-            await authority.setTargetFunctionRole(target, funSigs, role).send();
+        if (isTron) {
+            await contract.setTargetFunctionRole(target, funSigs, role).sendAndWait();
         } else {
-            await (await authority.setTargetFunctionRole(target, funSigs, role)).wait();
+            await (await contract.setTargetFunctionRole(target, funSigs, role)).wait();
         }
         console.log(`set target ${taskArgs.target} functions [${funSigs}] to role ${taskArgs.role}(${role})`);
     });
@@ -153,15 +133,14 @@ task("auth:setAuth", "update target authority")
     .addParam("addr", "new authority address")
     .addOptionalParam("auth", "authority address", "", types.string)
     .setAction(async (taskArgs, hre) => {
-        const { network } = hre;
-        let authority = await getAuth(hre, taskArgs.auth);
+        let { contract, isTron } = await getAuth(hre, taskArgs.auth);
+        let target = isTron ? tronToHex(taskArgs.target) : taskArgs.target;
+        let newAuth = isTron ? tronToHex(taskArgs.addr) : taskArgs.addr;
 
-        if (isTronNetwork(network.name)) {
-            let target = tronToHex(taskArgs.target);
-            let newAuth = tronToHex(taskArgs.addr);
-            await authority.updateAuthority(target, newAuth).send();
+        if (isTron) {
+            await contract.updateAuthority(target, newAuth).sendAndWait();
         } else {
-            await (await authority.updateAuthority(taskArgs.target, taskArgs.addr)).wait();
+            await (await contract.updateAuthority(taskArgs.target, taskArgs.addr)).wait();
         }
         console.log(`set target ${taskArgs.target} authority to ${taskArgs.addr}`);
     });
@@ -171,15 +150,14 @@ task("auth:closeTarget", "close/open target")
     .addParam("close", "true to close, false to open")
     .addOptionalParam("auth", "authority address", "", types.string)
     .setAction(async (taskArgs, hre) => {
-        const { network } = hre;
-        let authority = await getAuth(hre, taskArgs.auth);
+        let { contract, isTron } = await getAuth(hre, taskArgs.auth);
         let close = taskArgs.close === "true";
+        let target = isTron ? tronToHex(taskArgs.target) : taskArgs.target;
 
-        if (isTronNetwork(network.name)) {
-            let target = tronToHex(taskArgs.target);
-            await authority.setTargetClosed(target, close).send();
+        if (isTron) {
+            await contract.setTargetClosed(target, close).sendAndWait();
         } else {
-            await (await authority.setTargetClosed(taskArgs.target, close)).wait();
+            await (await contract.setTargetClosed(taskArgs.target, close)).wait();
         }
         console.log(`set target ${taskArgs.target} closed: ${close}`);
     });

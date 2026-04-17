@@ -21,18 +21,22 @@ export {
 
 // Deploy record — deploy.json address management
 export {
-    resolveDeploymentEnv,
+    resolveDeploymentPath,
     getDeploymentByKey,
     hasDeployment,
     saveDeployment,
+    type DeploymentPath,
     type DeploymentOptions
 } from "./deployRecord";
 
 // Contract verification
 export { verify, type VerifyOptions } from "./verifier";
 
+// Code hash for CREATE2 address prediction
+export { getCodeHash, getProxyCodeHash, getCustomProxyCodeHash } from "./codeHash";
+
 // Address encoding
 export { addressToHex, isBase58, isTronAddress, isSolanaChain } from "./addressCodec";
 
 // Tron utilities
-export { tronFromHex, tronToHex, isTronNetwork, createTronWeb, getTronContract, type TronConfig, type TronAddress } from "./tronHelper";
+export { TronClient, tronFromHex, tronToHex, isTronNetwork, sendAndWait, waitForTx, type TronAddress } from "./tronHelper";

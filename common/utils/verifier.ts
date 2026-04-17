@@ -1,20 +1,24 @@
-import { isTronNetwork } from "./tronHelper";
+/**
+ * Contract verification — supports Etherscan, Blockscout (Mapo), and TronScan.
+ * Auto-routes based on network name.
+ */
+import { isTronNetwork, tronFromHex } from "./tronHelper";
 
-// TronScan API endpoints
-const TRONSCAN_API: Record<string, string> = {
-    "Tron": "https://apilist.tronscan.org/api/solidity/contract/verify",
-    "tron_test": "https://nile.tronscan.org/api/solidity/contract/verify",
-    "Tron_test": "https://nile.tronscan.org/api/solidity/contract/verify",
+// TronScan API endpoints by chainId
+const TRONSCAN_API: Record<number, string> = {
+    728126428: "https://apilist.tronscan.org/api/solidity/contract/verify",   // mainnet
+    3448148188: "https://nile.tronscan.org/api/solidity/contract/verify",     // nile testnet
 };
 
 export interface VerifyOptions {
-    address: string;          // contract address
-    contractName: string;     // e.g. "AuthorityManager"
-    contractPath?: string;    // e.g. "contracts/AuthorityManager.sol:AuthorityManager"
-    constructorArgs?: any[];  // constructor arguments
-    compiler?: string;        // solc version, defaults to "0.8.25"
-    optimizer?: boolean;      // defaults to true
-    optimizerRuns?: number;   // defaults to 200
+    address: string;             // contract address
+    contractName: string;        // e.g. "AuthorityManager"
+    contractPath?: string;       // e.g. "contracts/AuthorityManager.sol:AuthorityManager"
+    constructorArgs?: any[];     // constructor arguments (raw values)
+    constructorParams?: string;  // pre-encoded constructor params hex (without 0x), overrides constructorArgs
+    compiler?: string;           // solc version, defaults to "0.8.25"
+    optimizer?: boolean;         // defaults to true
+    optimizerRuns?: number;      // defaults to 200
 }
 
 /**
@@ -63,76 +67,150 @@ async function verifyEvm(hre: any, opts: VerifyOptions): Promise<void> {
 // ============================================================
 
 async function verifyTron(hre: any, network: string, opts: VerifyOptions): Promise<void> {
-    const apiUrl = TRONSCAN_API[network];
-    if (!apiUrl) {
-        console.log(`no TronScan API for network ${network}, skipping verification`);
-        return;
+    const chainId = hre.network.config.chainId;
+    const fs = require("fs");
+    const path = require("path");
+
+    // Auto-read compiler settings from hardhat config
+    const solcConfig = hre.config?.solidity?.compilers?.[0] || hre.config?.solidity || {};
+    const compiler = opts.compiler || solcConfig.version || "0.8.25";
+    const optimizer = opts.optimizer ?? solcConfig.settings?.optimizer?.enabled ?? true;
+    const optimizerRuns = opts.optimizerRuns ?? solcConfig.settings?.optimizer?.runs ?? 200;
+    const evmVersion = solcConfig.settings?.evmVersion || "london";
+    const viaIR = solcConfig.settings?.viaIR ? "1" : "0";
+
+    // Convert address to Tron format
+    let address = opts.address;
+    if (address.startsWith("0x")) {
+        address = tronFromHex(address);
     }
 
-    const compiler = opts.compiler || "0.8.25";
-    const optimizer = opts.optimizer !== false;
-    const optimizerRuns = opts.optimizerRuns || 200;
-
     // Generate flattened source
-    console.log(`flattening ${opts.contractName} for TronScan verification...`);
-    let flattenedSource: string;
+    const outputDir = path.join(process.cwd(), "verify-output");
+    const flattenPath = path.join(outputDir, `${opts.contractName}_flatten.sol`);
+
+    console.log(`generating flatten for ${opts.contractName}...`);
     try {
-        flattenedSource = await hre.run("flatten:get-flattened-sources", {
-            files: [`contracts/${opts.contractName}.sol`],
+        // Find actual source path from artifact
+        const artifact = await hre.artifacts.readArtifact(opts.contractName);
+        const sourcePath = artifact.sourceName; // e.g. "contracts/factory/Create2Factory.sol"
+        let flattenedSource = await hre.run("flatten:get-flattened-sources", {
+            files: [sourcePath],
         });
-        // Remove duplicate SPDX license identifiers (flatten creates duplicates)
         flattenedSource = removeDuplicateSPDX(flattenedSource);
+        fs.mkdirSync(outputDir, { recursive: true });
+        fs.writeFileSync(flattenPath, flattenedSource);
+        console.log(`flatten saved to: ${flattenPath}`);
     } catch (e) {
-        // Fallback: try reading from verify-output if flatten fails
-        const fs = require("fs");
-        const path = require("path");
-        const flattenPath = path.join(process.cwd(), `verify-output/${opts.contractName}_flatten.sol`);
         if (fs.existsSync(flattenPath)) {
-            flattenedSource = fs.readFileSync(flattenPath, "utf-8");
-            console.log(`using cached flatten from ${flattenPath}`);
+            console.log(`using existing flatten: ${flattenPath}`);
         } else {
             console.log(`flatten failed, generate manually: forge flatten contracts/${opts.contractName}.sol`);
             return;
         }
     }
 
-    // Convert address to Tron format if needed
-    let address = opts.address;
-    if (address.startsWith("0x")) {
-        const { tronFromHex } = require("./tronHelper");
-        address = tronFromHex(address);
+    // Submit to TronScan API
+    const apiUrl = TRONSCAN_API[chainId];
+    if (!apiUrl) {
+        console.log(`no TronScan API for chainId ${chainId}, printing manual instructions instead`);
+        printTronVerifyInfo(address, opts.contractName, compiler, optimizer, optimizerRuns, evmVersion, flattenPath, chainId);
+        return;
     }
 
-    const payload = {
-        contractAddress: address,
-        contractName: opts.contractName,
-        compilerVersion: `v${compiler}`,
-        sourceCode: flattenedSource,
-        optimization: optimizer,
-        optimizerRuns: optimizerRuns,
-    };
-
     console.log(`submitting verification to TronScan for ${address}...`);
-
     try {
-        const response = await fetch(apiUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+        const FormData = require("form-data");
+        const form = new FormData();
+        form.append("contractAddress", address);
+        form.append("contractName", opts.contractName);
+        // Read full compiler version from build-info (includes commit hash)
+        let fullCompiler = `v${compiler}`;
+        try {
+            const buildInfoDir = path.join(process.cwd(), "artifacts/build-info");
+            const buildInfoFiles = fs.readdirSync(buildInfoDir);
+            if (buildInfoFiles.length > 0) {
+                const buildInfo = JSON.parse(fs.readFileSync(
+                    path.join(buildInfoDir, buildInfoFiles[0]), "utf-8"
+                ));
+                if (buildInfo.solcLongVersion) {
+                    fullCompiler = `v${buildInfo.solcLongVersion}`;
+                }
+            }
+        } catch (e: any) {
+            console.log(`[warn] could not read build-info: ${e.message}`);
+        }
+        form.append("compiler", fullCompiler);
+        form.append("license", "3"); // MIT
+        form.append("optimizer", optimizer ? "1" : "0");
+        form.append("runs", String(optimizerRuns));
+        form.append("viaIR", viaIR);
+        form.append("evmVersion", evmVersion);
+        // Encode constructor params from ABI if not pre-encoded
+        let constructorParams = opts.constructorParams || "";
+        if (!constructorParams && opts.constructorArgs && opts.constructorArgs.length > 0) {
+            const { Interface } = require("ethers");
+            const artifact = await hre.artifacts.readArtifact(opts.contractName);
+            const iface = new Interface(artifact.abi);
+            const encoded = iface.encodeDeploy(opts.constructorArgs);
+            constructorParams = encoded.slice(2); // remove 0x
+        }
+        form.append("constructorParams", constructorParams);
+        form.append("files", fs.createReadStream(flattenPath), {
+            filename: `${opts.contractName}.flat.tron.sol`,
+            contentType: "application/octet-stream",
         });
 
-        const result = await response.json();
+        const result: any = await new Promise((resolve, reject) => {
+            const url = new URL(apiUrl);
+            const https = require("https");
+            const req = https.request({
+                hostname: url.hostname,
+                path: url.pathname,
+                method: "POST",
+                headers: form.getHeaders(),
+            }, (res: any) => {
+                let data = "";
+                res.on("data", (chunk: string) => data += chunk);
+                res.on("end", () => {
+                    try { resolve(JSON.parse(data)); } catch { resolve({ code: -1, errmsg: data }); }
+                });
+            });
+            req.on("error", reject);
+            form.pipe(req);
+        });
 
-        if (response.ok && (result.code === 0 || result.success)) {
-            console.log(`${opts.contractName} verified on TronScan`);
+        if (result.code === 200 || result.success) {
+            console.log(`${opts.contractName} verified on TronScan: ${result.data?.message || "success"}`);
         } else {
-            console.log(`TronScan verification response:`, JSON.stringify(result, null, 2));
-            console.log(`if failed, verify manually at https://${network === "Tron" ? "" : "nile."}tronscan.org/#/contract/${address}/code`);
+            console.log(`TronScan response:`, JSON.stringify(result, null, 2));
+            printTronVerifyInfo(address, opts.contractName, fullCompiler, optimizer, optimizerRuns, evmVersion, flattenPath, chainId);
         }
     } catch (e: any) {
         console.log(`TronScan API error: ${e.message || e}`);
-        console.log(`verify manually at https://${network === "Tron" ? "" : "nile."}tronscan.org/#/contract/${address}/code`);
+        printTronVerifyInfo(address, opts.contractName, `v${compiler}`, optimizer, optimizerRuns, evmVersion, flattenPath, chainId);
     }
+}
+
+function printTronVerifyInfo(
+    address: string, contractName: string, compiler: string,
+    optimizer: boolean, runs: number, evmVersion: string,
+    flattenPath: string, chainId: number
+) {
+    const isMainnet = chainId === 728126428;
+    const tronscanUrl = isMainnet
+        ? `https://tronscan.org/#/contract/${address}/code`
+        : `https://nile.tronscan.org/#/contract/${address}/code`;
+
+    console.log(`\n=== Verify manually on TronScan ===`);
+    console.log(`Address:    ${address}`);
+    console.log(`Contract:   ${contractName}`);
+    console.log(`Compiler:   ${compiler}`);
+    console.log(`Optimizer:  ${optimizer ? "enabled" : "disabled"}, runs: ${runs}`);
+    console.log(`EVM:        ${evmVersion}`);
+    console.log(`Flatten:    ${flattenPath}`);
+    console.log(`URL:        ${tronscanUrl}`);
+    console.log(`=====================================\n`);
 }
 
 function removeDuplicateSPDX(source: string): string {

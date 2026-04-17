@@ -1,11 +1,15 @@
+/**
+ * Multi-chain address encoding — converts EVM, Tron, and Solana addresses to hex bytes.
+ */
 import bs58 from "bs58";
 import { tronToHex } from "./tronHelper";
 
 /**
- * Convert address to hex bytes based on address format
+ * Convert any address format to hex bytes.
  * - EVM address (0x prefix): return as-is lowercase
  * - Tron address (T prefix, 34 chars, 0x41 byte): convert via tronToHex
  * - Solana/other base58 address: base58 decode to full bytes
+ * @param addr - address in any supported format
  */
 export function addressToHex(addr: string): string {
     if (addr.startsWith("0x")) {
@@ -24,6 +28,7 @@ export function addressToHex(addr: string): string {
     throw new Error(`Unknown address format: ${addr}`);
 }
 
+/** Check if a string is valid base58 encoding. */
 export function isBase58(addr: string): boolean {
     const base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     for (const char of addr) {
@@ -34,6 +39,7 @@ export function isBase58(addr: string): boolean {
     return true;
 }
 
+/** Check if address is Tron format (T prefix, 34 chars, 0x41 first byte after decode). */
 export function isTronAddress(addr: string): boolean {
     if (!addr.startsWith("T") || addr.length !== 34 || !isBase58(addr)) return false;
     try {
@@ -45,6 +51,7 @@ export function isTronAddress(addr: string): boolean {
     }
 }
 
+/** Check if chain name is Solana. */
 export function isSolanaChain(chainName: string): boolean {
     return chainName === "Sol" || chainName === "sol_test";
 }

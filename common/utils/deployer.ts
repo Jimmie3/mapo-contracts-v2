@@ -13,12 +13,17 @@ import { verify as _verify } from "./verifier";
  */
 
 export interface DeployerOptions {
-    autoVerify?: boolean;   // auto verify after deploy/upgrade, defaults to false
+    /**
+     * Auto-verify contracts after deploy/upgrade.
+     * Failures are logged as warnings, never thrown — call deployer.verify() for explicit error handling.
+     * Defaults to false.
+     */
+    autoVerify?: boolean;
 }
 
 export interface DeployResult {
-    address: string;       // primary address (0x hex for EVM, base58 for Tron)
-    hex?: string;          // 0x hex (Tron only, EVM same as address)
+    address: string;       // EVM: 0x hex address. Tron: base58 (T...) address.
+    hex?: string;          // Tron only: 0x hex address. Undefined on EVM.
 }
 
 export interface DeployProxyResult {
@@ -29,9 +34,16 @@ export interface DeployProxyResult {
 }
 
 export interface Deployer {
+    /**
+     * Deploy a contract.
+     * @param contractName - artifact name
+     * @param args - constructor arguments as raw values
+     * @param salt - "" or omitted = direct deploy; non-empty string = CREATE2 factory (deterministic address)
+     */
     deploy(contractName: string, args?: any[], salt?: string): Promise<DeployResult>;
     deployProxy(contractName: string, initArgs?: any[], salt?: string): Promise<DeployProxyResult>;
     upgrade(contractName: string, proxyAddr: string): Promise<DeployResult>;
+    /** Verify explicitly (throws on failure, unlike autoVerify which only warns). */
     verify(contractName: string, address: string, constructorArgs?: any[], contractPath?: string): Promise<void>;
     isTron: boolean;
     network: string;

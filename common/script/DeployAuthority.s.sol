@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {console} from "forge-std/Script.sol";
-import {BaseScript} from "./Base.s.sol";
+import {BaseScript} from "./base/Base.s.sol";
 import {AuthorityManager} from "../contracts/AuthorityManager.sol";
 
 /**

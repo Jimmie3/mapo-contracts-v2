@@ -11,14 +11,24 @@ const TRONSCAN_API: Record<number, string> = {
 };
 
 export interface VerifyOptions {
-    address: string;             // contract address
+    address: string;             // contract address (0x hex or Tron base58)
     contractName: string;        // e.g. "AuthorityManager"
     contractPath?: string;       // e.g. "contracts/AuthorityManager.sol:AuthorityManager"
-    constructorArgs?: any[];     // constructor arguments (raw values)
-    constructorParams?: string;  // pre-encoded constructor params hex (without 0x), overrides constructorArgs
-    compiler?: string;           // solc version, defaults to "0.8.25"
-    optimizer?: boolean;         // defaults to true
-    optimizerRuns?: number;      // defaults to 200
+    /**
+     * Constructor arguments as raw values — auto-encoded via ethers `encodeDeploy`.
+     * Example: ["0xAbC123...", "0xDeF456...", 200]
+     * Use this for most cases. Mutually exclusive with constructorParams.
+     */
+    constructorArgs?: any[];
+    /**
+     * Pre-encoded constructor params as hex string (without 0x prefix).
+     * Use this when you already have the ABI-encoded bytes, e.g. from `cast abi-encode`.
+     * Takes priority over constructorArgs if both are provided.
+     */
+    constructorParams?: string;
+    compiler?: string;           // override solc version (auto-read from build-info if omitted)
+    optimizer?: boolean;         // override optimizer enabled (auto-read from build-info if omitted)
+    optimizerRuns?: number;      // override optimizer runs (auto-read from build-info if omitted)
 }
 
 /**
@@ -71,13 +81,13 @@ async function verifyTron(hre: any, opts: VerifyOptions): Promise<void> {
     const fs = require("fs");
     const path = require("path");
 
-    // Auto-read compiler settings from hardhat config
+    // Compiler settings: opts > build-info > hardhat config (no hardcoded defaults)
     const solcConfig = hre.config?.solidity?.compilers?.[0] || hre.config?.solidity || {};
-    const compiler = opts.compiler || solcConfig.version || "0.8.25";
-    const optimizer = opts.optimizer ?? solcConfig.settings?.optimizer?.enabled ?? true;
-    const optimizerRuns = opts.optimizerRuns ?? solcConfig.settings?.optimizer?.runs ?? 200;
-    const evmVersion = solcConfig.settings?.evmVersion || "london";
-    const viaIR = solcConfig.settings?.viaIR ? "1" : "0";
+    let compiler = opts.compiler || solcConfig.version || "";
+    let optimizer = opts.optimizer ?? solcConfig.settings?.optimizer?.enabled;
+    let optimizerRuns = opts.optimizerRuns ?? solcConfig.settings?.optimizer?.runs;
+    let evmVersion = solcConfig.settings?.evmVersion || "";
+    let viaIR = solcConfig.settings?.viaIR ? "1" : "0";
 
     // Convert address to Tron format
     let address = opts.address;
@@ -89,22 +99,21 @@ async function verifyTron(hre: any, opts: VerifyOptions): Promise<void> {
     const outputDir = path.join(process.cwd(), "verify-output");
     const flattenPath = path.join(outputDir, `${opts.contractName}_flatten.sol`);
 
-    console.log(`generating flatten for ${opts.contractName}...`);
-    try {
-        // Find actual source path from artifact
-        const artifact = await hre.artifacts.readArtifact(opts.contractName);
-        const sourcePath = artifact.sourceName; // e.g. "contracts/factory/Create2Factory.sol"
-        let flattenedSource = await hre.run("flatten:get-flattened-sources", {
-            files: [sourcePath],
-        });
-        flattenedSource = removeDuplicateSPDX(flattenedSource);
-        fs.mkdirSync(outputDir, { recursive: true });
-        fs.writeFileSync(flattenPath, flattenedSource);
-        console.log(`flatten saved to: ${flattenPath}`);
-    } catch (e) {
-        if (fs.existsSync(flattenPath)) {
-            console.log(`using existing flatten: ${flattenPath}`);
-        } else {
+    if (fs.existsSync(flattenPath)) {
+        console.log(`using existing flatten: ${flattenPath}`);
+    } else {
+        console.log(`generating flatten for ${opts.contractName}...`);
+        try {
+            const artifact = await hre.artifacts.readArtifact(opts.contractName);
+            const sourcePath = artifact.sourceName;
+            let flattenedSource = await hre.run("flatten:get-flattened-sources", {
+                files: [sourcePath],
+            });
+            flattenedSource = removeDuplicateSPDX(flattenedSource);
+            fs.mkdirSync(outputDir, { recursive: true });
+            fs.writeFileSync(flattenPath, flattenedSource);
+            console.log(`flatten saved to: ${flattenPath}`);
+        } catch (e) {
             console.log(`flatten failed, generate manually: forge flatten contracts/${opts.contractName}.sol`);
             return;
         }
@@ -124,28 +133,47 @@ async function verifyTron(hre: any, opts: VerifyOptions): Promise<void> {
         const form = new FormData();
         form.append("contractAddress", address);
         form.append("contractName", opts.contractName);
-        // Read full compiler version from build-info (includes commit hash)
+        // Read compiler settings from build-info that contains this contract
         let fullCompiler = `v${compiler}`;
         try {
             const buildInfoDir = path.join(process.cwd(), "artifacts/build-info");
-            const buildInfoFiles = fs.readdirSync(buildInfoDir);
-            if (buildInfoFiles.length > 0) {
-                const buildInfo = JSON.parse(fs.readFileSync(
-                    path.join(buildInfoDir, buildInfoFiles[0]), "utf-8"
-                ));
-                if (buildInfo.solcLongVersion) {
-                    fullCompiler = `v${buildInfo.solcLongVersion}`;
+            const buildInfoFiles = fs.readdirSync(buildInfoDir).filter((f: string) => f.endsWith(".json"));
+            const artifact = await hre.artifacts.readArtifact(opts.contractName);
+            const sourceName = artifact.sourceName;
+
+            for (const file of buildInfoFiles) {
+                const buildInfo = JSON.parse(fs.readFileSync(path.join(buildInfoDir, file), "utf-8"));
+                if (buildInfo.output?.contracts?.[sourceName]?.[opts.contractName]) {
+                    if (buildInfo.solcLongVersion) {
+                        fullCompiler = `v${buildInfo.solcLongVersion}`;
+                    }
+                    // Override settings from actual build-info input
+                    const settings = buildInfo.input?.settings;
+                    if (settings) {
+                        if (settings.evmVersion) evmVersion = settings.evmVersion;
+                        if (settings.optimizer != null) {
+                            optimizer = settings.optimizer.enabled ?? optimizer;
+                            optimizerRuns = settings.optimizer.runs ?? optimizerRuns;
+                        }
+                        if (settings.viaIR != null) viaIR = settings.viaIR ? "1" : "0";
+                    }
+                    break;
                 }
             }
         } catch (e: any) {
             console.log(`[warn] could not read build-info: ${e.message}`);
         }
+        if (!fullCompiler.includes("+commit.")) {
+            console.log(`[error] could not determine full compiler version (got: ${fullCompiler}). Run 'npx hardhat compile' to generate build-info.`);
+            printTronVerifyInfo(address, opts.contractName, fullCompiler, !!optimizer, optimizerRuns || 200, evmVersion || "london", flattenPath, chainId);
+            return;
+        }
         form.append("compiler", fullCompiler);
         form.append("license", "3"); // MIT
         form.append("optimizer", optimizer ? "1" : "0");
-        form.append("runs", String(optimizerRuns));
+        form.append("runs", String(optimizerRuns ?? 200));
         form.append("viaIR", viaIR);
-        form.append("evmVersion", evmVersion);
+        form.append("evmVersion", evmVersion || "london");
         // Encode constructor params from ABI if not pre-encoded
         let constructorParams = opts.constructorParams || "";
         if (!constructorParams && opts.constructorArgs && opts.constructorArgs.length > 0) {
@@ -180,10 +208,13 @@ async function verifyTron(hre: any, opts: VerifyOptions): Promise<void> {
             form.pipe(req);
         });
 
-        if (result.code === 200 || result.success) {
-            console.log(`${opts.contractName} verified on TronScan: ${result.data?.message || "success"}`);
+        console.log(`TronScan raw response:`, JSON.stringify(result, null, 2));
+        const status = result.data?.status;
+        if ((result.code === 200 && (status === 200 || status === 2006)) || result.success) {
+            console.log(`${opts.contractName} verified on TronScan`);
         } else {
-            console.log(`TronScan response:`, JSON.stringify(result, null, 2));
+            console.log(`verification failed (status: ${status}): ${result.data?.message || "unknown"}`);
+            console.log(`  compiler: ${fullCompiler}, evmVersion: ${evmVersion}, optimizer: ${optimizer}, runs: ${optimizerRuns}, viaIR: ${viaIR}`);
             printTronVerifyInfo(address, opts.contractName, fullCompiler, optimizer, optimizerRuns, evmVersion, flattenPath, chainId);
         }
     } catch (e: any) {

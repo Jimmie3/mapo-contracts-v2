@@ -1,9 +1,21 @@
 {
   "name": "@mapprotocol/common-contracts",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Common contracts for MAP Protocol",
   "main": "typechain-types/index.js",
   "types": "typechain-types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./typechain-types/index.d.ts",
+      "default": "./typechain-types/index.js"
+    },
+    "./utils/*": {
+      "types": "./utils/dist/*.d.ts",
+      "default": "./utils/dist/*.js"
+    },
+    "./contracts/*": "./contracts/*",
+    "./script/*": "./script/*"
+  },
   "files": [
     "contracts/**/*.sol",
     "artifacts/contracts/**/*.json",
@@ -11,6 +23,7 @@
     "typechain-types/**/*",
     "utils/**/*.ts",
     "utils/dist/**/*",
+    "script/base/**/*.sol",
     "README.md"
   ],
   "repository": {

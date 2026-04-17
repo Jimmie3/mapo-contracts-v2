@@ -28,7 +28,7 @@ export async function verify(hre: any, opts: VerifyOptions): Promise<void> {
     const network = hre.network.name;
 
     if (isTronNetwork(network)) {
-        await verifyTron(hre, network, opts);
+        await verifyTron(hre, opts);
     } else {
         await verifyEvm(hre, opts);
     }
@@ -66,7 +66,7 @@ async function verifyEvm(hre: any, opts: VerifyOptions): Promise<void> {
 // Tron verification via TronScan API
 // ============================================================
 
-async function verifyTron(hre: any, network: string, opts: VerifyOptions): Promise<void> {
+async function verifyTron(hre: any, opts: VerifyOptions): Promise<void> {
     const chainId = hre.network.config.chainId;
     const fs = require("fs");
     const path = require("path");

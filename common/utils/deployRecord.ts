@@ -26,7 +26,7 @@ export interface DeploymentPath {
 
 export interface DeploymentOptions {
     basePath?: string;  // defaults to <cwd>/deployments/
-    env?: string;       // "prod", "main", "test". defaults to "test"
+    env: string;        // "prod", "main", "test" — required
 }
 
 function defaultDeployPath(): string {
@@ -51,9 +51,9 @@ export function resolveDeploymentPath(network: string, env: string): DeploymentP
  * @param key - contract key (e.g. "Gateway", "Authority")
  * @param opts - optional basePath and env overrides
  */
-export async function getDeploymentByKey(network: string, key: string, opts?: DeploymentOptions): Promise<string> {
-    const deployPath = opts?.basePath || defaultDeployPath();
-    const { env, chain } = resolveDeploymentPath(network, opts?.env);
+export async function getDeploymentByKey(network: string, key: string, opts: DeploymentOptions): Promise<string> {
+    const deployPath = opts.basePath || defaultDeployPath();
+    const { env, chain } = resolveDeploymentPath(network, opts.env);
     const data = await readDeployFile(deployPath);
     const addr = data[env]?.[chain]?.[key];
     if (!addr) throw new Error(`no ${key} deployment in ${env}.${chain}`);
@@ -66,10 +66,10 @@ export async function getDeploymentByKey(network: string, key: string, opts?: De
  * @param key - contract key
  * @param opts - optional basePath and env overrides
  */
-export async function hasDeployment(network: string, key: string, opts?: DeploymentOptions): Promise<boolean> {
+export async function hasDeployment(network: string, key: string, opts: DeploymentOptions): Promise<boolean> {
     try {
-        const deployPath = opts?.basePath || defaultDeployPath();
-        const { env, chain } = resolveDeploymentPath(network, opts?.env);
+        const deployPath = opts.basePath || defaultDeployPath();
+        const { env, chain } = resolveDeploymentPath(network, opts.env);
         const data = await readDeployFile(deployPath);
         const addr = data[env]?.[chain]?.[key];
         return !!addr && addr.length > 2 && addr !== "0x";
@@ -85,9 +85,9 @@ export async function hasDeployment(network: string, key: string, opts?: Deploym
  * @param addr - deployed address
  * @param opts - optional basePath and env overrides
  */
-export async function saveDeployment(network: string, key: string, addr: string, opts?: DeploymentOptions): Promise<void> {
-    const deployPath = opts?.basePath || defaultDeployPath();
-    const { env, chain } = resolveDeploymentPath(network, opts?.env);
+export async function saveDeployment(network: string, key: string, addr: string, opts: DeploymentOptions): Promise<void> {
+    const deployPath = opts.basePath || defaultDeployPath();
+    const { env, chain } = resolveDeploymentPath(network, opts.env);
     const data = await readDeployFile(deployPath);
     if (!data[env]) data[env] = {};
     if (!data[env][chain]) data[env][chain] = {};

@@ -1,6 +1,6 @@
 {
   "name": "@mapprotocol/common-contracts",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Common contracts for MAP Protocol",
   "main": "typechain-types/index.js",
   "types": "typechain-types/index.d.ts",
@@ -10,6 +10,7 @@
     "!artifacts/contracts/**/*.dbg.json",
     "typechain-types/**/*",
     "utils/**/*.ts",
+    "utils/dist/**/*",
     "README.md"
   ],
   "repository": {
@@ -31,12 +32,13 @@
     "test": "forge test",
     "test:hardhat": "hardhat test",
     "format": "forge fmt",
-    "clean": "forge clean && hardhat clean && rm -rf typechain-types",
+    "build:utils": "cd utils && tsc",
+    "clean": "forge clean && hardhat clean && rm -rf typechain-types utils/dist",
     "compile": "hardhat compile",
     "typecheck": "tsc --noEmit",
     "gas-report": "forge test --gas-report",
     "coverage": "forge coverage",
-    "prepublishOnly": "npm run clean && npm run build:hardhat && npm run typecheck"
+    "prepublishOnly": "npm run clean && npm run build:hardhat && npm run build:utils && npm run typecheck"
   },
   "keywords": [
     "solidity",

@@ -1,6 +1,6 @@
 {
   "name": "@mapprotocol/common-contracts",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Common contracts for MAP Protocol",
   "main": "typechain-types/index.js",
   "types": "typechain-types/index.d.ts",
@@ -81,5 +81,8 @@
     "ts-node": ">=8.0.0",
     "typechain": "^8.3.0",
     "typescript": ">=4.5.0"
+  },
+  "overrides": {
+    "axios": "1.15.0"
   }
 }

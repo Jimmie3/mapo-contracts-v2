@@ -5,7 +5,10 @@ import * as dotenv from "dotenv";
 import "./tasks";
 dotenv.config();
 
-
+const PRIVATE_KEY = process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [];
+const TESTNET_PRIVATE_KEY = process.env.TESTNET_PRIVATE_KEY ? [process.env.TESTNET_PRIVATE_KEY] : [];
+const TRON_PRIVATE_KEY = process.env.TRON_PRIVATE_KEY ? [process.env.TRON_PRIVATE_KEY] : [];
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
 const config: HardhatUserConfig = {
   paths: {
@@ -29,108 +32,90 @@ const config: HardhatUserConfig = {
       url: "http://127.0.0.1:8545",
     },
 
+    // Testnets
     Mapo_test: {
       chainId: 212,
       url: "https://testnet-rpc.maplabs.io",
-      accounts: process.env.TESTNET_PRIVATE_KEY !== undefined ? [process.env.TESTNET_PRIVATE_KEY] : [],
+      accounts: TESTNET_PRIVATE_KEY,
     },
-
     Tron_test: {
-      url: `https://nile.trongrid.io/jsonrpc`,
       chainId: 3448148188,
-      accounts: process.env.TESTNET_PRIVATE_KEY !== undefined ? [process.env.TESTNET_PRIVATE_KEY] : [],
+      url: process.env.TRON_TEST_RPC_URL || "https://nile.trongrid.io/jsonrpc",
+      accounts: TESTNET_PRIVATE_KEY,
     },
-
     Eth_test: {
-      url: `https://eth-sepolia.api.onfinality.io/public`,
       chainId: 11155111,
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: "https://eth-sepolia.api.onfinality.io/public",
+      accounts: TESTNET_PRIVATE_KEY,
     },
-
     Bsc_test: {
-      url: `https://api.zan.top/bsc-testnet`,
       chainId: 97,
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: "https://api.zan.top/bsc-testnet",
+      accounts: TESTNET_PRIVATE_KEY,
     },
 
+    // Mainnets
     Mapo: {
       chainId: 22776,
       url: "https://rpc.maplabs.io",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: PRIVATE_KEY,
     },
-
     Eth: {
-      url: "https://eth-mainnet.public.blastapi.io",
       chainId: 1,
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: "https://eth-mainnet.public.blastapi.io",
+      accounts: PRIVATE_KEY,
     },
-
     Bsc: {
-      url: `https://bsc-rpc.publicnode.com`,
       chainId: 56,
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: "https://bsc-rpc.publicnode.com",
+      accounts: PRIVATE_KEY,
     },
-
     Base: {
-      url: `https://1rpc.io/base`,
       chainId: 8453,
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: "https://1rpc.io/base",
+      accounts: PRIVATE_KEY,
     },
-
     Arb: {
-      url: `https://arb-one.api.pocket.network`,
       chainId: 42161,
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: "https://arb-one.api.pocket.network",
+      accounts: PRIVATE_KEY,
     },
-
     Op: {
-      url: `https://optimism-public.nodies.app`,
       chainId: 10,
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: "https://optimism-public.nodies.app",
+      accounts: PRIVATE_KEY,
     },
-
     Uni: {
-      url: `https://unichain.drpc.org`,
       chainId: 130,
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: "https://unichain.drpc.org",
+      accounts: PRIVATE_KEY,
     },
-
     Pol: {
-      url: `https://polygon.rpc.subquery.network/public`,
       chainId: 137,
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: "https://polygon.rpc.subquery.network/public",
+      accounts: PRIVATE_KEY,
     },
-
     Xlayer: {
-      url: `https://rpc.xlayer.tech`,
       chainId: 196,
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: "https://rpc.xlayer.tech",
+      accounts: PRIVATE_KEY,
     },
-
     Tron: {
-      url: `https://api.trongrid.io/jsonrpc`,
       chainId: 728126428,
-      accounts: process.env.TRON_PRIVATE_KEY !== undefined ? [process.env.TRON_PRIVATE_KEY] : [],
+      url: process.env.TRON_RPC_URL || "https://api.trongrid.io/jsonrpc",
+      accounts: TRON_PRIVATE_KEY,
     },
   },
   etherscan: {
     apiKey: {
       Mapo: " ",
-      Eth: process.env.ETHERSCAN_API_KEY || "",
-      Bsc: process.env.ETHERSCAN_API_KEY || "",
-      Base: process.env.ETHERSCAN_API_KEY || "",
-      Arb: process.env.ETHERSCAN_API_KEY || "",
-      Op: process.env.ETHERSCAN_API_KEY || "",
-      Uni: process.env.ETHERSCAN_API_KEY || "",
-      Pol: process.env.ETHERSCAN_API_KEY || "",
+      Eth: ETHERSCAN_API_KEY,
+      Bsc: ETHERSCAN_API_KEY,
+      Base: ETHERSCAN_API_KEY,
+      Arb: ETHERSCAN_API_KEY,
+      Op: ETHERSCAN_API_KEY,
+      Uni: ETHERSCAN_API_KEY,
+      Pol: ETHERSCAN_API_KEY,
       Xlayer: " ",
     },
     customChains: [
@@ -158,7 +143,6 @@ const config: HardhatUserConfig = {
           browserURL: "https://bscscan.com/",
         },
       },
-
       {
         network: "Base",
         chainId: 8453,
@@ -167,7 +151,6 @@ const config: HardhatUserConfig = {
           browserURL: "https://basescan.com/",
         },
       },
-
       {
         network: "Arb",
         chainId: 42161,

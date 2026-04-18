@@ -30,15 +30,15 @@
     "@types/mocha": "^10.0.0",
     "@types/node": "^20.0.0",
     "chai": "^4.2.0",
+    "dotenv": "^16.0.3",
     "ethers": "^6.4.0",
     "hardhat": "^2.19.0",
     "hardhat-gas-reporter": "^1.0.8",
     "solidity-coverage": "^0.8.1",
+    "tronweb": "^5.3.0",
     "ts-node": "^10.0.0",
     "typechain": "^8.3.0",
-    "typescript": "^5.0.0",
-    "dotenv": "^16.0.3",
-    "tronweb": "^5.3.0"
+    "typescript": "^5.0.0"
   },
   "keywords": [
     "solidity",
@@ -50,8 +50,11 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@mapprotocol/common-contracts": "^0.1.1",
+    "@mapprotocol/common-contracts": "^0.4.0",
     "@openzeppelin/contracts": "5.4.0",
     "@openzeppelin/contracts-upgradeable": "5.4.0"
+  },
+  "overrides": {
+    "axios": "1.15.0"
   }
 }

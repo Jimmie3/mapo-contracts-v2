@@ -7,7 +7,7 @@ import {
     getTokenRegisterByTokenName,
     getAllTokenRegister
 } from "../utils/utils"
-import { addressToHex } from "../utils/addressUtil"
+import { addressToHex } from "@mapprotocol/common-contracts/utils/addressCodec"
 
 task("registry:registerAllChains", "register all chain info")
     .addOptionalParam("dryrun", "dry run mode, only show diff (set false to execute)", "true")

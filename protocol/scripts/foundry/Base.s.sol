@@ -1,40 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-
-import { IFactory } from "./interfaces/IFactory.sol";
-import { Script, stdJson, console } from "forge-std/Script.sol";
-// import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { ERC1967Proxy } from "../../contracts/ERC1967Proxy.sol";
-
+import {BaseScript as CommonBaseScript, console} from "@mapprotocol/common-contracts/script/base/Base.s.sol";
 
 /**
  * @title BaseScript
- * @notice Base contract for deployment scripts with verification support
- * @dev Supports both Blockscout (MAPO) and Etherscan-compatible explorers
- *
- * Verification Examples:
- *
- * 1. MAPO Mainnet (Blockscout):
- *    forge verify-contract <ADDRESS> <CONTRACT> \
- *      --verifier blockscout \
- *      --verifier-url https://explorer-api.chainservice.io/api
- *
- * 2. MAPO Testnet (Blockscout):
- *    forge verify-contract <ADDRESS> <CONTRACT> \
- *      --verifier blockscout \
- *      --verifier-url https://testnet-explorer-api.chainservice.io/api
- *
- * 3. Etherscan-compatible chains:
- *    forge verify-contract <ADDRESS> <CONTRACT> \
- *      --etherscan-api-key $API_KEY \
- *      --chain-id <CHAIN_ID>
+ * @notice Protocol-specific base, extends common BaseScript with verification helpers
  */
-abstract contract BaseScript is Script {
-    IFactory constant private factory = IFactory(0x6258e4d2950757A749a4d4683A7342261ce12471);
-    using stdJson for string;
-    address internal broadcaster;
-    uint256 private broadcasterPK;
+abstract contract BaseScript is CommonBaseScript {
 
     // Struct to store deployment info for verification
     struct DeploymentInfo {
@@ -47,163 +20,10 @@ abstract contract BaseScript is Script {
     // Store deployments for batch verification
     DeploymentInfo[] internal deployments;
 
-    constructor() {
-        uint256 privateKey;
-        if (block.chainid == 212) {
-            privateKey = vm.envUint("TESTNET_PRIVATE_KEY");
-        } else {
-            privateKey = vm.envUint("PRIVATE_KEY");
-        }
-
-        broadcaster = vm.addr(privateKey);
-        broadcasterPK = privateKey;
-    }
-
-    modifier broadcast() {
-        vm.startBroadcast(broadcasterPK);
-        _;
-        vm.stopBroadcast();
-    }
-
-    function deployProxyByFactory(string memory salt, address impl, bytes memory initData) internal returns(address addr) {
-        addr = deployByFactory(salt, type(ERC1967Proxy).creationCode, abi.encode(impl, initData));
-    }
-
-    function deployByFactory(string memory salt, bytes memory creationCode, bytes memory param) internal returns(address addr) {
-        addr = factory.getAddress(keccak256(bytes(salt)));
-        if(addr.code.length > 0 ) revert ("addr already exist");
-        bytes memory code = abi.encodePacked(creationCode, param);
-        factory.deploy(keccak256(bytes(salt)), code, 0);
-    }
-
-    function deployProxy(address impl, bytes memory initData)  internal returns(address) {
-        ERC1967Proxy p = new ERC1967Proxy(impl, initData);
-        return address(p);
-    }
-
-    function readConfigAddr(string memory networkName, string memory key) internal view returns(address addr) {
-        string memory configPath = "deployments/deploy.json";
-        if (!vm.exists(configPath)) {
-            revert(string(abi.encodePacked("Config file not found: ", configPath)));
-        }
-        string memory config = vm.readFile(configPath);
-        string memory path = string(abi.encodePacked(".", networkName, ".", key));
-        addr = config.readAddress(path);
-    }
-
-    function readConfigUint(string memory networkName, string memory key) internal view returns(uint256 v) {
-        string memory configPath = "deployments/deploy.json";
-        if (!vm.exists(configPath)) {
-            revert(string(abi.encodePacked("Config file not found: ", configPath)));
-        }
-        string memory config = vm.readFile(configPath);
-        string memory path = string(abi.encodePacked(".", networkName, ".", key));
-        v = config.readUint(path);
-    }
-
-    function saveConfig(string memory networkName, string memory key, address addr) internal {
-        string memory configPath = "deployments/deploy.json";
-        string memory path = string(abi.encodePacked(".", networkName, ".", key));
-        string memory json = vm.readFile(configPath);
-        bool exists = vm.keyExistsJson(json, path);
-        string memory addrStr = vm.toString(addr);
-        if(exists) {
-            vm.writeJson(addrStr, configPath, path);
-        } else {
-            revert(string(abi.encodePacked("key:", key, "not exists")));
-        }
-    }
-
-    function getNetworkName() internal view returns (string memory) {
-        uint256 chainId = block.chainid;
-        string memory suffix = vm.envOr("NETWORK_SUFFIX", string(""));
-        bool isMain = keccak256(bytes(suffix)) == keccak256(bytes("main"));
-        if(chainId == 212) return "Mapo_test";
-        if(chainId == 11155111) return "Eth_test";
-        if(chainId == 97) return "Bsc_test";
-
-        
-        if(chainId == 22776) {
-            if(isMain) {
-                return "Mapo_main";
-            } else {
-                return "Mapo_prod";
-            }
-        } 
-        if(chainId == 1) {
-            if(isMain) {
-                return "Eth_main";
-            } else {
-                return "Eth_prod";
-            }
-        } 
-        
-        if(chainId == 56) {
-            if(isMain) {
-                return "Bsc_main";
-            } else {
-                return "Bsc_prod";
-            }
-        }
-        
-        if(chainId == 8453){
-            if(isMain) {
-                return "Base_main";
-            } else {
-                return "Base_prod";
-            }
-        }
-
-        if(chainId == 42161){
-            if(isMain) {
-                return "Arb_main";
-            } else {
-                return "Arb_prod";
-            }
-        }
-
-        if(chainId == 10){
-            if(isMain) {
-                return "Op_main";
-            } else {
-                return "Op_prod";
-            }
-        }
-
-        if(chainId == 130){
-            if(isMain) {
-                return "Uni_main";
-            } else {
-                return "Uni_prod";
-            }
-        }
-
-        if(chainId == 137){
-            if(isMain) {
-                return "Pol_main";
-            } else {
-                return "Pol_prod";
-            }
-        }
-
-        if(chainId == 196){
-            if(isMain) {
-                return "Xlayer_main";
-            } else {
-                return "Xlayer_prod";
-            }
-        }
-        revert("unknown");
-    }
-
     // ==================== Verification Helpers ====================
 
     /**
      * @notice Store deployment info for later verification
-     * @param proxy The proxy contract address
-     * @param implementation The implementation contract address
-     * @param contractName The contract name for verification
-     * @param initData The initialization data used in proxy constructor
      */
     function _recordDeployment(
         address proxy,
@@ -221,7 +41,6 @@ abstract contract BaseScript is Script {
 
     /**
      * @notice Print verification commands for all recorded deployments
-     * @dev Uses foundry.toml [etherscan] config for API URLs
      */
     function printVerificationCommands() internal view {
         uint256 chainId = block.chainid;
@@ -280,14 +99,5 @@ abstract contract BaseScript is Script {
             result[i - lastSlash] = pathBytes[i];
         }
         return string(result);
-    }
-
-    /**
-     * @notice Check if current chain uses Blockscout explorer
-     * @return True if chain uses Blockscout
-     */
-    function _isBlockscoutChain() internal view returns (bool) {
-        uint256 chainId = block.chainid;
-        return (chainId == 212 || chainId == 22776);
     }
 }

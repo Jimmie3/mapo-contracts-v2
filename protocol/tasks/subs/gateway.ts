@@ -1,35 +1,69 @@
-import { task } from "hardhat/config";
+import { task, types } from "hardhat/config";
 import { Gateway, VaultManager } from "../../typechain-types/contracts"
 import { getDeploymentByKey, getChainTokenByNetwork, getAllChainTokens, saveDeployment} from "../utils/utils"
-import { tronDeploy, tronFromHex, tronToHex, getTronContract } from "../utils/tronUtil"
-import { addressToHex } from "../utils/addressUtil"
+import { TronClient, tronFromHex, tronToHex, isTronNetwork } from "@mapprotocol/common-contracts/utils/tronHelper"
+import { addressToHex } from "@mapprotocol/common-contracts/utils/addressCodec"
 
 
-task("gateway:tronDeploy", "set wtoken address")
+
+task("gateway:deploy", "deploy Gateway (EVM and Tron)")
+    .addOptionalParam("salt", "salt for factory deployment", "", types.string)
+    .addOptionalParam("impl", "existing implementation address (skip impl deploy)", "", types.string)
+    .addOptionalParam("verify", "verify contract after deploy", "false", types.string)
     .setAction(async (taskArgs, hre) => {
-        const { network, ethers } = hre;
-        if(network.name !== "Tron" && network.name !== "tron_test") {
-            throw ("only support tron");
-        }
+        const { network } = hre;
+        const { createDeployer } = require("@mapprotocol/common-contracts/utils/deployer");
 
         let authority = await getDeploymentByKey(network.name, "Authority");
-        if(!authority || authority.length === 0) throw("authority not set");
+        if (!authority || authority.length === 0) throw("authority not set");
 
-        let impl = await tronDeploy("Gateway", [], hre.artifacts, network.name);
+        const deployer = createDeployer(hre, { autoVerify: taskArgs.verify === "true" });
+        console.log(`deploying Gateway on ${network.name}...`);
 
-        const GatewayFactory = await ethers.getContractFactory("Gateway");
+        let authorityHex = deployer.isTron ? tronToHex(authority) : authority;
+        let result;
 
-        let data = GatewayFactory.interface.encodeFunctionData("initialize", [await tronToHex(authority, network.name)]);
+        if (taskArgs.impl) {
+            // Use existing implementation, only deploy proxy
+            let implAddr = deployer.isTron ? tronToHex(taskArgs.impl) : taskArgs.impl;
+            console.log(`using existing implementation: ${taskArgs.impl}`);
 
-        let addr = await tronDeploy("ERC1967Proxy", [impl, data], hre.artifacts, network.name);
-        
-        await saveDeployment(network.name, "Gateway", await tronFromHex(addr, network.name));
+            // Encode initData
+            const { Interface } = require("ethers");
+            const artifact = await hre.artifacts.readArtifact("Gateway");
+            const initData = new Interface(artifact.abi).encodeFunctionData("initialize", [authorityHex]);
+
+            // Deploy proxy only
+            let proxyResult = await deployer.deploy("ERC1967Proxy", [implAddr, initData], taskArgs.salt);
+            result = { proxy: proxyResult.address, implementation: taskArgs.impl };
+        } else {
+            result = await deployer.deployProxy("Gateway", [authorityHex], taskArgs.salt);
+        }
+
+        console.log(`Gateway proxy: ${result.proxy}`);
+        console.log(`Gateway implementation: ${result.implementation}`);
+
+        await saveDeployment(network.name, "Gateway", result.proxy);
+
+        // Set wToken if configured
+        // Wait for network to index the new contract (especially on Tron)
+        if (deployer.isTron) {
+            console.log("waiting for contract to be indexed...");
+            await new Promise(r => setTimeout(r, 5000));
+        }
         let wtoken = await getDeploymentByKey(network.name, "wToken");
-        if(wtoken && wtoken.length > 0) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
-            console.log(`pre wtoken address is: `, await tronFromHex(await c.wToken().call(), network.name));
-            await c.setWtoken(await tronToHex(wtoken, network.name)).send();
-            console.log(`after wtoken address is: `, await tronFromHex(await c.wToken().call(), network.name))
+        if (wtoken && wtoken.length > 0) {
+            if (deployer.isTron) {
+                let client = TronClient.fromHre(hre);
+                let gw = await client.getContract(hre.artifacts, "Gateway", result.proxy);
+                console.log(`pre wtoken: ${tronFromHex(await gw.wToken().call())}`);
+                await gw.setWtoken(tronToHex(wtoken)).sendAndWait();
+                console.log(`after wtoken: ${tronFromHex(await gw.wToken().call())}`);
+            } else {
+                const gateway = await hre.ethers.getContractAt("Gateway", result.proxy);
+                await(await gateway.setWtoken(wtoken)).wait();
+                console.log(`wtoken set to: ${await gateway.wToken()}`);
+            }
         }
 });
 
@@ -44,15 +78,16 @@ task("gateway:setWtoken", "set wtoken address")
             addr = await getDeploymentByKey(network.name, "Gateway");
         }
         if(isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
-            let currentWtoken = await tronFromHex(await c.wToken().call(), network.name);
+            let client = TronClient.fromHre(hre);
+                let c = await client.getContract(hre.artifacts, "Gateway", addr);
+            let currentWtoken = tronFromHex(await c.wToken().call());
             if (currentWtoken.toLowerCase() === wtoken.toLowerCase()) {
                 console.log(`wtoken already set to ${currentWtoken}, skipping`);
                 return;
             }
             console.log(`on-chain wtoken: ${currentWtoken}, config wtoken: ${wtoken}, updating...`);
-            await c.setWtoken(await tronToHex(wtoken, network.name)).send();
-            console.log(`after wtoken address is: `, await tronFromHex(await c.wToken().call(), network.name))
+            await c.setWtoken(tronToHex(wtoken)).sendAndWait();
+            console.log(`after wtoken address is: `, tronFromHex(await c.wToken().call()))
         } else {
             const [deployer] = await ethers.getSigners();
             console.log("deployer address:", await deployer.getAddress())
@@ -76,21 +111,22 @@ task("gateway:setTssAddress", "set tss pubkey")
 
         let addr = await getDeploymentByKey(network.name, "Gateway");
 
-        let tssPubkey = await getPubkey(network.name, ethers);
+        let tssPubkey = await getPubkey(ethers);
         
         if(!tssPubkey) throw("tss not active yet, cannot get pubkey");
         if(tssPubkey.length !== 130) throw("invalid pubkey length");
         console.log(`current active tss pubkey is ${tssPubkey}`);
 
         if(isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
+            let client = TronClient.fromHre(hre);
+                let c = await client.getContract(hre.artifacts, "Gateway", addr);
             let currentPubkey = await c.activeTss().call();
             if (currentPubkey.toLowerCase() === tssPubkey.toLowerCase()) {
                 console.log(`pubkey already set to ${currentPubkey}, skipping`);
                 return;
             }
             console.log(`on-chain pubkey: ${currentPubkey}, config pubkey: ${tssPubkey}, updating...`);
-            await c.setTssAddress(tssPubkey).send();
+            await c.setTssAddress(tssPubkey).sendAndWait();
             console.log(`after pubkey is: `, await c.activeTss().call())
         } else {
             console.log("deployer address:", await deployer.getAddress())
@@ -122,15 +158,16 @@ task("gateway:setTransferFailedReceiver", "set Transfer Failed Receiver")
         if(!transferFailedReceiver || transferFailedReceiver.length == 0) return;
 
         if(isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
-            let currentReceiver = await tronFromHex(await c.transferFailedReceiver().call(), network.name);
+            let client = TronClient.fromHre(hre);
+                let c = await client.getContract(hre.artifacts, "Gateway", addr);
+            let currentReceiver = tronFromHex(await c.transferFailedReceiver().call());
             if (currentReceiver.toLowerCase() === transferFailedReceiver.toLowerCase()) {
                 console.log(`transferFailedReceiver already set to ${currentReceiver}, skipping`);
                 return;
             }
             console.log(`on-chain transferFailedReceiver: ${currentReceiver}, config: ${transferFailedReceiver}, updating...`);
-            await c.setTransferFailedReceiver(await tronToHex(transferFailedReceiver, network.name)).send();
-            console.log(`after transferFailedReceiver is: `, await tronFromHex(await c.transferFailedReceiver().call(), network.name))
+            await c.setTransferFailedReceiver(tronToHex(transferFailedReceiver)).sendAndWait();
+            console.log(`after transferFailedReceiver is: `, tronFromHex(await c.transferFailedReceiver().call()))
         } else {
             const [deployer] = await ethers.getSigners();
             console.log("deployer address:", await deployer.getAddress())
@@ -162,14 +199,15 @@ task("gateway:updateMinGasCallOnReceive", "update MinGas CallOnReceive")
         if(!minGasCallOnReceive || minGasCallOnReceive === 0) return;
 
         if(isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
+            let client = TronClient.fromHre(hre);
+                let c = await client.getContract(hre.artifacts, "Gateway", addr);
             let currentMinGas = await c.minGasCallOnReceive().call();
             if (currentMinGas === BigInt(minGasCallOnReceive)) {
                 console.log(`minGasCallOnReceive already set to ${currentMinGas}, skipping`);
                 return;
             }
             console.log(`on-chain minGasCallOnReceive: ${currentMinGas}, config: ${minGasCallOnReceive}, updating...`);
-            await c.updateMinGasCallOnReceive(minGasCallOnReceive).send();
+            await c.updateMinGasCallOnReceive(minGasCallOnReceive).sendAndWait();
             console.log(`after minGasCallOnReceive is: `, await c.minGasCallOnReceive().call())
         } else {
             const [deployer] = await ethers.getSigners();
@@ -206,7 +244,8 @@ task("gateway:updateTokens", "update Tokens")
 
 
         if(isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
+            let client = TronClient.fromHre(hre);
+                let c = await client.getContract(hre.artifacts, "Gateway", addr);
            for (let index = 0; index < tokens.length; index++) {
                 const element = tokens[index];
                 let feature = 0;
@@ -220,7 +259,7 @@ task("gateway:updateTokens", "update Tokens")
                 }
                 console.log(`[diff] ${element.name} tokenFeature: ${pre} -> ${feature}`);
                 if (!dryRun) {
-                    await c.updateTokens([addressToHex(element.addr)], feature).send();
+                    await c.updateTokens([addressToHex(element.addr)], feature).sendAndWait();
                     console.log(`${element.name} after tokenFeature`, await c.tokenFeatureList(addressToHex(element.addr)).call());
                 }
             }
@@ -295,24 +334,25 @@ task("gateway:bridgeOut", "bridge out tokens to another chain")
         const isNativeToken = token === "0x0000000000000000000000000000000000000000";
 
         if (isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
+            let client = TronClient.fromHre(hre);
+            let c = await client.getContract(hre.artifacts, "Gateway", addr);
 
             if (!isNativeToken) {
-                const tokenContract = await getTronContract("IERC20", hre.artifacts, network.name, await tronFromHex(token, network.name));
+                const tokenContract = await client.getContract(hre.artifacts, "IERC20", token);
                 console.log("Approving token...");
-                await tokenContract.approve(await tronToHex(addr, network.name), amount).send();
+                await tokenContract.approve(tronToHex(addr), amount).sendAndWait();
             }
 
             console.log(`Bridging out ${taskArgs.amount} ${tokenInfo.name} to ${taskArgs.tochain}...`);
             const tx = await c.bridgeOut(
-                await tronToHex(token, network.name),
+                tronToHex(token),
                 amount,
                 toChainId,
                 to,
-                await tronToHex(refundAddr, network.name),
+                tronToHex(refundAddr),
                 payload,
                 deadline
-            ).send({ callValue: isNativeToken ? amount : 0 });
+            ).sendAndWait({ callValue: isNativeToken ? amount : 0 });
 
             console.log("Bridge out tx:", tx);
         } else {
@@ -394,22 +434,23 @@ task("gateway:deposit", "deposit tokens to vault")
         const isNativeToken = token === "0x0000000000000000000000000000000000000000";
 
         if (isTronNetwork(network.name)) {
-            let c = await getTronContract("Gateway", hre.artifacts, network.name, await tronFromHex(addr, network.name));
+            let client = TronClient.fromHre(hre);
+            let c = await client.getContract(hre.artifacts, "Gateway", addr);
 
             if (!isNativeToken) {
-                const tokenContract = await getTronContract("IERC20", hre.artifacts, network.name, await tronFromHex(token, network.name));
+                const tokenContract = await client.getContract(hre.artifacts, "IERC20", token);
                 console.log("Approving token...");
-                await tokenContract.approve(await tronToHex(addr, network.name), amount).send();
+                await tokenContract.approve(tronToHex(addr), amount).sendAndWait();
             }
 
             console.log(`Depositing ${taskArgs.amount} ${tokenInfo.name}...`);
             const tx = await c.deposit(
-                await tronToHex(token, network.name),
+                tronToHex(token),
                 amount,
-                await tronToHex(toAddress, network.name),
-                await tronToHex(refundAddr, network.name),
+                tronToHex(toAddress),
+                tronToHex(refundAddr),
                 deadline
-            ).send({ callValue: isNativeToken ? amount : 0 });
+            ).sendAndWait({ callValue: isNativeToken ? amount : 0 });
 
             console.log("Deposit tx:", tx);
         } else {
@@ -450,9 +491,6 @@ task("gateway:deposit", "deposit tokens to vault")
         }
 });
 
-function isTronNetwork(network:string) {
-    return (network === "Tron" || network === "tron_test")
-}
 
 function isRelayChain(network:string) {
     return (network === "Mapo" || network === "Mapo_test")
@@ -499,17 +537,14 @@ async function getChainInfoByName(currentNetwork: string, chainName: string) {
     throw new Error(`Chain ${chainName} not found in config`);
 }
 
-async function getPubkey(chainName: string , ethers: any) {
+async function getPubkey(ethers: any) {
+    const env = process.env.NETWORK_ENV;
+    if (!env) throw new Error("NETWORK_ENV is required (test/prod/main)");
+    const rpcUrl = env === "test" ? "https://testnet-rpc.maplabs.io" : "https://rpc.maplabs.io";
+
+    const addr = await getDeploymentByKey("Mapo", "VaultManager");
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
     const VaultManagerFactory = await ethers.getContractFactory("VaultManager");
-    if(chainName.indexOf("test") > 0) {
-        let addr = await getDeploymentByKey("Mapo_test", "VaultManager");
-        let provider = new ethers.JsonRpcProvider("https://testnet-rpc.maplabs.io");
-        const v = VaultManagerFactory.attach(addr) as VaultManager;
-        return v.connect(provider).getActiveVault();
-    } else {
-        let addr = await getDeploymentByKey("Mapo", "VaultManager");
-        let provider = new ethers.JsonRpcProvider("https://rpc.maplabs.io");
-        const v = VaultManagerFactory.attach(addr) as VaultManager;
-        return v.connect(provider).getActiveVault();
-    }
+    const v = VaultManagerFactory.attach(addr).connect(provider) as VaultManager;
+    return v.getActiveVault();
 }       

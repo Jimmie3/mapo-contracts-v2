@@ -364,14 +364,14 @@
 
         "Tron": {
             "chainId": 728126428, 
-            "lastScanBlock": 0,
+            "lastScanBlock": 81900000,
             "updateGasFeeGap": 3,
             "confirmCount": 6,
             "minGasCallOnReceive": 500000,
             "chainType": "contract",
             "gasToken": "0x593a37fe0F6DFd0b6c5A051e9a44aA0F6922A1a2", 
             "baseFeeToken": "0x33daba9618a75a7aff103e53afe530fbacf4a3dd",
-            "transferFailedReceiver": "TT6GDYkpHPVk24w9he9pavbagtzqBRS3XP",
+            "transferFailedReceiver": "TBfBKHgqaDyBF1m3NA3WkWWfjiA6QuxmwB",
             "tokens": [
                 {
                     "name": "USDT",

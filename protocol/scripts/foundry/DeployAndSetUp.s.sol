@@ -24,6 +24,7 @@ pragma solidity ^0.8.20;
  * Environment Variables:
  *   PRIVATE_KEY          - Mainnet deployer private key
  *   TESTNET_PRIVATE_KEY  - Testnet deployer private key
+ *   NETWORK_ENV          - Required: test/prod/main
  *   GATEWAY_SALT         - Salt for CREATE2 deployment
  *   ETHERSCAN_API_KEY    - Etherscan API key
  */
@@ -49,157 +50,137 @@ contract DeployAndSetUp is BaseScript {
     }
 
     function deploy() internal {
-        string memory networkName = getNetworkName();
-        address authority = readConfigAddr(networkName, "Authority");
+        address authority = readDeployment("Authority");
         console.log("Authority address:", authority);
         uint256 chainId = block.chainid;
         if (chainId == 212 || chainId == 22776) {
-               deployRelay(networkName, authority);
-               deployGasService(networkName, authority);
-               deployProtocolFee(networkName, authority);
-               deployRegistry(networkName, authority);
-               deployVaultManager(networkName, authority);
-               deployViewController(networkName, authority);
+               deployRelay(authority);
+               deployGasService(authority);
+               deployProtocolFee(authority);
+               deployRegistry(authority);
+               deployVaultManager(authority);
+               deployViewController(authority);
         } else {
-               deployGateway(networkName, authority);
+               deployGateway(authority);
         }
     }
 
     function set() internal {
           uint256 chainId = block.chainid;
           if(chainId == 212 || chainId == 22776) {
-               string memory networkName = getNetworkName();
-               address authority = readConfigAddr(networkName, "Authority");
-               console.log("Authority address:", authority);
-               setUp(networkName);
+               setUp();
           } else {
                console.log("nothing to set");
           }
     }
 
-   function deployRelay(string memory networkName, address authority) internal returns(Relay relay) {
+   function deployRelay(address authority) internal returns(Relay relay) {
         string memory salt = vm.envString("GATEWAY_SALT");
-        Relay impl = new Relay();
         bytes memory initData = abi.encodeWithSelector(Relay.initialize.selector, authority);
-        address r = deployProxyByFactory(salt, address(impl), initData);
+        (address r, address impl) = deployProxyByFactory(salt, type(Relay).creationCode, initData);
         relay = Relay(payable(r));
 
         console.log("Relay address:", r);
-        console.log("Relay implementation:", address(impl));
-        saveConfig(networkName, "Relay", r);
+        console.log("Relay implementation:", impl);
+        saveDeployment("Relay", r);
 
-        // Record deployment for verification
-        _recordDeployment(r, address(impl), "Relay", initData);
+        _recordDeployment(r, impl, "Relay", initData);
 
-        address wToken = readConfigAddr(networkName, "wToken");
+        address wToken = readDeployment("wToken");
         relay.setWtoken(wToken);
         console.log("wToken address:", wToken);
-
    }
 
-    function deployGateway(string memory networkName, address authority) internal returns(Gateway gateway) {
+    function deployGateway(address authority) internal returns(Gateway gateway) {
         string memory salt = vm.envString("GATEWAY_SALT");
-        Gateway impl = new Gateway();
         bytes memory initData = abi.encodeWithSelector(Gateway.initialize.selector, authority);
-        address g = deployProxyByFactory(salt, address(impl), initData);
+        (address g, address impl) = deployProxyByFactory(salt, type(Gateway).creationCode, initData);
         gateway = Gateway(payable(g));
 
         console.log("Gateway address:", g);
-        console.log("Gateway implementation:", address(impl));
-        saveConfig(networkName, "Gateway", g);
+        console.log("Gateway implementation:", impl);
+        saveDeployment("Gateway", g);
 
-        // Record deployment for verification
-        _recordDeployment(g, address(impl), "Gateway", initData);
+        _recordDeployment(g, impl, "Gateway", initData);
 
-        address wToken = readConfigAddr(networkName, "wToken");
+        address wToken = readDeployment("wToken");
         gateway.setWtoken(wToken);
         console.log("wToken address:", wToken);
    }
 
-   function deployVaultManager(string memory networkName, address authority) internal returns(VaultManager vaultManager) {
-        VaultManager impl = new VaultManager();
+   function deployVaultManager(address authority) internal returns(VaultManager vaultManager) {
         bytes memory initData = abi.encodeWithSelector(VaultManager.initialize.selector, authority);
-        address v = deployProxy(address(impl), initData);
+        (address v, address impl) = deployProxy(type(VaultManager).creationCode, initData);
         vaultManager = VaultManager(v);
 
         console.log("VaultManager address:", v);
-        console.log("VaultManager implementation:", address(impl));
-        saveConfig(networkName, "VaultManager", v);
+        console.log("VaultManager implementation:", impl);
+        saveDeployment("VaultManager", v);
 
-        // Record deployment for verification
-        _recordDeployment(v, address(impl), "VaultManager", initData);
+        _recordDeployment(v, impl, "VaultManager", initData);
    }
 
-    function deployProtocolFee(string memory networkName, address authority) internal returns(ProtocolFee protocolFee) {
-        ProtocolFee impl = new ProtocolFee();
+    function deployProtocolFee(address authority) internal returns(ProtocolFee protocolFee) {
         bytes memory initData = abi.encodeWithSelector(ProtocolFee.initialize.selector, authority);
-        address p = deployProxy(address(impl), initData);
+        (address p, address impl) = deployProxy(type(ProtocolFee).creationCode, initData);
         protocolFee = ProtocolFee(payable(p));
 
         console.log("ProtocolFee address:", p);
-        console.log("ProtocolFee implementation:", address(impl));
-        saveConfig(networkName, "ProtocolFee", p);
+        console.log("ProtocolFee implementation:", impl);
+        saveDeployment("ProtocolFee", p);
 
-        // Record deployment for verification
-        _recordDeployment(p, address(impl), "ProtocolFee", initData);
+        _recordDeployment(p, impl, "ProtocolFee", initData);
    }
 
-
-    function deployRegistry(string memory networkName, address authority) internal returns(Registry registry) {
-        Registry impl = new Registry();
+    function deployRegistry(address authority) internal returns(Registry registry) {
         bytes memory initData = abi.encodeWithSelector(Registry.initialize.selector, authority);
-        address r = deployProxy(address(impl), initData);
+        (address r, address impl) = deployProxy(type(Registry).creationCode, initData);
         registry = Registry(r);
 
         console.log("Registry address:", r);
-        console.log("Registry implementation:", address(impl));
-        saveConfig(networkName, "Registry", r);
+        console.log("Registry implementation:", impl);
+        saveDeployment("Registry", r);
 
-        // Record deployment for verification
-        _recordDeployment(r, address(impl), "Registry", initData);
+        _recordDeployment(r, impl, "Registry", initData);
    }
 
-   function deployGasService(string memory networkName, address authority) internal returns(GasService gasService) {
-        GasService impl = new GasService();
+   function deployGasService(address authority) internal returns(GasService gasService) {
         bytes memory initData = abi.encodeWithSelector(GasService.initialize.selector, authority);
-        address g = deployProxy(address(impl), initData);
+        (address g, address impl) = deployProxy(type(GasService).creationCode, initData);
         gasService = GasService(g);
 
         console.log("GasService address:", g);
-        console.log("GasService implementation:", address(impl));
-        saveConfig(networkName, "GasService", g);
+        console.log("GasService implementation:", impl);
+        saveDeployment("GasService", g);
 
-        // Record deployment for verification
-        _recordDeployment(g, address(impl), "GasService", initData);
+        _recordDeployment(g, impl, "GasService", initData);
    }
 
-    function deployViewController(string memory networkName, address authority) internal returns(ViewController viewController) {
-        ViewController impl = new ViewController();
+    function deployViewController(address authority) internal returns(ViewController viewController) {
         bytes memory initData = abi.encodeWithSelector(ViewController.initialize.selector, authority);
-        address v = deployProxy(address(impl), initData);
+        (address v, address impl) = deployProxy(type(ViewController).creationCode, initData);
         viewController = ViewController(v);
 
         console.log("ViewController address:", v);
-        console.log("ViewController implementation:", address(impl));
-        saveConfig(networkName, "ViewController", v);
+        console.log("ViewController implementation:", impl);
+        saveDeployment("ViewController", v);
 
-        // Record deployment for verification
-        _recordDeployment(v, address(impl), "len/ViewController", initData);
+        _recordDeployment(v, impl, "len/ViewController", initData);
    }
 
-   function setUp(string memory networkName) internal {
-        address relay_addr = readConfigAddr(networkName, "Relay");
+   function setUp() internal {
+        address relay_addr = readDeployment("Relay");
         console.log("Relay address:", relay_addr);
-        address vaultManager_addr = readConfigAddr(networkName, "VaultManager");
+        address vaultManager_addr = readDeployment("VaultManager");
         console.log("VaultManager address:", vaultManager_addr);
-        address protocolFee_addr = readConfigAddr(networkName, "ProtocolFee");
+        address protocolFee_addr = readDeployment("ProtocolFee");
         console.log("ProtocolFee address:", protocolFee_addr);
-        address gasService_addr = readConfigAddr(networkName, "GasService");
+        address gasService_addr = readDeployment("GasService");
         console.log("GasService address:", gasService_addr);
-        address registry_addr = readConfigAddr(networkName, "Registry");
+        address registry_addr = readDeployment("Registry");
         console.log("Registry address:", registry_addr);
 
-        address TSSManager = readConfigAddr(networkName, "TSSManager");
+        address TSSManager = readDeployment("TSSManager");
         console.log("TSSManager address:", TSSManager);
 
         Relay r = Relay(payable(relay_addr));
@@ -213,8 +194,8 @@ contract DeployAndSetUp is BaseScript {
         GasService g = GasService(gasService_addr);
         g.setRegistry(registry_addr);
 
-        address swapManager = readConfigAddr(networkName, "SwapManager");
-        address affiliateManager = readConfigAddr(networkName, "AffiliateManager");
+        address swapManager = readDeployment("SwapManager");
+        address affiliateManager = readDeployment("AffiliateManager");
         Registry registry = Registry(registry_addr);
         registry.registerContract(ContractType.RELAY, relay_addr);
         registry.registerContract(ContractType.GAS_SERVICE, gasService_addr);
@@ -224,7 +205,7 @@ contract DeployAndSetUp is BaseScript {
         registry.registerContract(ContractType.SWAP, swapManager);
         registry.registerContract(ContractType.PROTOCOL_FEE, protocolFee_addr);
 
-        address viewController_addr = readConfigAddr(networkName, "ViewController");
+        address viewController_addr = readDeployment("ViewController");
         ViewController vc = ViewController(viewController_addr);
         console.log("ViewController address:", viewController_addr);
         vc.setRegistry(registry_addr);
@@ -235,42 +216,27 @@ contract DeployAndSetUp is BaseScript {
    }
 
    function upgrade(string memory c) internal {
-     string memory networkName = getNetworkName();
      if(keccak256(bytes(c)) == keccak256(bytes("Relay"))) {
-          address relay_addr = readConfigAddr(networkName, "Relay");
-          Relay r = Relay(payable(relay_addr));
-          Relay impl = new Relay();
-          r.upgradeToAndCall(address(impl), bytes(""));
+          address relay_addr = readDeployment("Relay");
+          deployAndUpgrade(relay_addr, type(Relay).creationCode);
      } else if(keccak256(bytes(c)) == keccak256(bytes("VaultManager"))) {
-          address vaultManager_addr = readConfigAddr(networkName, "VaultManager");
-          VaultManager v = VaultManager(vaultManager_addr);
-          VaultManager impl = new VaultManager();
-          v.upgradeToAndCall(address(impl), bytes(""));
+          address vaultManager_addr = readDeployment("VaultManager");
+          deployAndUpgrade(vaultManager_addr, type(VaultManager).creationCode);
      } else if(keccak256(bytes(c)) == keccak256(bytes("GasService"))) {
-          address gasService_addr = readConfigAddr(networkName, "GasService");
-          GasService g = GasService(gasService_addr);
-          GasService impl = new GasService();
-          g.upgradeToAndCall(address(impl), bytes(""));
+          address gasService_addr = readDeployment("GasService");
+          deployAndUpgrade(gasService_addr, type(GasService).creationCode);
      } else if(keccak256(bytes(c)) == keccak256(bytes("Registry"))) {
-          address registry_addr = readConfigAddr(networkName, "Registry");
-          Registry r = Registry(registry_addr);
-          Registry impl = new Registry();
-          r.upgradeToAndCall(address(impl), bytes(""));
+          address registry_addr = readDeployment("Registry");
+          deployAndUpgrade(registry_addr, type(Registry).creationCode);
      } else if(keccak256(bytes(c)) == keccak256(bytes("ProtocolFee"))) {
-          address protocolFee_addr = readConfigAddr(networkName, "ProtocolFee");
-          ProtocolFee p = ProtocolFee(payable(protocolFee_addr));
-          ProtocolFee impl = new ProtocolFee();
-          p.upgradeToAndCall(address(impl), bytes(""));
+          address protocolFee_addr = readDeployment("ProtocolFee");
+          deployAndUpgrade(protocolFee_addr, type(ProtocolFee).creationCode);
      } else if(keccak256(bytes(c)) == keccak256(bytes("Gateway"))) {
-          address gateway_addr = readConfigAddr(networkName, "Gateway");
-          Gateway g = Gateway(payable(gateway_addr));
-          Gateway impl = new Gateway();
-          g.upgradeToAndCall(address(impl), bytes(""));
+          address gateway_addr = readDeployment("Gateway");
+          deployAndUpgrade(gateway_addr, type(Gateway).creationCode);
      } else if(keccak256(bytes(c)) == keccak256(bytes("ViewController"))) {
-          address viewController_addr = readConfigAddr(networkName, "ViewController");
-          ViewController v = ViewController(viewController_addr);
-          ViewController impl = new ViewController();
-          v.upgradeToAndCall(address(impl), bytes(""));
+          address viewController_addr = readDeployment("ViewController");
+          deployAndUpgrade(viewController_addr, type(ViewController).creationCode);
      } else {
           revert("unknown contract");
      }

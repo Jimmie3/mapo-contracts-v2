@@ -12,8 +12,29 @@ import "./subs/configuration";
 import "./subs/setup";
 
 
-import { task } from "hardhat/config";
+import { task, types } from "hardhat/config";
 import { getDeploymentByKey, verify } from "./utils/utils"
+
+
+task("verify-contract", "verify a deployed contract on block explorer")
+    .addParam("contract", "contract name (e.g. Gateway, ERC1967Proxy)")
+    .addParam("address", "deployed contract address")
+    .addOptionalParam("args", "constructor args as JSON array (e.g. '[\"0x...\"]')", "[]", types.string)
+    .addOptionalParam("params", "pre-encoded constructor params hex (no 0x prefix)", "", types.string)
+    .setAction(async (taskArgs, hre) => {
+        const { verify: verifyFn } = require("@mapprotocol/common-contracts/utils/verifier");
+        let constructorArgs: any[] = [];
+        try {
+            constructorArgs = JSON.parse(taskArgs.args);
+        } catch {}
+
+        await verifyFn(hre, {
+            contractName: taskArgs.contract,
+            address: taskArgs.address,
+            constructorArgs: constructorArgs.length > 0 ? constructorArgs : undefined,
+            constructorParams: taskArgs.params || undefined,
+        });
+    });
 
 
 task("upgrade", "upgrade contract")

@@ -108,16 +108,19 @@ contract FusionReceiver is BaseImplementation, IReceiver {
         bytes calldata _payload
     ) external {
         ReceivedStruct memory rs = _assignment(_orderId, _token, _amount, _fromChain, _from, _payload);
+        rs.receiveType = (msg.sender == address(mos)) ? ReceiveType.BUTTER : ReceiveType.TSS;
+        if(gasleft() < MINGASFORSTORE) {
+            _store(rs);
+            return;
+        }
         uint256 gasForCall = gasleft() - MINGASFORSTORE;
         if (msg.sender == address(mos)) {
-           rs.receiveType = ReceiveType.BUTTER;
            try this.forwardToGateway{gas: gasForCall}(rs) {
                 emit TransactionConnect(_orderId, false);
            } catch  {
                 _store(rs);
            }
         } else if (msg.sender == address(gateway)) {
-            rs.receiveType = ReceiveType.TSS;
             try this.forwardToMos{gas: gasForCall}(rs) {
                 emit TransactionConnect(_orderId, true);
             } catch  {

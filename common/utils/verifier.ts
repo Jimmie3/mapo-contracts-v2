@@ -49,7 +49,16 @@ export async function verify(hre: any, opts: VerifyOptions): Promise<void> {
 // ============================================================
 
 async function verifyEvm(hre: any, opts: VerifyOptions): Promise<void> {
-    const contractPath = opts.contractPath || `contracts/${opts.contractName}.sol:${opts.contractName}`;
+    // Resolve contractPath from hardhat artifact (authoritative) instead of guessing
+    let contractPath = opts.contractPath;
+    if (!contractPath) {
+        try {
+            const artifact = await hre.artifacts.readArtifact(opts.contractName);
+            contractPath = `${artifact.sourceName}:${opts.contractName}`;
+        } catch {
+            contractPath = `contracts/${opts.contractName}.sol:${opts.contractName}`;
+        }
+    }
 
     console.log(`verifying ${opts.contractName} at ${opts.address} ...`);
 
@@ -103,9 +112,10 @@ async function verifyTron(hre: any, opts: VerifyOptions): Promise<void> {
         console.log(`using existing flatten: ${flattenPath}`);
     } else {
         console.log(`generating flatten for ${opts.contractName}...`);
+        let sourcePath = "";
         try {
             const artifact = await hre.artifacts.readArtifact(opts.contractName);
-            const sourcePath = artifact.sourceName;
+            sourcePath = artifact.sourceName;
             let flattenedSource = await hre.run("flatten:get-flattened-sources", {
                 files: [sourcePath],
             });
@@ -114,7 +124,8 @@ async function verifyTron(hre: any, opts: VerifyOptions): Promise<void> {
             fs.writeFileSync(flattenPath, flattenedSource);
             console.log(`flatten saved to: ${flattenPath}`);
         } catch (e) {
-            console.log(`flatten failed, generate manually: forge flatten contracts/${opts.contractName}.sol`);
+            const hint = sourcePath || `contracts/${opts.contractName}.sol`;
+            console.log(`flatten failed, generate manually: npx hardhat flatten ${hint} > ${flattenPath}`);
             return;
         }
     }

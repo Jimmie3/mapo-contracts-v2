@@ -8,65 +8,63 @@ import {TSSManager} from "../../contracts/TSSManager.sol";
 
 
 contract DeployAndSetUp is BaseScript {
-     
+
     function run() public virtual broadcast {
           deploy();
           // set();
-    } 
+    }
 
     function deploy() internal returns (Parameters parameters, Maintainers maintainers, TSSManager manager) {
-        string memory networkName = getNetworkName();
-        address authority = readConfigAddr(networkName, "Authority");
+        address authority = readDeployment("Authority");
         console.log("Authority address:", authority);
-        parameters = deployParameters(networkName, authority);
-        maintainers = deployMaintainer(networkName, authority);
-        manager = deployTSSManager(networkName, authority);
+        parameters = deployParameters(authority);
+        maintainers = deployMaintainer(authority);
+        manager = deployTSSManager(authority);
     }
 
     function set() internal {
-        string memory networkName = getNetworkName();
-        setUp(networkName);
-        setUpParameters(networkName);
+        setUp();
+        setUpParameters();
     }
 
-   function deployMaintainer(string memory networkName, address authority) internal returns(Maintainers maintainers) {
-        Maintainers impl = new Maintainers();
+   function deployMaintainer(address authority) internal returns(Maintainers maintainers) {
         bytes memory initData = abi.encodeWithSelector(Maintainers.initialize.selector, authority);
-        address m = deployProxy(address(impl), initData);
+        (address m, address impl) = deployProxy(type(Maintainers).creationCode, initData);
         maintainers = Maintainers(payable(m));
 
         console.log("Maintainers address:", m);
-        saveConfig(networkName, "Maintainers", m);
+        console.log("Maintainers implementation:", impl);
+        saveDeployment("Maintainers", m);
    }
 
-   function deployParameters(string memory networkName, address authority) internal returns(Parameters parameters) {
-        Parameters impl = new Parameters();
+   function deployParameters(address authority) internal returns(Parameters parameters) {
         bytes memory initData = abi.encodeWithSelector(Parameters.initialize.selector, authority);
-        address p = deployProxy(address(impl), initData);
+        (address p, address impl) = deployProxy(type(Parameters).creationCode, initData);
         parameters = Parameters(p);
 
-        console.log("parameters address:", p);
-        saveConfig(networkName, "Parameters", p);
+        console.log("Parameters address:", p);
+        console.log("Parameters implementation:", impl);
+        saveDeployment("Parameters", p);
    }
 
-    function deployTSSManager(string memory networkName, address authority) internal returns(TSSManager manager) {
-        TSSManager impl = new TSSManager();
+    function deployTSSManager(address authority) internal returns(TSSManager manager) {
         bytes memory initData = abi.encodeWithSelector(TSSManager.initialize.selector, authority);
-        address m = deployProxy(address(impl), initData);
+        (address m, address impl) = deployProxy(type(TSSManager).creationCode, initData);
         manager = TSSManager(m);
 
         console.log("TSSManager address:", m);
-        saveConfig(networkName, "TSSManager", m);
+        console.log("TSSManager implementation:", impl);
+        saveDeployment("TSSManager", m);
    }
 
-   function setUp(string memory networkName) internal {
-        address maintainer_addr = readConfigAddr(networkName, "Maintainers");
+   function setUp() internal {
+        address maintainer_addr = readDeployment("Maintainers");
         console.log("Maintainers address:", maintainer_addr);
-        address manager_addr = readConfigAddr(networkName, "TSSManager");
+        address manager_addr = readDeployment("TSSManager");
         console.log("TSSManager address:", manager_addr);
-        address parameters_addr = readConfigAddr(networkName, "Parameters");
+        address parameters_addr = readDeployment("Parameters");
         console.log("Parameters address:", parameters_addr);
-        address relay_addr = readConfigAddr(networkName, "Relay");
+        address relay_addr = readDeployment("Relay");
         console.log("Relay address:", relay_addr);
 
         Maintainers m = Maintainers(payable(maintainer_addr));
@@ -81,8 +79,8 @@ contract DeployAndSetUp is BaseScript {
         uint256 value;
     }
 
-   function setUpParameters(string memory networkName) internal {
-          address parameters_addr = readConfigAddr(networkName, "Parameters");
+   function setUpParameters() internal {
+          address parameters_addr = readDeployment("Parameters");
           Parameters p = Parameters(parameters_addr);
           string memory json = vm.readFile("config/parameters.json");
           bytes memory data = vm.parseJson(json);
@@ -94,29 +92,21 @@ contract DeployAndSetUp is BaseScript {
    }
 
    function upgrade(string memory c) internal {
-          string memory networkName = getNetworkName();
           if(keccak256(bytes(c)) == keccak256(bytes("Parameters"))){
-               address parameters_addr = readConfigAddr(networkName, "Parameters");
-               Parameters p = Parameters(parameters_addr);
-               Parameters impl = new Parameters();
-               p.upgradeToAndCall(address(impl), bytes(""));
+               address parameters_addr = readDeployment("Parameters");
+               deployAndUpgrade(parameters_addr, type(Parameters).creationCode);
           } else if(keccak256(bytes(c)) == keccak256(bytes("Maintainers"))) {
-               address Maintainers_addr = readConfigAddr(networkName, "Maintainers");
-               Maintainers maintainer = Maintainers(payable(Maintainers_addr));
-               Maintainers impl = new Maintainers();
-               maintainer.upgradeToAndCall(address(impl), bytes(""));
+               address maintainers_addr = readDeployment("Maintainers");
+               deployAndUpgrade(maintainers_addr, type(Maintainers).creationCode);
           } else {
-               address manager_addr = readConfigAddr(networkName, "TSSManager");
-               TSSManager manager = TSSManager(manager_addr);
-               TSSManager impl = new TSSManager();
-               manager.upgradeToAndCall(address(impl), bytes(""));
+               address manager_addr = readDeployment("TSSManager");
+               deployAndUpgrade(manager_addr, type(TSSManager).creationCode);
           }
-   } 
+   }
 
    function updateMaintainerLimit(uint256 limit) internal {
-          string memory networkName = getNetworkName();
-          address Maintainers_addr = readConfigAddr(networkName, "Maintainers");
-          Maintainers maintainer = Maintainers(payable(Maintainers_addr));
+          address maintainers_addr = readDeployment("Maintainers");
+          Maintainers maintainer = Maintainers(payable(maintainers_addr));
           maintainer.updateMaintainerLimit(limit);
    }
 }

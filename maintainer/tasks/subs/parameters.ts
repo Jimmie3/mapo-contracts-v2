@@ -1,44 +1,26 @@
-import { task } from "hardhat/config";
-import { Parameters } from "../../typechain-types/contracts/Parameters"
-import { deployProxy, verify, saveDeployment, getDeployment } from "./utils";
+import { task, types } from "hardhat/config";
+import { saveDeployment, getDeployment } from "./utils";
 
 task("Parameters:deploy", "deploy Parameters")
     .addParam("authority", "authority addresss")
+    .addParam("verify", "verify impl after deploy (true/false)", undefined, types.string)
     .setAction(async (taskArgs, hre) => {
-        const { network, ethers } = hre;
-        const [deployer] = await ethers.getSigners();
-        console.log("deployer address:", await deployer.getAddress())
-        let Parameters = await ethers.getContractFactory("Parameters");
-        let p = await(await Parameters.deploy()).waitForDeployment();
-        console.log("impl address: ", await p.getAddress())
-        let addr = await deployProxy(hre, await p.getAddress(), taskArgs.authority)
-        console.log("Parameters deploy to: ", addr);
-        await saveDeployment(network.name, "Parameters", addr);
-        await verify(hre, await p.getAddress(), [], "contracts/Parameters.sol:Parameters")
+        const { network } = hre;
+        const { createDeployer } = require("@mapprotocol/common-contracts/utils/deployer");
+        const deployer = createDeployer(hre, { autoVerify: taskArgs.verify === "true" });
+        let result = await deployer.deployProxy("Parameters", [taskArgs.authority]);
+        console.log("Parameters proxy:", result.proxy);
+        console.log("Parameters impl:", result.implementation);
+        await saveDeployment(network.name, "Parameters", result.proxy);
 });
-
-task("Parameters:upgrade", "upgrade Parameters")
-    .setAction(async (taskArgs, hre) => {
-        const { network, ethers } = hre;
-        const [deployer] = await ethers.getSigners();
-        console.log("deployer address:", await deployer.getAddress())
-        let Parameters = await ethers.getContractFactory("Parameters");
-        let i = await(await Parameters.deploy()).waitForDeployment();
-        console.log("impl address: ", await i.getAddress())
-        let addr = await getDeployment(network.name, "Parameters");
-        let p = await ethers.getContractAt("Parameters", addr, deployer) as Parameters;
-        await(await p.upgradeToAndCall(await i.getAddress(), "0x")).wait();
-        await verify(hre, await i.getAddress(), [], "contracts/Parameters.sol:Parameters")
-});
-
 
 task("Parameters:set", "Parameters set")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
-        const [deployer] = await ethers.getSigners();
+        const [signer] = await ethers.getSigners();
         let addr = await getDeployment(network.name, "Parameters");
         console.log("Parameters:", addr);
-        let p = await ethers.getContractAt("Parameters", addr, deployer);
+        let p = await ethers.getContractAt("Parameters", addr, signer);
         let params = require("../../config/parameters.json")
         for(let index = 0; index < params.length; index++) {
             const element = params[index];
@@ -47,7 +29,3 @@ task("Parameters:set", "Parameters set")
             console.log(await p.get(element.key));
         }
 });
-
-
-
-

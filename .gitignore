@@ -18,6 +18,9 @@ docs/
 # Dotenv file
 .env
 
+# Local examples/scripts
+common/examples/
+
 # Node modules
 node_modules/
 

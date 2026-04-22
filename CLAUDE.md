@@ -55,12 +55,25 @@ For `common/` directory:
 - `npm run build` or `forge build` - Build common contracts
 - `npm run build:hardhat` - Build using Hardhat and generate TypeChain types
 - `npm run test` or `forge test` - Run tests for common contracts
-- `npm run test:hardhat` - Run Hardhat tests
 - `forge fmt` or `npm run format` - Format Solidity code
 - `npm run clean` - Clean all build artifacts
-- `npm run compile` - Compile and generate TypeScript types
 - `npm run prepublishOnly` - Prepare for npm publish (clean, build, typecheck)
 - `npm publish` - Publish to npm registry as @mapprotocol/common-contracts
+
+### Common Deployment Commands (via Makefile in common/)
+- `make deploy-authority CHAIN=Bsc` - Deploy AuthorityManager (direct)
+- `make deploy-authority-factory CHAIN=Bsc SALT=mapo_authority` - Deploy via CREATE2 factory
+- `make deploy-authority CHAIN=Mapo` - Deploy with blockscout verification
+- Tron deployment: `npx hardhat auth:deploy --network Tron`
+
+### Common Authority Management (Hardhat tasks in common/)
+- `npx hardhat auth:deploy --network Tron` - Deploy AuthorityManager (Tron only)
+- `npx hardhat auth:grant --account <addr> --role admin --network <chain>` - Grant role
+- `npx hardhat auth:revoke --account <addr> --role admin --network <chain>` - Revoke role
+- `npx hardhat auth:getMember --role admin --network <chain>` - List role members
+- `npx hardhat auth:setTarget --target <addr> --funcs <selectors> --role admin --network <chain>` - Set function permissions
+- `npx hardhat auth:setAuth --target <addr> --addr <new_auth> --network <chain>` - Update authority
+- `npx hardhat auth:closeTarget --target <addr> --close true --network <chain>` - Close/open target
 
 ## Architecture Overview
 
@@ -165,6 +178,27 @@ abstract contract MyContract is BaseImplementation {
 - **AuthorityManager**: Flexible authority and role management
 - **TypeScript Support**: Full TypeChain generated types for type-safe development
 - **Dual Toolchain**: Works with both Foundry and Hardhat
+- **Shared Utils**: TypeScript utilities for deployment, Tron interaction, and address encoding
+
+### Import Utils in TypeScript
+```typescript
+import { getDeploymentByKey, saveDeployment } from "@mapprotocol/common-contracts/utils/deployRecord";
+import { TronClient, tronToHex, tronFromHex } from "@mapprotocol/common-contracts/utils/tronHelper";
+import { addressToHex, isTronAddress } from "@mapprotocol/common-contracts/utils/addressCodec";
+```
+
+### Forge Script Base (published in npm)
+```solidity
+import {BaseScript} from "@mapprotocol/common-contracts/script/base/Base.s.sol";
+
+contract MyDeploy is BaseScript {
+    function run() public broadcast {
+        // deployByFactory(salt, creationCode, args) — CREATE2 deterministic deploy
+        // upgradeProxy(proxy, newImpl) — UUPS upgrade
+        // deployAndUpgrade(proxy, creationCode) — deploy + upgrade in one step
+    }
+}
+```
 
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
@@ -194,7 +228,7 @@ This repository contains the on-chain components: relay chain core contracts (pr
 - Solidity 0.8.24 - Smart contracts in `common/` module
 - Solidity ^0.8.20 - Base contracts and interfaces (pragma range)
 - TypeScript ^5.0 - Deployment scripts, Hardhat tasks, configuration
-- JavaScript (CommonJS) - TronWeb integration (`protocol/tasks/utils/tronUtil.ts`)
+- JavaScript (CommonJS) - TronWeb integration (`common/utils/tronHelper.ts`)
 ## Runtime
 - Node.js >=18.0.0 (inferred from `@types/node` versions)
 - Foundry/Forge (Rust-based Solidity toolchain, primary)
@@ -220,7 +254,7 @@ This repository contains the on-chain components: relay chain core contracts (pr
 ### Production
 - `@openzeppelin/contracts` 5.4.0 - Standard contract library (ERC20, ECDSA, ERC1967, AccessManager)
 - `@openzeppelin/contracts-upgradeable` 5.4.0 - Upgradeable patterns (UUPSUpgradeable, PausableUpgradeable, AccessManagedUpgradeable)
-- `@mapprotocol/common-contracts` ^0.1.1 - Shared base contracts (published npm package)
+- `@mapprotocol/common-contracts` ^0.4.1 - Shared base contracts + utils + forge script base (published npm package)
 - forge-std - Testing utilities, Script base, console logging (`lib/forge-std/`)
 ### Development
 - `@nomicfoundation/hardhat-toolbox` ^4.0.0
@@ -242,12 +276,14 @@ This repository contains the on-chain components: relay chain core contracts (pr
 - `.env.example` files present in all three modules
 - `PRIVATE_KEY` - Mainnet deployer key
 - `TESTNET_PRIVATE_KEY` - Testnet deployer key
-- `ETHERSCAN_API_KEY` - Contract verification
 - `TRON_PRIVATE_KEY` - Tron network deployment
 - `TRON_RPC_URL` - Tron RPC endpoint
+- `ETHERSCAN_API_KEY` - Contract verification
 - `GATEWAY_SALT` - CREATE2 deployment salt
-- `NETWORK_SUFFIX` - Distinguishes "main" vs "prod" deployments
-- `protocol/deployments/deploy.json` - Deployed contract addresses per network
+- `NETWORK_ENV` - **Required.** Deployment environment: `test`, `prod`, or `main`. No default — must be set in .env
+  - Determines deploy.json key: `NETWORK_ENV=prod` + network `Bsc` → `prod.Bsc`
+  - Determines config directory: `test` → `configs/testnet/`, `prod` → `configs/prod/`, `main` → `configs/mainnet/`
+- `protocol/deployments/deploy.json` - Deployed contract addresses (nested: `{ env: { chain: { key: addr } } }`)
 - `protocol/configs/prod/` - Production chain and token configurations
 - `protocol/configs/mainnet/` - Mainnet configurations
 - `protocol/configs/testnet/` - Testnet configurations

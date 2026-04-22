@@ -1,29 +1,28 @@
 import { task } from "hardhat/config";
-import { getDeploymentByKey, verify, saveDeployment } from "../utils/utils"
+import { getDeploymentByKey, saveDeployment } from "../utils/utils"
 import { FusionReceiver } from "../../typechain-types/contracts/len/FusionReceiver.sol";
 
 
 task("FusionReceiver:deploy", "deploy FusionReceiver")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
-        const [deployer] = await ethers.getSigners();
-        console.log("deployer address:", await deployer.getAddress())
-        const FusionReceiverFactory = await ethers.getContractFactory("FusionReceiver");
+        const { createDeployer } = require("@mapprotocol/common-contracts/utils/deployer");
+
         let authority = await getDeploymentByKey(network.name, "Authority");
         if(!authority || authority.length == 0) throw("authority not deploy");
         let relay = await getDeploymentByKey(network.name, "Relay");
         if(!relay || relay.length == 0) throw("relay not deploy");
-        let impl = await(await FusionReceiverFactory.deploy()).waitForDeployment();
-        let init_data = FusionReceiverFactory.interface.encodeFunctionData("initialize", [authority]);
-        let ContractProxy = await ethers.getContractFactory("ERC1967Proxy");
-        let c = await (await ContractProxy.deploy(impl, init_data)).waitForDeployment();
-        console.log("FusionReceiver deploy to :", await c.getAddress());
-        let f = FusionReceiverFactory.attach(await c.getAddress()) as FusionReceiver;
-        await saveDeployment(network.name, "FusionReceiver", await c.getAddress());
+
+        const deployer = createDeployer(hre, { autoVerify: true });
+        let result = await deployer.deployProxy("FusionReceiver", [authority]);
+        console.log("FusionReceiver proxy:", result.proxy);
+        console.log("FusionReceiver impl:", result.implementation);
+        await saveDeployment(network.name, "FusionReceiver", result.proxy);
+
+        const FusionReceiverFactory = await ethers.getContractFactory("FusionReceiver");
+        let f = FusionReceiverFactory.attach(result.proxy) as FusionReceiver;
         let mos = "0x0000317Bec33Af037b5fAb2028f52d14658F6A56";
         await (await f.set(mos, relay)).wait();
-      // await verify(hre, await c.getAddress(), [await impl.getAddress(), init_data], "contracts/ERC1967Proxy.sol:ERC1967Proxy");
-       await verify(hre, await impl.getAddress(), [], "contracts/len/FusionReceiver.sol:FusionReceiver");
 });
 
 
@@ -35,7 +34,7 @@ task("FusionReceiver:emergencyWithdraw", "emergencyWithdraw")
         const { network, ethers } = hre;
         const [deployer] = await ethers.getSigners();
         console.log("deployer address:", await deployer.getAddress())
-        let addr = "0xFe6Fc65c1B47be20bD776db55a412dF7520438F3"
+        let addr = await getDeploymentByKey(network.name, "FusionReceiver");
         const FusionReceiverFactory = await ethers.getContractFactory("FusionReceiver");
         const r = FusionReceiverFactory.attach(addr) as FusionReceiver;
         // Set receiver address (default to sender)
@@ -57,7 +56,7 @@ task("FusionReceiver:retry", "retry")
         const { network, ethers } = hre;
         const [deployer] = await ethers.getSigners();
         console.log("deployer address:", await deployer.getAddress())
-        let addr = "0xFe6Fc65c1B47be20bD776db55a412dF7520438F3"
+        let addr = await getDeploymentByKey(network.name, "FusionReceiver");
         const FusionReceiverFactory = await ethers.getContractFactory("FusionReceiver");
         const r = FusionReceiverFactory.attach(addr) as FusionReceiver;
         await(
@@ -75,50 +74,47 @@ task("FusionReceiver:retry", "retry")
 });
 
 
-task("FusionReceiver:retryWithHash", "retry")
+task("FusionReceiver:retryWithHash", "retry a failed FusionReceiver store by tx hash")
     .addParam("hash", "failed transaction hash")
     .setAction(async (taskArgs, hre) => {
         const { network, ethers } = hre;
         const [deployer] = await ethers.getSigners();
-        console.log("deployer address:", await deployer.getAddress())
-        let addr = "0xFe6Fc65c1B47be20bD776db55a412dF7520438F3"
+        console.log("deployer address:", await deployer.getAddress());
+
+        let addr = await getDeploymentByKey(network.name, "FusionReceiver");
         const FusionReceiverFactory = await ethers.getContractFactory("FusionReceiver");
         const r = FusionReceiverFactory.attach(addr) as FusionReceiver;
-        let provide = deployer.provider;
-        let receipt = await provide.getTransactionReceipt(taskArgs.hash);
-        if(!receipt) throw("no receipts")
-        let logs = receipt.logs;
-        for (let index = 0; index < logs.length; index++) {
-        const log = logs[index];
-        if(log.address === addr) {
-            let e = FusionReceiverFactory.interface.parseLog(log);
-            if(!e) continue;
-            if(e.name === "FailedStore") {
-                let source = e.args[0].toString();
-                let order = e.args[1];
-                let token = e.args[2];
-                let amount = e.args[3].toString();
-                let chain = e.args[4].toString();
-                let from = e.args[5];
-                let payload = e.args[7];
-                await(
-                        await r.retry(
-                            source, 
-                            order, 
-                            token, 
-                            amount, 
-                            chain, 
-                            from, 
-                            payload
-                        )
-                ).wait();
-                console.log("...........done...........");
-                break;
-            } else {
-                console.log("no FailedStore event found in transaction logs");
-            }
-        }
 
-    }
-    
+        let receipt = await deployer.provider.getTransactionReceipt(taskArgs.hash);
+        if (!receipt) throw new Error("no receipt for tx: " + taskArgs.hash);
+
+        const addrLower = addr.toLowerCase();
+        let retried = false;
+        for (const log of receipt.logs) {
+            if (log.address.toLowerCase() !== addrLower) continue;
+            let e;
+            try {
+                e = FusionReceiverFactory.interface.parseLog(log);
+            } catch {
+                continue;
+            }
+            if (!e || e.name !== "FailedStore") continue;
+
+            // FailedStore(receiveType, orderId, token, amount, fromChain, from, payload)
+            const [source, order, token, amount, chain, from, payload] = e.args;
+            console.log("retrying FailedStore:", {
+                source: source.toString(),
+                order,
+                token,
+                amount: amount.toString(),
+                chain: chain.toString(),
+                from,
+                payload,
+            });
+            await (await r.retry(source, order, token, amount, chain, from, payload)).wait();
+            console.log("...........done...........");
+            retried = true;
+            break;
+        }
+        if (!retried) throw new Error("no FailedStore event found in tx logs");
 });

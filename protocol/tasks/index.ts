@@ -39,33 +39,15 @@ task("verify-contract", "verify a deployed contract on block explorer")
 
 task("upgrade", "upgrade contract")
   .addParam("contract", "contract name")
+  .addParam("verify", "verify new impl after upgrade (true/false)", undefined, types.string)
   .setAction(async (taskArgs, hre) => {
-      const { network, ethers } = hre;
-      let [wallet] = await ethers.getSigners();
-      console.log("wallet address is: ", await wallet.getAddress());
-      const ContractFactory = await ethers.getContractFactory(taskArgs.contract);
+      const { network } = hre;
+      const { createDeployer } = require("@mapprotocol/common-contracts/utils/deployer");
       let addr = await getDeploymentByKey(network.name, taskArgs.contract);
       if(!addr || addr.length === 0) throw("contract not deploy");
-      // cast to any so TypeScript allows calling deploy on the generated factory
-      let impl = await (await (ContractFactory as any).deploy()).waitForDeployment();
-
-      let c = await ethers.getContractAt("BaseImplementation", addr, wallet);
-      console.log(`pre impl `, await c.getImplementation());
-      await(await c.upgradeToAndCall(await impl.getAddress(), "0x")).wait();
-      console.log(`after impl `, await c.getImplementation());
-      let code;
-      if(
-         taskArgs.contract === 'FlashSwapManager' || 
-         taskArgs.contract === 'ViewController' || 
-         taskArgs.contract === 'FusionQuoter' ||
-         taskArgs.contract === 'FusionReceiver' ||
-         taskArgs.contract === 'Configuration'
-      ){
-         code = `contracts/len/${taskArgs.contract}.sol:${taskArgs.contract}`
-      } else {
-         code = `contracts/${taskArgs.contract}.sol:${taskArgs.contract}` 
-      }
-      await verify(hre, await impl.getAddress(), [], code);
+      const deployer = createDeployer(hre, { autoVerify: taskArgs.verify === "true" });
+      let result = await deployer.upgrade(taskArgs.contract, addr);
+      console.log(`${taskArgs.contract} upgraded, new impl:`, result.address);
   })
 
 // ============================================================

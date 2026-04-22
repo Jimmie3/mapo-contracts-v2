@@ -104,6 +104,7 @@
 			"ViewController": "0x8c98bA0a11Cbb0DB3C52e4CD91B0844B39BC1F11",
 			"ProtocolFee": "0xc9041777D421b5fcB272f7Cd8C66757246F1f9F1",
 			"wToken": "0x13cb04d4a5dfb6398fc5ab005a6c84337256ee23",
+			"FusionReceiver": "0xFe6Fc65c1B47be20bD776db55a412dF7520438F3",
 			"Configuration": ""
 		},
 		"Eth": {

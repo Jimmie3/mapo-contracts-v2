@@ -318,28 +318,45 @@ async function registerChain(network: string, registry: Registry, chainToken: {
         baseFeeToken:string,
         tokens: any[]}, dryRun: boolean = false) {
 
-        let chainType = (chainToken.chainType === "contract") ? 0 : 1;
+        const chainType = (chainToken.chainType === "contract") ? 0 : 1;
+        const router = await getRouter(network);
+        const chainId = chainToken.chainId;
+        const doRegister = async () => {
+            await (await registry.registerChain(
+                chainId, chainType, router, chainToken.gasToken, chainToken.baseFeeToken, network
+            )).wait();
+        };
 
-        let isRegistered = await registry.isRegistered(chainToken.chainId);
-        if (isRegistered) {
-            console.log(`[skip] chain ${chainToken.chainId} (${network}) already registered`);
+        if (!(await registry.isRegistered(chainId))) {
+            console.log(
+                `[new]  registerChain ${network} chain(${chainId}), chainType(${chainType}), router(${router}), gasToken(${chainToken.gasToken}), baseFeeToken(${chainToken.baseFeeToken})`
+            );
+            if (!dryRun) await doRegister();
             return;
         }
 
-        let router = await getRouter(network);
-        console.log(
-            `[new]  registerChain ${network} chain(${chainToken.chainId}), chainType(${chainType}), router(${router}), gasToken(${chainToken.gasToken}), baseFeeToken(${chainToken.baseFeeToken})`
-        );
-        if (!dryRun) {
-            await(await registry.registerChain(
-                chainToken.chainId,
-                chainType,
-                router,
-                chainToken.gasToken,
-                chainToken.baseFeeToken,
-                network
-            )).wait()
+        // Already registered — compare each on-chain field with config
+        const [onType, onRouter, onGas, onBase, onName] = await Promise.all([
+            registry.getChainType(chainId),
+            registry.getChainRouters(chainId),
+            registry.getChainGasToken(chainId),
+            registry.getChainBaseToken(chainId),
+            registry.getChainName(chainId),
+        ]);
+
+        const diffs: string[] = [];
+        if (Number(onType) !== chainType) diffs.push(`chainType: ${onType} -> ${chainType}`);
+        if (onRouter.toLowerCase() !== router.toLowerCase()) diffs.push(`router: ${onRouter} -> ${router}`);
+        if (onGas.toLowerCase() !== chainToken.gasToken.toLowerCase()) diffs.push(`gasToken: ${onGas} -> ${chainToken.gasToken}`);
+        if (onBase.toLowerCase() !== chainToken.baseFeeToken.toLowerCase()) diffs.push(`baseFeeToken: ${onBase} -> ${chainToken.baseFeeToken}`);
+        if (onName !== network) diffs.push(`name: "${onName}" -> "${network}"`);
+
+        if (diffs.length === 0) {
+            console.log(`[skip] chain ${chainId} (${network}) already registered, all fields up-to-date`);
+            return;
         }
+        console.log(`[diff] chain ${chainId} (${network}): ${diffs.join(", ")}`);
+        if (!dryRun) await doRegister();
 }
 
 async function getRouter(network:string) {
@@ -350,8 +367,9 @@ async function getRouter(network:string) {
             try {
                 router = await getDeploymentByKey(network, "Gateway");
             } catch (error) {
-                router = "0x";
+                return "0x";
             }
         }
-        return router;
+        // Convert to hex bytes — handles EVM (passthrough), Tron (base58 → hex), Solana (base58 → hex)
+        return addressToHex(router);
 }
